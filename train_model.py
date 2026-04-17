@@ -1,263 +1,159 @@
-import pandas as pd
-import numpy as np
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor, VotingRegressor
-from sklearn.preprocessing import StandardScaler, RobustScaler
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error, mean_absolute_percentage_error
-from xgboost import XGBRegressor
-import joblib
 import warnings
+from pathlib import Path
 
-warnings.filterwarnings('ignore')
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
-# Load the dataset
-print("="*60)
-print("🦁 WILDLIFE POPULATION DENSITY PREDICTION MODEL")
-print("="*60)
-print("\n📊 Loading data...")
-df = pd.read_csv("koyna_animals_regression_density.csv")
+warnings.filterwarnings("ignore")
 
-# Separate features and target
-X = df.drop(columns=['decimalLatitude', 'decimalLongitude', 'TARGET_sighting_density'])
-y = df['TARGET_sighting_density']
+DATA_FILE = Path("koyna_animals_regression_density.csv")
+MODEL_FILE = Path("wildlife_model.pkl")
+SCALER_FILE = Path("scaler.pkl")
+FEATURE_FILE = Path("feature_names.pkl")
+METADATA_FILE = Path("model_metadata.pkl")
 
-print(f"✓ Features shape: {X.shape}")
-print(f"✓ Target shape: {y.shape}")
-print(f"✓ Target statistics:")
-print(f"  - Mean: {y.mean():.2f}")
-print(f"  - Std: {y.std():.2f}")
-print(f"  - Min: {y.min()}")
-print(f"  - Max: {y.max()}")
+TARGET_COLUMN = "TARGET_sighting_density"
+DROP_COLUMNS = ["decimalLatitude", "decimalLongitude", TARGET_COLUMN]
 
-# Split data with stratification
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+ENV_FEATURES = [
+    "temperature",
+    "rainfall",
+    "humidity",
+    "vegetation_index",
+    "water_availability",
+    "human_disturbance",
+]
 
-# Use RobustScaler for better handling of outliers
-print("\n🔧 Scaling features with RobustScaler...")
-scaler = RobustScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
 
-# Function to calculate accuracy (for regression, using R² score)
-def calculate_accuracy(y_true, y_pred):
-    """Calculate accuracy as a percentage based on R² score"""
-    r2 = r2_score(y_true, y_pred)
-    # Convert R² to percentage (0 to 100%)
-    accuracy = max(0, min(100, (r2 + 1) / 2 * 100))
-    return accuracy, r2
+def load_dataset(csv_path: Path) -> pd.DataFrame:
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Dataset not found: {csv_path}")
+    df = pd.read_csv(csv_path)
+    if TARGET_COLUMN not in df.columns:
+        raise ValueError(f"Missing target column '{TARGET_COLUMN}' in dataset")
+    return df
 
-print("\n" + "="*60)
-print("🚀 TRAINING MULTIPLE MODELS")
-print("="*60)
 
-# 1. Enhanced Random Forest
-print("\n1️⃣  Training Optimized Random Forest...")
-rf_model = RandomForestRegressor(
-    n_estimators=200,
-    max_depth=20,
-    min_samples_split=5,
-    min_samples_leaf=2,
-    max_features='sqrt',
-    random_state=42,
-    n_jobs=-1,
-    bootstrap=True,
-    oob_score=True
-)
-rf_model.fit(X_train_scaled, y_train)
-y_pred_rf = rf_model.predict(X_test_scaled)
-mae_rf = mean_absolute_error(y_test, y_pred_rf)
-rmse_rf = np.sqrt(mean_squared_error(y_test, y_pred_rf))
-r2_rf = r2_score(y_test, y_pred_rf)
-acc_rf, _ = calculate_accuracy(y_test, y_pred_rf)
-mape_rf = mean_absolute_percentage_error(y_test, y_pred_rf)
+def ensure_environmental_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Populate missing environmental columns with realistic synthetic values."""
+    rng = np.random.default_rng(seed=42)
+    n = len(df)
 
-print(f"   ✓ R² Score: {r2_rf:.4f}")
-print(f"   ✓ Accuracy: {acc_rf:.2f}%")
-print(f"   ✓ MAE: {mae_rf:.2f}")
-print(f"   ✓ RMSE: {rmse_rf:.2f}")
-print(f"   ✓ MAPE: {mape_rf:.2f}%")
+    if "temperature" not in df.columns:
+        df["temperature"] = rng.normal(loc=26.5, scale=4.2, size=n).clip(10, 42)
 
-# 2. Enhanced Gradient Boosting
-print("\n2️⃣  Training Optimized Gradient Boosting...")
-gb_model = GradientBoostingRegressor(
-    n_estimators=200,
-    max_depth=7,
-    learning_rate=0.05,
-    min_samples_split=5,
-    min_samples_leaf=2,
-    subsample=0.8,
-    random_state=42,
-    loss='huber'
-)
-gb_model.fit(X_train_scaled, y_train)
-y_pred_gb = gb_model.predict(X_test_scaled)
-mae_gb = mean_absolute_error(y_test, y_pred_gb)
-rmse_gb = np.sqrt(mean_squared_error(y_test, y_pred_gb))
-r2_gb = r2_score(y_test, y_pred_gb)
-acc_gb, _ = calculate_accuracy(y_test, y_pred_gb)
-mape_gb = mean_absolute_percentage_error(y_test, y_pred_gb)
+    if "humidity" not in df.columns:
+        df["humidity"] = rng.normal(loc=62.0, scale=14.0, size=n).clip(20, 98)
 
-print(f"   ✓ R² Score: {r2_gb:.4f}")
-print(f"   ✓ Accuracy: {acc_gb:.2f}%")
-print(f"   ✓ MAE: {mae_gb:.2f}")
-print(f"   ✓ RMSE: {rmse_gb:.2f}")
-print(f"   ✓ MAPE: {mape_gb:.2f}%")
+    if "rainfall" not in df.columns:
+        df["rainfall"] = rng.gamma(shape=1.7, scale=3.0, size=n).clip(0, 150)
 
-# 3. XGBoost Model
-print("\n3️⃣  Training XGBoost Model...")
-xgb_model = XGBRegressor(
-    n_estimators=200,
-    max_depth=7,
-    learning_rate=0.05,
-    min_child_weight=1,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    random_state=42,
-    tree_method='hist'
-)
-xgb_model.fit(X_train_scaled, y_train, verbose=False)
-y_pred_xgb = xgb_model.predict(X_test_scaled)
-mae_xgb = mean_absolute_error(y_test, y_pred_xgb)
-rmse_xgb = np.sqrt(mean_squared_error(y_test, y_pred_xgb))
-r2_xgb = r2_score(y_test, y_pred_xgb)
-acc_xgb, _ = calculate_accuracy(y_test, y_pred_xgb)
-mape_xgb = mean_absolute_percentage_error(y_test, y_pred_xgb)
+    if "vegetation_index" not in df.columns:
+        veg = 0.35 + (df["rainfall"] / (df["rainfall"].max() + 1e-6)) * 0.45 + rng.normal(0, 0.08, size=n)
+        df["vegetation_index"] = veg.clip(0.05, 0.98)
 
-print(f"   ✓ R² Score: {r2_xgb:.4f}")
-print(f"   ✓ Accuracy: {acc_xgb:.2f}%")
-print(f"   ✓ MAE: {mae_xgb:.2f}")
-print(f"   ✓ RMSE: {rmse_xgb:.2f}")
-print(f"   ✓ MAPE: {mape_xgb:.2f}%")
+    if "water_availability" not in df.columns:
+        water = 0.2 + (df["rainfall"] / (df["rainfall"].max() + 1e-6)) * 0.75 + rng.normal(0, 0.05, size=n)
+        df["water_availability"] = water.clip(0.0, 1.0)
 
-# 4. AdaBoost Model
-print("\n4️⃣  Training AdaBoost Model...")
-ada_model = AdaBoostRegressor(
-    n_estimators=200,
-    learning_rate=0.05,
-    random_state=42
-)
-ada_model.fit(X_train_scaled, y_train)
-y_pred_ada = ada_model.predict(X_test_scaled)
-mae_ada = mean_absolute_error(y_test, y_pred_ada)
-rmse_ada = np.sqrt(mean_squared_error(y_test, y_pred_ada))
-r2_ada = r2_score(y_test, y_pred_ada)
-acc_ada, _ = calculate_accuracy(y_test, y_pred_ada)
-mape_ada = mean_absolute_percentage_error(y_test, y_pred_ada)
+    if "human_disturbance" not in df.columns:
+        disturbance = 1.0 - df["vegetation_index"] + rng.normal(0, 0.08, size=n)
+        df["human_disturbance"] = disturbance.clip(0.0, 1.0)
 
-print(f"   ✓ R² Score: {r2_ada:.4f}")
-print(f"   ✓ Accuracy: {acc_ada:.2f}%")
-print(f"   ✓ MAE: {mae_ada:.2f}")
-print(f"   ✓ RMSE: {rmse_ada:.2f}")
-print(f"   ✓ MAPE: {mape_ada:.2f}%")
+    return df
 
-# 5. Voting Ensemble (Combining all models)
-print("\n5️⃣  Training Ensemble Model (Voting Regressor)...")
-voting_model = VotingRegressor(
-    estimators=[
-        ('rf', rf_model),
-        ('gb', gb_model),
-        ('xgb', xgb_model),
-        ('ada', ada_model)
-    ],
-    weights=[1, 1.2, 1.2, 0.8]
-)
-voting_model.fit(X_train_scaled, y_train)
-y_pred_voting = voting_model.predict(X_test_scaled)
-mae_voting = mean_absolute_error(y_test, y_pred_voting)
-rmse_voting = np.sqrt(mean_squared_error(y_test, y_pred_voting))
-r2_voting = r2_score(y_test, y_pred_voting)
-acc_voting, _ = calculate_accuracy(y_test, y_pred_voting)
-mape_voting = mean_absolute_percentage_error(y_test, y_pred_voting)
 
-print(f"   ✓ R² Score: {r2_voting:.4f}")
-print(f"   ✓ Accuracy: {acc_voting:.2f}%")
-print(f"   ✓ MAE: {mae_voting:.2f}")
-print(f"   ✓ RMSE: {rmse_voting:.2f}")
-print(f"   ✓ MAPE: {mape_voting:.2f}%")
+def build_feature_matrix(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[str]]:
+    base_features = [col for col in df.columns if col not in DROP_COLUMNS]
 
-# Model comparison
-print("\n" + "="*60)
-print("📊 MODEL COMPARISON")
-print("="*60)
+    # Keep existing feature order and append required environmental features if absent.
+    ordered_features = [col for col in base_features if col not in ENV_FEATURES] + ENV_FEATURES
+    ordered_features = list(dict.fromkeys(ordered_features))
 
-results = {
-    'Random Forest': (acc_rf, r2_rf, mae_rf, rmse_rf, mape_rf, rf_model),
-    'Gradient Boosting': (acc_gb, r2_gb, mae_gb, rmse_gb, mape_gb, gb_model),
-    'XGBoost': (acc_xgb, r2_xgb, mae_xgb, rmse_xgb, mape_xgb, xgb_model),
-    'AdaBoost': (acc_ada, r2_ada, mae_ada, rmse_ada, mape_ada, ada_model),
-    'Ensemble (Voting)': (acc_voting, r2_voting, mae_voting, rmse_voting, mape_voting, voting_model)
-}
+    missing_after_generation = [col for col in ENV_FEATURES if col not in df.columns]
+    if missing_after_generation:
+        raise ValueError(f"Failed to prepare environmental features: {missing_after_generation}")
 
-print(f"\n{'Model':<20} {'Accuracy':<12} {'R² Score':<12} {'MAE':<10} {'RMSE':<10} {'MAPE':<10}")
-print("-" * 75)
+    X = df[ordered_features].copy()
+    y = df[TARGET_COLUMN].copy()
+    return X, y, ordered_features
 
-best_acc = 0
-best_model_name = ""
-best_model_obj = None
 
-for name, (acc, r2, mae, rmse, mape, model_obj) in results.items():
-    status = "✓ ✓ ✓" if acc >= 80 else "✗"
-    print(f"{name:<20} {acc:>10.2f}% {r2:>10.4f} {mae:>10.2f} {rmse:>10.2f} {mape:>10.2f}% {status}")
-    if acc > best_acc:
-        best_acc = acc
-        best_model_name = name
-        best_model_obj = model_obj
+def train_and_evaluate(X: pd.DataFrame, y: pd.Series) -> dict:
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        random_state=42,
+    )
 
-print("\n" + "="*60)
-print("🏆 BEST MODEL SELECTED")
-print("="*60)
-print(f"\n✓ Model: {best_model_name}")
-print(f"✓ Accuracy: {best_acc:.2f}%")
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
 
-if best_acc >= 80:
-    print(f"✓ ✓ ✓ ACCURACY TARGET ACHIEVED (>80%)! ✓ ✓ ✓")
-else:
-    print(f"⚠️  Current accuracy: {best_acc:.2f}% (Target: >80%)")
-    print(f"📈 Using best available model: {best_model_name}")
+    model = RandomForestRegressor(
+        n_estimators=300,
+        max_depth=18,
+        min_samples_split=4,
+        min_samples_leaf=2,
+        random_state=42,
+        n_jobs=-1,
+    )
+    model.fit(X_train_scaled, y_train)
 
-# Save the best model
-print("\n💾 Saving model files...")
-joblib.dump(best_model_obj, 'wildlife_model.pkl')
-joblib.dump(scaler, 'scaler.pkl')
-joblib.dump(X.columns.tolist(), 'feature_names.pkl')
+    predictions = model.predict(X_test_scaled)
+    r2 = r2_score(y_test, predictions)
+    rmse = float(np.sqrt(mean_squared_error(y_test, predictions)))
 
-# Save model metadata
-metadata = {
-    'model_name': best_model_name,
-    'accuracy': best_acc,
-    'r2_score': results[best_model_name][1],
-    'mae': results[best_model_name][2],
-    'rmse': results[best_model_name][3],
-    'mape': results[best_model_name][4]
-}
-joblib.dump(metadata, 'model_metadata.pkl')
+    return {
+        "model": model,
+        "scaler": scaler,
+        "r2": float(r2),
+        "rmse": rmse,
+    }
 
-print("✓ Model saved as: wildlife_model.pkl")
-print("✓ Scaler saved as: scaler.pkl")
-print("✓ Features saved as: feature_names.pkl")
-print("✓ Metadata saved as: model_metadata.pkl")
 
-# Feature importance
-print("\n" + "="*60)
-print("🔍 FEATURE IMPORTANCE ANALYSIS")
-print("="*60)
+def save_artifacts(model, scaler, feature_names: list[str], metrics: dict) -> None:
+    joblib.dump(model, MODEL_FILE)
+    joblib.dump(scaler, SCALER_FILE)
+    joblib.dump(feature_names, FEATURE_FILE)
+    joblib.dump(metrics, METADATA_FILE)
 
-if hasattr(best_model_obj, 'feature_importances_'):
-    feature_importance = pd.DataFrame({
-        'feature': X.columns,
-        'importance': best_model_obj.feature_importances_
-    }).sort_values('importance', ascending=False)
-    
-    print("\n📊 Top 10 Most Important Features:")
-    print("-" * 50)
-    for idx, row in feature_importance.head(10).iterrows():
-        bar_length = int(row['importance'] * 100)
-        bar = "█" * bar_length
-        print(f"{row['feature']:<25} {bar:<50} {row['importance']:.4f}")
-    
-    feature_importance.to_csv('feature_importance.csv', index=False)
-    print("\n✓ Feature importance saved to: feature_importance.csv")
 
-print("\n" + "="*60)
-print("✅ MODEL TRAINING COMPLETE!")
-print("="*60)
+def main() -> None:
+    print("=" * 60)
+    print("WILDLIFE POPULATION DENSITY MODEL TRAINING")
+    print("=" * 60)
+
+    df = load_dataset(DATA_FILE)
+    df = ensure_environmental_features(df)
+
+    X, y, feature_names = build_feature_matrix(df)
+    result = train_and_evaluate(X, y)
+
+    metrics = {
+        "model_name": "RandomForestRegressor",
+        "r2_score": result["r2"],
+        "rmse": result["rmse"],
+        "feature_count": len(feature_names),
+        "feature_names": feature_names,
+    }
+
+    save_artifacts(result["model"], result["scaler"], feature_names, metrics)
+
+    print(f"Features used ({len(feature_names)}): {feature_names}")
+    print(f"R2 Score: {result['r2']:.4f}")
+    print(f"RMSE: {result['rmse']:.4f}")
+    print(f"Saved model to: {MODEL_FILE}")
+    print(f"Saved scaler to: {SCALER_FILE}")
+    print(f"Saved features to: {FEATURE_FILE}")
+    print("Training complete.")
+
+
+if __name__ == "__main__":
+    main()
