@@ -96,6 +96,23 @@
         .form-group {
             display: flex;
             flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .slider {
+            width: 100%;
+        }
+
+        .validation-msg {
+            font-size: 0.8em;
+            color: #c0392b;
+            min-height: 1em;
         }
 
         label {
@@ -413,7 +430,6 @@
             <p>Estimate how many animals you'll find in a protected region</p>
             <div class="nav-links">
                 <a href="/" class="nav-link">← Back to Home</a>
-                <a href="/predict/animals/result/" class="nav-link">📄 Open Full Animals Report</a>
             </div>
         </div>
 
@@ -473,6 +489,8 @@
     <script>
         let features = [];
         let featureRanges = {};
+        const dropdownFeatures = ['phylum_enc', 'class_enc', 'order_enc', 'family_enc', 'taxonRank_enc', 'basisOfRecord_enc', 'season_enc'];
+        const sliderFeatures = ['coordinateUncertaintyInMeters', 'lat_grid', 'lon_grid', 'species_richness'];
 
         const fieldDescriptions = {
             // These keys match exactly what `/features/animals/` returns.
@@ -563,14 +581,71 @@
                         </span>
                     `;
 
-                    const input = document.createElement('input');
-                    input.type = 'number';
-                    input.name = feature;
-                    input.step = '0.1';
-                    input.min = ranges.min;
-                    input.max = ranges.max;
-                    input.value = Math.round(ranges.mean * 10) / 10;
-                    input.required = true;
+                    const inputWrap = document.createElement('div');
+                    inputWrap.className = 'input-row';
+
+                    let primaryInput;
+                    if (dropdownFeatures.includes(feature)) {
+                        const span = Math.round(ranges.max - ranges.min);
+                        if (span > 0 && span <= 25) {
+                            const select = document.createElement('select');
+                            select.name = feature;
+                            select.required = true;
+                            select.style.padding = '12px';
+                            select.style.border = '2px solid #A9DFBF';
+                            select.style.borderRadius = '8px';
+                            select.style.background = '#F0FDF4';
+                            for (let val = Math.round(ranges.min); val <= Math.round(ranges.max); val++) {
+                                const opt = document.createElement('option');
+                                opt.value = val;
+                                opt.textContent = val;
+                                if (val === Math.round(ranges.mean)) {
+                                    opt.selected = true;
+                                }
+                                select.appendChild(opt);
+                            }
+                            primaryInput = select;
+                        }
+                    }
+
+                    if (!primaryInput) {
+                        const input = document.createElement('input');
+                        input.type = 'number';
+                        input.name = feature;
+                        input.step = '0.1';
+                        input.min = ranges.min;
+                        input.max = ranges.max;
+                        input.value = Math.round(ranges.mean * 10) / 10;
+                        input.required = true;
+                        primaryInput = input;
+                    }
+
+                    if (primaryInput.tagName === 'INPUT' && sliderFeatures.includes(feature)) {
+                        const slider = document.createElement('input');
+                        slider.type = 'range';
+                        slider.className = 'slider';
+                        slider.min = ranges.min;
+                        slider.max = ranges.max;
+                        slider.step = '0.1';
+                        slider.value = primaryInput.value;
+                        slider.addEventListener('input', () => {
+                            primaryInput.value = slider.value;
+                        });
+                        primaryInput.addEventListener('input', () => {
+                            slider.value = primaryInput.value;
+                        });
+                        inputWrap.appendChild(slider);
+                    }
+
+                    const validation = document.createElement('div');
+                    validation.className = 'validation-msg';
+
+                    primaryInput.addEventListener('invalid', () => {
+                        validation.textContent = 'Enter a valid value within the shown range.';
+                    });
+                    primaryInput.addEventListener('input', () => {
+                        validation.textContent = '';
+                    });
 
                     const hint = document.createElement('div');
                     hint.className = 'input-hint';
@@ -580,8 +655,10 @@
                     `;
 
                     formGroup.appendChild(label);
-                    formGroup.appendChild(input);
+                    inputWrap.appendChild(primaryInput);
+                    formGroup.appendChild(inputWrap);
                     formGroup.appendChild(hint);
+                    formGroup.appendChild(validation);
                     container.appendChild(formGroup);
                 }
             } catch (error) {
@@ -595,7 +672,7 @@
                 const form = document.getElementById('predictionForm');
                 const formData = new FormData(form);
                 const data = Object.fromEntries(formData);
-                submitToReport('/predict/animals/result/', data);
+                submitToReport('/dashboard/animals/', data);
             });
 
             document.getElementById('resetBtn').addEventListener('click', () => {

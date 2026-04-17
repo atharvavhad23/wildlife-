@@ -10,6 +10,7 @@ import warnings
 from pathlib import Path
 from predictor.utils.environmental_data import get_environmental_data
 from predictor.utils.decision_engine import analyze_prediction
+from predictor.utils.trend_analysis import analyze_trend
 
 warnings.filterwarnings('ignore')
 
@@ -82,11 +83,14 @@ def _predict_animals_from_payload(payload: dict) -> dict:
     df_scaled = animals_scaler.transform(df_input)
     prediction = float(animals_model.predict(df_scaled)[0])
     decision = analyze_prediction(prediction, env_data)
+    trend = analyze_trend(prediction)
 
     return {
         'prediction': prediction,
         'environmental_data': env_data,
         'decision': decision,
+        'trend': trend,
+        'model_input': model_input,
     }
 
 
@@ -120,11 +124,102 @@ def _predict_birds_from_payload(payload: dict) -> dict:
 
     env_data = get_environmental_data(base_input['lat_grid'], base_input['lon_grid'])
     decision = analyze_prediction(pred, env_data)
+    trend = analyze_trend(pred)
 
     return {
         'prediction': pred,
         'environmental_data': env_data,
         'decision': decision,
+        'trend': trend,
+        'model_input': base_input,
+    }
+
+
+def _safe_round(value, decimals=3):
+    try:
+        return round(float(value), decimals)
+    except (TypeError, ValueError):
+        return value
+
+
+def _build_input_summary(input_data: dict, max_items: int = 12) -> list[dict]:
+    summary = []
+    for idx, (key, value) in enumerate(input_data.items()):
+        if idx >= max_items:
+            break
+        summary.append(
+            {
+                'label': key.replace('_', ' ').title(),
+                'value': _safe_round(value, 3),
+            }
+        )
+    return summary
+
+
+def _extract_feature_importance(model, feature_names, top_n=5):
+    if model is None or not hasattr(model, 'feature_importances_'):
+        return {'labels': [], 'values': []}
+
+    try:
+        importances = list(model.feature_importances_)
+        pairs = list(zip(feature_names, importances))
+        pairs.sort(key=lambda x: x[1], reverse=True)
+        top_pairs = pairs[:top_n]
+        return {
+            'labels': [name for name, _ in top_pairs],
+            'values': [round(float(score), 4) for _, score in top_pairs],
+        }
+    except Exception:
+        return {'labels': [], 'values': []}
+
+
+def _build_dashboard_context(species_label: str, result: dict, input_data: dict, model, feature_names):
+    env = result['environmental_data']
+    lat = float(input_data.get('lat_grid', 0.0))
+    lon = float(input_data.get('lon_grid', 0.0))
+    prediction = float(result['prediction'])
+
+    prediction_normalized = min(100.0, max(0.0, prediction * 4.0))
+
+    chart_data = {
+        'labels': [
+            'Temperature',
+            'Rainfall',
+            'Humidity',
+            'Vegetation',
+            'Water Availability',
+            'Human Disturbance',
+        ],
+        'values': [
+            _safe_round(env.get('temperature', 0.0), 2),
+            _safe_round(env.get('rainfall', 0.0), 2),
+            _safe_round(env.get('humidity', 0.0), 2),
+            _safe_round(env.get('vegetation_index', 0.0), 3),
+            _safe_round(env.get('water_availability', 0.0), 3),
+            _safe_round(env.get('human_disturbance', 0.0), 3),
+        ],
+    }
+
+    map_data = {
+        'lat': lat,
+        'lon': lon,
+        'prediction': _safe_round(prediction, 3),
+        'prediction_normalized': prediction_normalized,
+        'risk_level': result['decision'].get('risk_level', 'Medium'),
+    }
+
+    feature_importance = _extract_feature_importance(model, feature_names, top_n=5)
+
+    return {
+        'species_label': species_label,
+        'prediction': _safe_round(prediction, 4),
+        'environmental_data': env,
+        'decision': result['decision'],
+        'trend': result['trend'],
+        'input_summary': _build_input_summary(input_data),
+        'chart_data': chart_data,
+        'map_data': map_data,
+        'feature_importance': feature_importance,
     }
 
 # Load animals model
@@ -270,6 +365,7 @@ def predict_animals(request):
             'prediction': result['prediction'],
             'environmental_data': result['environmental_data'],
             'decision': result['decision'],
+            'trend': result['trend'],
             'status': 'success'
         })
 
@@ -293,6 +389,36 @@ def animals_result(request):
                 'decision': {},
                 'species_label': 'Animals',
                 'info': 'Submit an animal prediction to view a full conservation report.',
+            },
+        )
+
+
+@require_http_methods(["GET", "POST"])
+def animals_dashboard(request):
+    """Render dashboard for animal prediction output."""
+    if request.method == "GET":
+        return render(
+            request,
+            'dashboard.html',
+            {
+                'prediction': None,
+                'species_label': 'Animals',
+            },
+        )
+
+    try:
+        payload = {k: v for k, v in request.POST.items()}
+        result = _predict_animals_from_payload(payload)
+        context = _build_dashboard_context('Animals', result, result['model_input'], animals_model, animals_features)
+        return render(request, 'dashboard.html', context)
+    except Exception as e:
+        return render(
+            request,
+            'dashboard.html',
+            {
+                'error': str(e),
+                'prediction': None,
+                'species_label': 'Animals',
             },
         )
 
@@ -368,6 +494,36 @@ def birds_result(request):
         )
 
 
+@require_http_methods(["GET", "POST"])
+def birds_dashboard(request):
+    """Render dashboard for bird prediction output."""
+    if request.method == "GET":
+        return render(
+            request,
+            'dashboard.html',
+            {
+                'prediction': None,
+                'species_label': 'Birds',
+            },
+        )
+
+    try:
+        payload = {k: v for k, v in request.POST.items()}
+        result = _predict_birds_from_payload(payload)
+        context = _build_dashboard_context('Birds', result, result['model_input'], birds_model, birds_features)
+        return render(request, 'dashboard.html', context)
+    except Exception as e:
+        return render(
+            request,
+            'dashboard.html',
+            {
+                'error': str(e),
+                'prediction': None,
+                'species_label': 'Birds',
+            },
+        )
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def predict_birds(request):
@@ -380,6 +536,7 @@ def predict_birds(request):
             'prediction': result['prediction'],
             'environmental_data': result['environmental_data'],
             'decision': result['decision'],
+            'trend': result['trend'],
             'status': 'success'
         })
     
