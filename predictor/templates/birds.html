@@ -64,6 +64,14 @@
             background: rgba(255, 255, 255, 0.3);
         }
 
+        .nav-links {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
         .content {
             padding: 40px;
         }
@@ -88,6 +96,23 @@
         .form-group {
             display: flex;
             flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .slider {
+            width: 100%;
+        }
+
+        .validation-msg {
+            font-size: 0.8em;
+            color: #c0392b;
+            min-height: 1em;
         }
 
         label {
@@ -299,6 +324,49 @@
             border-top: 2px solid rgba(255, 255, 255, 0.2);
         }
 
+        .insights {
+            margin-top: 24px;
+            text-align: left;
+        }
+
+        .insight-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .insight-card {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 8px;
+            padding: 12px;
+            backdrop-filter: blur(4px);
+        }
+
+        .insight-title {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-bottom: 6px;
+        }
+
+        .insight-value {
+            font-size: 1.15em;
+            font-weight: 700;
+        }
+
+        .risk-box {
+            margin-top: 14px;
+            border-radius: 8px;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+
+        .risk-high { border-left: 5px solid #ff7675; }
+        .risk-medium { border-left: 5px solid #feca57; }
+        .risk-low { border-left: 5px solid #55efc4; }
+
         .stat-box {
             background: rgba(255, 255, 255, 0.1);
             padding: 20px;
@@ -360,12 +428,14 @@
         <div class="header">
             <h1>🦅 Bird Population Density Predictor</h1>
             <p>Predict how many birds you'll find in an area</p>
-            <a href="/" class="nav-link">← Back to Home</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link">← Back to Home</a>
+            </div>
         </div>
 
         <div class="content">
             <div class="info-box">
-                <p>ℹ️ <strong>How to use:</strong> Fill in the bird and environmental details below and we'll predict how many birds are likely to be sighted there.</p>
+                <p>ℹ️ <strong>How to use:</strong> Fill in the bird and environmental details below. After prediction, you will be redirected to the full conservation report page.</p>
             </div>
 
             <form id="predictionForm">
@@ -406,6 +476,7 @@
                 <div class="result-value" id="predictionResult">0</div>
                 <div class="result-unit">birds per observation area</div>
                 <div class="stats" id="statsContainer"></div>
+                <div class="insights" id="intelligencePanel"></div>
             </div>
         </div>
     </div>
@@ -413,6 +484,8 @@
     <script>
         let features = [];
         let featureRanges = {};
+        const dropdownFeatures = ['order_enc', 'family_enc', 'taxonRank_enc', 'basisOfRecord_enc', 'season_enc'];
+        const sliderFeatures = ['coordinateUncertaintyInMeters', 'lat_grid', 'lon_grid', 'species_richness'];
 
         const fieldDescriptions = {
             // These keys match exactly what `/features/birds/` returns.
@@ -498,14 +571,71 @@
                         </span>
                     `;
 
-                    const input = document.createElement('input');
-                    input.type = 'number';
-                    input.name = feature;
-                    input.step = '0.1';
-                    input.min = ranges.min;
-                    input.max = ranges.max;
-                    input.value = Math.round(ranges.mean * 10) / 10;
-                    input.required = true;
+                    const inputWrap = document.createElement('div');
+                    inputWrap.className = 'input-row';
+
+                    let primaryInput;
+                    if (dropdownFeatures.includes(feature)) {
+                        const span = Math.round(ranges.max - ranges.min);
+                        if (span > 0 && span <= 25) {
+                            const select = document.createElement('select');
+                            select.name = feature;
+                            select.required = true;
+                            select.style.padding = '12px';
+                            select.style.border = '2px solid #B2E6E2';
+                            select.style.borderRadius = '8px';
+                            select.style.background = '#F0FFFE';
+                            for (let val = Math.round(ranges.min); val <= Math.round(ranges.max); val++) {
+                                const opt = document.createElement('option');
+                                opt.value = val;
+                                opt.textContent = val;
+                                if (val === Math.round(ranges.mean)) {
+                                    opt.selected = true;
+                                }
+                                select.appendChild(opt);
+                            }
+                            primaryInput = select;
+                        }
+                    }
+
+                    if (!primaryInput) {
+                        const input = document.createElement('input');
+                        input.type = 'number';
+                        input.name = feature;
+                        input.step = '0.1';
+                        input.min = ranges.min;
+                        input.max = ranges.max;
+                        input.value = Math.round(ranges.mean * 10) / 10;
+                        input.required = true;
+                        primaryInput = input;
+                    }
+
+                    if (primaryInput.tagName === 'INPUT' && sliderFeatures.includes(feature)) {
+                        const slider = document.createElement('input');
+                        slider.type = 'range';
+                        slider.className = 'slider';
+                        slider.min = ranges.min;
+                        slider.max = ranges.max;
+                        slider.step = '0.1';
+                        slider.value = primaryInput.value;
+                        slider.addEventListener('input', () => {
+                            primaryInput.value = slider.value;
+                        });
+                        primaryInput.addEventListener('input', () => {
+                            slider.value = primaryInput.value;
+                        });
+                        inputWrap.appendChild(slider);
+                    }
+
+                    const validation = document.createElement('div');
+                    validation.className = 'validation-msg';
+
+                    primaryInput.addEventListener('invalid', () => {
+                        validation.textContent = 'Enter a valid value within the shown range.';
+                    });
+                    primaryInput.addEventListener('input', () => {
+                        validation.textContent = '';
+                    });
 
                     const hint = document.createElement('div');
                     hint.className = 'input-hint';
@@ -515,8 +645,10 @@
                     `;
 
                     formGroup.appendChild(label);
-                    formGroup.appendChild(input);
+                    inputWrap.appendChild(primaryInput);
+                    formGroup.appendChild(inputWrap);
                     formGroup.appendChild(hint);
+                    formGroup.appendChild(validation);
                     container.appendChild(formGroup);
                 }
             } catch (error) {
@@ -527,13 +659,39 @@
         function setupFormSubmission() {
             document.getElementById('predictionForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                await makePrediction();
+                const form = document.getElementById('predictionForm');
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData);
+                submitToReport('/dashboard/birds/', data);
             });
 
             document.getElementById('resetBtn').addEventListener('click', () => {
                 document.getElementById('resultSection').classList.remove('show');
                 document.getElementById('errorSection').classList.remove('show');
             });
+        }
+
+        function submitToReport(actionUrl, data) {
+            const redirectForm = document.createElement('form');
+            redirectForm.method = 'POST';
+            redirectForm.action = actionUrl;
+
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = csrftoken || '';
+            redirectForm.appendChild(csrfInput);
+
+            Object.entries(data).forEach(([key, value]) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = value;
+                redirectForm.appendChild(input);
+            });
+
+            document.body.appendChild(redirectForm);
+            redirectForm.submit();
         }
 
         async function makePrediction() {
@@ -558,7 +716,7 @@
                 const result = await response.json();
 
                 if (result.status === 'success') {
-                    displayResult(result.prediction);
+                    displayResult(result);
                 } else {
                     showError(result.error || 'Prediction failed');
                 }
@@ -569,7 +727,8 @@
             }
         }
 
-        function displayResult(prediction) {
+        function displayResult(result) {
+            const prediction = result.prediction;
             const displayValue = Math.round(prediction * 100) / 100;
             document.getElementById('predictionResult').textContent = displayValue;
             
@@ -599,6 +758,29 @@
                 <div class="stat-box">
                     <div class="stat-value">${(displayValue * 1.3).toFixed(0)}</div>
                     <div class="stat-label">Optimistic</div>
+                </div>
+            `;
+
+            const env = result.environmental_data || {};
+            const decision = result.decision || {};
+            const riskLevel = (decision.risk_level || 'Medium').toLowerCase();
+
+            const intelligencePanel = document.getElementById('intelligencePanel');
+            intelligencePanel.innerHTML = `
+                <h3 style="margin-bottom: 8px;">Environmental Conditions</h3>
+                <div class="insight-grid">
+                    <div class="insight-card"><div class="insight-title">Temperature</div><div class="insight-value">${(env.temperature ?? 0).toFixed(2)} °C</div></div>
+                    <div class="insight-card"><div class="insight-title">Humidity</div><div class="insight-value">${(env.humidity ?? 0).toFixed(2)} %</div></div>
+                    <div class="insight-card"><div class="insight-title">Rainfall</div><div class="insight-value">${(env.rainfall ?? 0).toFixed(2)} mm</div></div>
+                    <div class="insight-card"><div class="insight-title">Vegetation Index</div><div class="insight-value">${(env.vegetation_index ?? 0).toFixed(3)}</div></div>
+                    <div class="insight-card"><div class="insight-title">Water Availability</div><div class="insight-value">${(env.water_availability ?? 0).toFixed(3)}</div></div>
+                    <div class="insight-card"><div class="insight-title">Human Disturbance</div><div class="insight-value">${(env.human_disturbance ?? 0).toFixed(3)}</div></div>
+                </div>
+                <h3 style="margin: 14px 0 8px 0;">Risk Analysis</h3>
+                <div class="risk-box risk-${riskLevel}">
+                    <div><strong>Risk Level:</strong> ${decision.risk_level || 'Medium'}</div>
+                    <div><strong>Status:</strong> ${decision.status || 'Declining'}</div>
+                    <div style="margin-top: 8px;"><strong>Recommendation:</strong> ${decision.recommendation || 'Continue habitat protection and monitoring.'}</div>
                 </div>
             `;
 
