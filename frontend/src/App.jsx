@@ -1,4 +1,6 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
+import { AnimatePresence } from 'framer-motion'
+import { PageTransition } from './components/PageTransition'
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import Animals from './pages/Animals'
@@ -18,24 +20,41 @@ function NotFound() {
   )
 }
 
+function AnimatedRoutes() {
+  const location = useLocation()
+  
+  // A helper component to wrap elements in PageTransition
+  const withTransition = (Element) => (
+    <PageTransition>
+      <Element />
+    </PageTransition>
+  )
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/" element={withTransition(Home)} />
+        <Route path="/animals" element={withTransition(Animals)} />
+        <Route path="/birds" element={withTransition(Birds)} />
+        <Route path="/insects" element={withTransition(Insects)} />
+        <Route path="/:species/photos" element={withTransition(PhotosGallery)} />
+        <Route path="/animals/clustering" element={withTransition(ClusteringMap)} />
+        <Route path="/animals/species" element={withTransition(SpeciesDetail)} />
+        <Route path="/birds/clustering" element={withTransition(ClusteringMap)} />
+        <Route path="/birds/species" element={withTransition(SpeciesDetail)} />
+        <Route path="/insects/clustering" element={withTransition(ClusteringMap)} />
+        <Route path="/insects/species" element={withTransition(SpeciesDetail)} />
+        <Route path="*" element={withTransition(NotFound)} />
+      </Routes>
+    </AnimatePresence>
+  )
+}
+
 export default function App() {
   return (
-    <BrowserRouter>
+    <>
       <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/animals" element={<Animals />} />
-        <Route path="/birds" element={<Birds />} />
-        <Route path="/insects" element={<Insects />} />
-        <Route path="/:species/photos" element={<PhotosGallery />} />
-        <Route path="/animals/clustering" element={<ClusteringMap />} />
-        <Route path="/animals/species" element={<SpeciesDetail />} />
-        <Route path="/birds/clustering" element={<ClusteringMap />} />
-        <Route path="/birds/species" element={<SpeciesDetail />} />
-        <Route path="/insects/clustering" element={<ClusteringMap />} />
-        <Route path="/insects/species" element={<SpeciesDetail />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+      <AnimatedRoutes />
+    </>
   )
 }

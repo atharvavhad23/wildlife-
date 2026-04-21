@@ -20,10 +20,22 @@ function ClusterBadge({ id }) {
 
 let leafletAssetsPromise = null
 function ensureLeafletAssets() {
-  if (window.L) return Promise.resolve(window.L)
+  if (window.L && window.L.heatLayer) return Promise.resolve(window.L)
   if (leafletAssetsPromise) return leafletAssetsPromise
 
   leafletAssetsPromise = new Promise((resolve, reject) => {
+    const loadHeat = () => {
+      if (window.L && window.L.heatLayer) return resolve(window.L)
+      if (document.querySelector('script[data-heat="true"]')) return resolve(window.L)
+      const heatScript = document.createElement('script')
+      heatScript.src = 'https://unpkg.com/leaflet.heat/dist/leaflet-heat.js'
+      heatScript.async = true
+      heatScript.setAttribute('data-heat', 'true')
+      heatScript.onload = () => resolve(window.L)
+      heatScript.onerror = () => reject(new Error('Failed to load Leaflet Heat script'))
+      document.body.appendChild(heatScript)
+    }
+
     if (!document.querySelector('link[data-leaflet="true"]')) {
       const css = document.createElement('link')
       css.rel = 'stylesheet'
@@ -34,8 +46,8 @@ function ensureLeafletAssets() {
 
     const existing = document.querySelector('script[data-leaflet="true"]')
     if (existing) {
-      existing.addEventListener('load', () => resolve(window.L))
-      existing.addEventListener('error', () => reject(new Error('Failed to load Leaflet script')))
+      if (window.L) loadHeat()
+      else existing.addEventListener('load', loadHeat)
       return
     }
 
@@ -43,7 +55,7 @@ function ensureLeafletAssets() {
     script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
     script.async = true
     script.setAttribute('data-leaflet', 'true')
-    script.onload = () => resolve(window.L)
+    script.onload = loadHeat
     script.onerror = () => reject(new Error('Failed to load Leaflet script'))
     document.body.appendChild(script)
   })
@@ -55,6 +67,7 @@ export default function ClusteringMap() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [nClusters, setNClusters] = useState(8)
+  const [layerType, setLayerType] = useState('both')
   const [selected, setSelected] = useState(null)
   const [error, setError] = useState(null)
   const [mapReady, setMapReady] = useState(false)
@@ -81,29 +94,52 @@ export default function ClusteringMap() {
 
         mapEl.innerHTML = ''
         map = L.map(mapEl, { zoomControl: true })
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
           maxZoom: 18,
-          attribution: '&copy; OpenStreetMap contributors',
+          attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
         }).addTo(map)
 
         const bounds = []
+        const heatData = []
+        let maxCount = 0
+        
         points.forEach((c) => {
           bounds.push([c.center_lat, c.center_lon])
-          const color = CLUSTER_COLORS[Number(c.id) % CLUSTER_COLORS.length]
-          const radius = Math.min(18, Math.max(8, Math.sqrt((c.animal_count || 0) / 40)))
-
-          L.circleMarker([c.center_lat, c.center_lon], {
-            radius,
-            color,
-            fillColor: color,
-            fillOpacity: 0.75,
-            weight: 2,
-          })
-            .addTo(map)
-            .bindPopup(
-              `<b>Cluster ${c.id}</b><br/>${(c.animal_count || 0).toLocaleString()} observations<br/>${c.species_count || 0} species`
-            )
+          maxCount = Math.max(maxCount, c.animal_count || 1)
         })
+
+        if (layerType === 'markers' || layerType === 'both') {
+          points.forEach((c) => {
+            const color = CLUSTER_COLORS[Number(c.id) % CLUSTER_COLORS.length]
+            const radius = Math.min(18, Math.max(8, Math.sqrt((c.animal_count || 0) / 40)))
+
+            L.circleMarker([c.center_lat, c.center_lon], {
+              radius,
+              color,
+              fillColor: color,
+              fillOpacity: 0.75,
+              weight: 2,
+            })
+              .addTo(map)
+              .bindPopup(
+                `<b>Cluster ${c.id}</b><br/>${(c.animal_count || 0).toLocaleString()} observations<br/>${c.species_count || 0} species`
+              )
+          })
+        }
+
+        if (layerType === 'heatmap' || layerType === 'both') {
+          points.forEach((c) => {
+             heatData.push([c.center_lat, c.center_lon, (c.animal_count || 1) / maxCount])
+          })
+          if (L.heatLayer) {
+              L.heatLayer(heatData, {
+                 radius: 45,
+                 blur: 35,
+                 maxZoom: 10,
+                 gradient: {0.4: 'cyan', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red'}
+              }).addTo(map)
+          }
+        }
 
         if (bounds.length > 1) {
           map.fitBounds(bounds, { padding: [30, 30] })
@@ -125,7 +161,7 @@ export default function ClusteringMap() {
         map.remove()
       }
     }
-  }, [data])
+  }, [data, layerType])
 
   const load = async (n) => {
     setLoading(true)
@@ -178,7 +214,30 @@ export default function ClusteringMap() {
             onChange={e => setNClusters(Number(e.target.value))}
             style={{ width: 140 }}
           />
-          <span style={{ color: 'var(--green-300)', fontWeight: 700, minWidth: 20 }}>{nClusters}</span>
+          <span style={{ color: 'var(--dataviz-green)', fontWeight: 700, minWidth: 20 }}>{nClusters}</span>
+        </label>
+        
+        <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.1)' }} />
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 600 }}>
+          View Mode:
+          <select 
+            value={layerType} 
+            onChange={e => setLayerType(e.target.value)}
+            style={{ 
+              padding: '6px 12px', 
+              borderRadius: 6, 
+              background: 'rgba(0,0,0,0.3)', 
+              color: 'white', 
+              border: '1px solid rgba(255,255,255,0.1)',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="both" style={{background: '#1a1f1b'}}>Markers + Heatmap</option>
+            <option value="markers" style={{background: '#1a1f1b'}}>Markers Only</option>
+            <option value="heatmap" style={{background: '#1a1f1b'}}>Heatmap Only</option>
+          </select>
         </label>
         {data && (
           <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginLeft: 'auto' }}>

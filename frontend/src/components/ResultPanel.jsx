@@ -2,6 +2,7 @@ import {
   ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
 } from 'recharts'
+import { motion } from 'framer-motion'
 
 function TrendChip({ trend }) {
   if (!trend) return null
@@ -61,27 +62,32 @@ function qualitativeLabel(key, value) {
 
 function EnvSimpleBars({ env }) {
   const rows = [
-    { key: 'temperature', label: 'Temperature' },
-    { key: 'humidity', label: 'Humidity' },
-    { key: 'rainfall', label: 'Rainfall' },
-    { key: 'vegetation_index', label: 'Vegetation cover' },
-    { key: 'water_availability', label: 'Water availability' },
-    { key: 'human_disturbance', label: 'Human disturbance' },
+    { key: 'temperature', label: 'Temperature', color: 'from-orange-500 to-red-500' },
+    { key: 'humidity', label: 'Humidity', color: 'from-blue-400 to-cyan-400' },
+    { key: 'rainfall', label: 'Rainfall', color: 'from-cyan-500 to-blue-500' },
+    { key: 'vegetation_index', label: 'Vegetation cover', color: 'from-green-500 to-emerald-400' },
+    { key: 'water_availability', label: 'Water availability', color: 'from-teal-400 to-cyan-300' },
+    { key: 'human_disturbance', label: 'Human disturbance', color: 'from-purple-500 to-pink-500' },
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {rows.map((row) => {
+    <div className="flex flex-col gap-3">
+      {rows.map((row, index) => {
         const raw = Number(env?.[row.key] ?? 0)
         const pct = normalizeMetric(row.key, raw)
         return (
-          <div key={row.key}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-              <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
-              <span style={{ color: 'var(--text-muted)' }}>{qualitativeLabel(row.key, raw)}</span>
+          <div key={row.key} className="glass p-3 rounded-lg flex flex-col gap-2 transition hover:bg-white/10">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-medium text-text-primary">{row.label}</span>
+              <span className="text-text-muted">{qualitativeLabel(row.key, raw)}</span>
             </div>
-            <div style={{ height: 9, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg,#43a047,#66bb6a)' }} />
+            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 1, ease: "easeOut", delay: index * 0.1 }}
+                className={`h-full rounded-full bg-gradient-to-r ${row.color}`}
+              />
             </div>
           </div>
         )

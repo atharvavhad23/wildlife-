@@ -1,5 +1,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'Segoe UI';
+  src: local('Segoe UI');
+}
+
 /* ── Design Tokens ─────────────────────────────────────── */
 :root {
   --green-900: #0d2818;
@@ -39,6 +48,50 @@
   --shadow-hover: 0 16px 48px rgba(0,0,0,0.6);
 
   --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Skill Tokens */
+  --color-brand: #8251EE;
+  --color-brand-hover: #9366F5;
+  --color-brand-light: #A37EF5;
+  --color-brand-subtle: rgba(130, 81, 238, 0.15);
+
+  --color-bg-1: hsl(240, 6%, 10%);
+  --color-bg-2: hsl(240, 5%, 12%);
+  --color-bg-3: hsl(240, 5%, 14%);
+  --color-bg-4: hsl(240, 4%, 18%);
+  --color-bg-5: hsl(240, 4%, 22%);
+  --color-bg-6: hsl(240, 4%, 26%);
+
+  --color-border-subtle: hsla(0, 0%, 100%, 0.08);
+  --color-border-default: hsla(0, 0%, 100%, 0.12);
+  --color-border-strong: hsla(0, 0%, 100%, 0.20);
+}
+
+/* Glass utility classes */
+@layer components {
+  .glass {
+    @apply backdrop-blur-md bg-white/5 border border-white/10;
+  }
+
+  /* .glass-card already heavily utilized, let's keep custom but adopt some aspects */
+  .glass-panel {
+    @apply backdrop-blur-lg bg-black/40 border border-white/5;
+  }
+
+  .glass-overlay {
+    @apply backdrop-blur-sm bg-black/60;
+  }
+
+  .glass-input {
+    @apply backdrop-blur-sm bg-white/5 border border-white/10 focus:border-brand focus:bg-white/10;
+  }
+}
+
+/* Animation utilities */
+@layer utilities {
+  .animate-in {
+    animation: fadeIn 0.3s ease-out, slideUp 0.3s ease-out;
+  }
 }
 
 /* ── Reset ─────────────────────────────────────────────── */
