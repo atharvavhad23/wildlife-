@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conservation Decision Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-900">
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <div class="bg-gradient-to-r from-emerald-700 to-teal-700 rounded-2xl text-white p-6 shadow-lg">
+            <h1 class="text-2xl md:text-3xl font-bold">Wildlife Conservation Intelligence</h1>
+            <p class="mt-2 text-emerald-100">{{ species_label|default:'Animals' }}: Prediction Summary, Environmental Conditions, and Risk Analysis</p>
+        </div>
+
+        {% if error %}
+        <div class="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+            <p class="font-semibold">Prediction failed</p>
+            <p class="mt-1">{{ error }}</p>
+        </div>
+        {% endif %}
+
+        {% if info %}
+        <div class="mt-6 rounded-xl border border-teal-200 bg-teal-50 p-4 text-teal-700">
+            <p class="font-semibold">Report Page Ready</p>
+            <p class="mt-1">{{ info }}</p>
+            <a href="/animals/" class="mt-3 inline-flex items-center rounded-lg bg-teal-700 px-3 py-2 text-white font-semibold hover:bg-teal-800">Go to Animal Predictor</a>
+        </div>
+        {% endif %}
+
+        {% if prediction is not None %}
+        <section class="mt-6 bg-white rounded-2xl shadow p-6">
+            <h2 class="text-xl font-semibold text-emerald-800">Prediction Summary</h2>
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="rounded-xl bg-emerald-50 border border-emerald-100 p-4">
+                    <p class="text-sm text-emerald-700">Predicted {{ species_label|default:'Animal' }} Population Density</p>
+                    <p class="mt-2 text-3xl font-bold text-emerald-900">{{ prediction }}</p>
+                    <p class="text-sm text-emerald-700">{% if species_label == 'Birds' %}birds per observation area{% else %}animals per sq. km{% endif %}</p>
+                </div>
+                <div class="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                    <p class="text-sm text-slate-600">Conservation Status</p>
+                    <p class="mt-2 text-2xl font-semibold text-slate-900">{{ decision.status }}</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="mt-6 bg-white rounded-2xl shadow p-6">
+            <h2 class="text-xl font-semibold text-emerald-800">Environmental Conditions</h2>
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="rounded-lg border bg-slate-50 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-500">Temperature</p>
+                    <p class="text-lg font-semibold">{{ environmental_data.temperature }} °C</p>
+                </div>
+                <div class="rounded-lg border bg-slate-50 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-500">Humidity</p>
+                    <p class="text-lg font-semibold">{{ environmental_data.humidity }} %</p>
+                </div>
+                <div class="rounded-lg border bg-slate-50 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-500">Rainfall</p>
+                    <p class="text-lg font-semibold">{{ environmental_data.rainfall }} mm</p>
+                </div>
+                <div class="rounded-lg border bg-slate-50 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-500">Vegetation Index</p>
+                    <p class="text-lg font-semibold">{{ environmental_data.vegetation_index }}</p>
+                </div>
+                <div class="rounded-lg border bg-slate-50 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-500">Water Availability</p>
+                    <p class="text-lg font-semibold">{{ environmental_data.water_availability }}</p>
+                </div>
+                <div class="rounded-lg border bg-slate-50 p-4">
+                    <p class="text-xs uppercase tracking-wide text-slate-500">Human Disturbance</p>
+                    <p class="text-lg font-semibold">{{ environmental_data.human_disturbance }}</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="mt-6 bg-white rounded-2xl shadow p-6">
+            <h2 class="text-xl font-semibold text-emerald-800">Risk Analysis</h2>
+            <div class="mt-4 rounded-xl p-4 {% if decision.risk_level == 'High' %}bg-red-50 border border-red-200{% elif decision.risk_level == 'Low' %}bg-green-50 border border-green-200{% else %}bg-amber-50 border border-amber-200{% endif %}">
+                <p class="text-sm text-slate-700">Risk Level</p>
+                <p class="text-2xl font-bold {% if decision.risk_level == 'High' %}text-red-700{% elif decision.risk_level == 'Low' %}text-green-700{% else %}text-amber-700{% endif %}">
+                    {{ decision.risk_level }}
+                </p>
+                <p class="mt-3 text-slate-800"><span class="font-semibold">Recommendation:</span> {{ decision.recommendation }}</p>
+            </div>
+        </section>
+        {% endif %}
+
+        <div class="mt-6">
+            {% if species_label == 'Birds' %}
+            <a href="/birds/" class="inline-flex items-center rounded-lg bg-emerald-700 px-4 py-2 text-white font-semibold hover:bg-emerald-800">Back to Bird Predictor</a>
+            {% else %}
+            <a href="/animals/" class="inline-flex items-center rounded-lg bg-emerald-700 px-4 py-2 text-white font-semibold hover:bg-emerald-800">Back to Animal Predictor</a>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

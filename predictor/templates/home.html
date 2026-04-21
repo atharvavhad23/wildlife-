@@ -64,6 +64,18 @@
             margin-bottom: 15px;
         }
 
+        .flow-note {
+            margin-top: 15px;
+            display: inline-block;
+            background: #E8F5E9;
+            color: #1B5E20;
+            border: 1px solid #C8E6C9;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-weight: 700;
+            font-size: 0.95em;
+        }
+
         .cards-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -213,6 +225,7 @@
             font-size: 0.95em;
         }
 
+
         @media (max-width: 768px) {
             .navbar h1 {
                 font-size: 1.8em;
@@ -247,6 +260,7 @@
             <h2>Welcome to Wildlife Prediction</h2>
             <p>Use machine learning to predict wildlife population density in different areas of the Koyna region.</p>
             <p>Select below whether you want to predict animal or bird population density based on environmental and temporal factors.</p>
+            <div class="flow-note">Flow: Home → Prediction Form → Detailed Dashboard</div>
 
             <div class="stats">
                 <div class="stat">
