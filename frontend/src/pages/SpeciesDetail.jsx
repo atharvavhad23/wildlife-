@@ -89,9 +89,10 @@ export default function SpeciesDetail() {
       setError(null)
 
       try {
+        const category = window.location.pathname.split('/')[1] || 'animals'
         const [detailRes, photosRes] = await Promise.all([
-          fetch(`/api/animals/species/?species=${encodeURIComponent(species)}`),
-          fetch(`/api/animals/species-photos/?species=${encodeURIComponent(species)}&offset=0&limit=24`),
+          fetch(`/api/${category}/species/?species=${encodeURIComponent(species)}`),
+          fetch(`/api/${category}/species-photos/?species=${encodeURIComponent(species)}&offset=0&limit=24`),
         ])
 
         const detailData = await detailRes.json()
@@ -175,7 +176,8 @@ export default function SpeciesDetail() {
     if (!hasMore || loadingMore || !species) return
     setLoadingMore(true)
     try {
-      const res = await fetch(`/api/animals/species-photos/?species=${encodeURIComponent(species)}&offset=${offset}&limit=24`)
+      const category = window.location.pathname.split('/')[1] || 'animals'
+      const res = await fetch(`/api/${category}/species-photos/?species=${encodeURIComponent(species)}&offset=${offset}&limit=24`)
       const data = await res.json()
       setPhotos((prev) => [...prev, ...(data.photos || [])])
       setOffset(data.nextOffset || offset)
@@ -185,10 +187,12 @@ export default function SpeciesDetail() {
     }
   }
 
+  const category = window.location.pathname.split('/')[1] || 'animals'
+
   return (
     <div className="page-wrapper">
       <div style={{ padding: '40px 0 24px' }}>
-        <Link to="/animals/clustering" className="back-link">← Back to Clustering Map</Link>
+        <Link to={`/${category}/clustering`} className="back-link">← Back to Clustering Map</Link>
         <h1 style={{ fontSize: '2.2rem', marginTop: 6 }}>{title}</h1>
         {detail?.class && detail?.family && (
           <p style={{ color: 'var(--text-secondary)', marginTop: 4 }}>{detail.class} • {detail.family}</p>

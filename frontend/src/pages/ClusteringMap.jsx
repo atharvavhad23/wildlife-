@@ -132,7 +132,8 @@ export default function ClusteringMap() {
     setError(null)
     setSelected(null)
     try {
-      const res = await fetch(`/api/animals/clustering/?clusters=${n}`)
+      const category = window.location.pathname.split('/')[1] || 'animals'
+      const res = await fetch(`/api/${category}/clustering/?clusters=${n}`)
       const d = await res.json()
       if (d.error) throw new Error(d.error)
       setData(d)
@@ -148,17 +149,20 @@ export default function ClusteringMap() {
   const clusters = data?.clusters || {}
   const clusterIds = Object.keys(clusters).map(Number)
 
+  const category = window.location.pathname.split('/')[1] || 'animals'
+  const categoryTitle = category.charAt(0).toUpperCase() + category.slice(1)
+
   return (
     <div className="page-wrapper">
       {/* Header */}
       <div style={{ padding: '48px 0 32px' }}>
-        <Link to="/animals" className="back-link">← Back to Animals</Link>
+        <Link to={`/${category}`} className="back-link">← Back to {categoryTitle}</Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 8 }}>
           <span style={{ fontSize: '3rem' }}>🗺️</span>
           <div>
-            <h1 style={{ fontSize: '2rem', marginBottom: 4 }}>Animals Clustering Map</h1>
+            <h1 style={{ fontSize: '2rem', marginBottom: 4 }}>{categoryTitle} Clustering Map</h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-              K-means geographic + taxonomic clustering of all animal observations
+              K-means geographic + taxonomic clustering of all {category} observations
             </p>
           </div>
         </div>
@@ -246,7 +250,7 @@ export default function ClusteringMap() {
                   {(c.species || []).slice(0, isSelected ? 10 : 4).map((sp, i) => (
                     <a
                       key={i}
-                      href={`/animals/species?species=${encodeURIComponent(sp)}`}
+                      href={`/${category}/species?species=${encodeURIComponent(sp)}`}
                       onClick={e => e.stopPropagation()}
                       style={{
                         display: 'flex', alignItems: 'center',

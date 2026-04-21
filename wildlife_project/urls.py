@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 from predictor import views
+# Trigger reload
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -31,6 +32,14 @@ urlpatterns = [
     path('photos/insects/', views.get_insects_photos, name='insects_photos'),
     # API endpoints for clustering
     path('api/animals/clustering/', views.get_animals_clustering, name='animals_clustering_api'),
+    path('api/birds/clustering/', views.get_birds_clustering, name='birds_clustering_api'),
+    path('api/insects/clustering/', views.get_insects_clustering, name='insects_clustering_api'),
+    
     path('api/animals/species/', views.get_species_detail, name='species_detail_api'),
+    path('api/birds/species/', views.get_birds_species_detail, name='birds_species_detail_api'),
+    path('api/insects/species/', views.get_insects_species_detail, name='insects_species_detail_api'),
+    
     path('api/animals/species-photos/', views.get_species_photos, name='species_photos_api'),
+    path('api/birds/species-photos/', views.get_birds_species_photos, name='birds_species_photos_api'),
+    path('api/insects/species-photos/', views.get_insects_species_photos, name='insects_species_photos_api'),
 ]

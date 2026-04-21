@@ -11,6 +11,7 @@ const config = {
   accentColor: 'linear-gradient(135deg, #4ecdc4, #26c6da)',
   quickLinks: [
     { to: '/birds/photos', label: 'Photo Gallery', icon: '📸' },
+    { to: '/birds/clustering', label: 'Clustering Map', icon: '🗺️' },
   ],
 }
 

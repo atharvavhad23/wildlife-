@@ -30,6 +30,10 @@ export default function App() {
         <Route path="/:species/photos" element={<PhotosGallery />} />
         <Route path="/animals/clustering" element={<ClusteringMap />} />
         <Route path="/animals/species" element={<SpeciesDetail />} />
+        <Route path="/birds/clustering" element={<ClusteringMap />} />
+        <Route path="/birds/species" element={<SpeciesDetail />} />
+        <Route path="/insects/clustering" element={<ClusteringMap />} />
+        <Route path="/insects/species" element={<SpeciesDetail />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

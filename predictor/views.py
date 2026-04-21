@@ -1356,36 +1356,41 @@ def get_insects_features(request):
 # CLUSTERING & SPECIES DETAIL SYSTEM
 # =============================================================================
 
-_animals_clustering_cache = {}
-_animals_species_cache = None
+_clustering_cache = { 'animals': {}, 'birds': {}, 'insects': {} }
+_species_cache = { 'animals': None, 'birds': None, 'insects': None }
 _clustering_lock = threading.Lock()
 
 
-def _load_animals_data():
-    """Load and cache animals CSV data."""
-    global _animals_species_cache
-    if _animals_species_cache is not None:
-        return _animals_species_cache
+def _load_category_data(category='animals'):
+    """Load and cache category CSV data."""
+    global _species_cache
+    if _species_cache[category] is not None:
+        return _species_cache[category]
+    
+    files = {
+        'animals': 'Koyna_animals_final.csv',
+        'birds': 'Koyna_birds_final.csv',
+        'insects': 'Koyna_insects_final.csv'
+    }
     
     try:
-        df = pd.read_csv(_project_file('Koyna_animals_final.csv'))
-        _animals_species_cache = df
+        df = pd.read_csv(_project_file(files[category]))
+        _species_cache[category] = df
         return df
     except Exception:
         return pd.DataFrame()
 
 
-def _perform_clustering(n_clusters=8):
+def _perform_clustering(n_clusters=8, category='animals'):
     """
-    Perform K-means clustering on animals by location + taxonomy.
-    Returns: {cluster_id: [species_list], centers: [[lat, lon]], ...}
+    Perform K-means clustering by location + taxonomy.
     """
     with _clustering_lock:
         cache_key = f'clusters_{n_clusters}'
-        if cache_key in _animals_clustering_cache:
-            return _animals_clustering_cache[cache_key]
+        if cache_key in _clustering_cache[category]:
+            return _clustering_cache[category][cache_key]
     
-    df = _load_animals_data()
+    df = _load_category_data(category)
     if df.empty:
         return {'error': 'No data available'}
     
@@ -1398,12 +1403,12 @@ def _perform_clustering(n_clusters=8):
     # Feature engineering: location + class encoding
     df_features = df_clean.copy()
     
-    # Encode categorical features
-    class_mapping = {cls: i for i, cls in enumerate(df_features['class'].unique())}
-    order_mapping = {ord: i for i, ord in enumerate(df_features['order'].unique())}
+    # Encode categorical features safely
+    class_mapping = {cls: i for i, cls in enumerate(df_features['class'].unique())} if 'class' in df_features.columns else {}
+    order_mapping = {ord: i for i, ord in enumerate(df_features['order'].unique())} if 'order' in df_features.columns else {}
     
-    df_features['class_enc'] = df_features['class'].map(class_mapping).fillna(0)
-    df_features['order_enc'] = df_features['order'].map(order_mapping).fillna(0)
+    df_features['class_enc'] = df_features['class'].map(class_mapping).fillna(0) if 'class' in df_features.columns else 0
+    df_features['order_enc'] = df_features['order'].map(order_mapping).fillna(0) if 'order' in df_features.columns else 0
     
     # Select features for clustering
     features_for_clustering = df_features[[
@@ -1452,17 +1457,17 @@ def _perform_clustering(n_clusters=8):
         }
     
     with _clustering_lock:
-        _animals_clustering_cache[cache_key] = result
+        _clustering_cache[category][cache_key] = result
     
     return result
 
 
-def _get_species_detail(species_name):
+def _get_species_detail(species_name, category='animals'):
     """
     Get detailed information about a specific species.
     Returns: species info + all related observations + images
     """
-    df = _load_animals_data()
+    df = _load_category_data(category)
     if df.empty:
         return {'error': 'No data available'}
     
@@ -1573,12 +1578,69 @@ def species_detail_page(request):
 @require_http_methods(["GET"])
 def get_species_photos(request):
     """API: Get paginated photos for a specific species."""
+    return _get_species_photos_generic(request, 'animals')
+
+@require_http_methods(["GET"])
+def get_birds_species_photos(request):
+    """API: Get paginated photos for a specific bird species."""
+    return _get_species_photos_generic(request, 'birds')
+
+@require_http_methods(["GET"])
+def get_insects_species_photos(request):
+    """API: Get paginated photos for a specific insect species."""
+    return _get_species_photos_generic(request, 'insects')
+        
+@require_http_methods(["GET"])
+def get_birds_clustering(request):
+    try:
+        n_clusters = int(request.GET.get('clusters', 8))
+        n_clusters = max(3, min(20, n_clusters))
+        result = _perform_clustering(n_clusters, 'birds')
+        return JsonResponse(result)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@require_http_methods(["GET"])
+def get_insects_clustering(request):
+    try:
+        n_clusters = int(request.GET.get('clusters', 8))
+        n_clusters = max(3, min(20, n_clusters))
+        result = _perform_clustering(n_clusters, 'insects')
+        return JsonResponse(result)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@require_http_methods(["GET"])
+def get_birds_species_detail(request):
+    try:
+        species_name = str(request.GET.get('species', '')).strip()
+        if not species_name:
+            return JsonResponse({'error': 'Species name required'}, status=400)
+        detail = _sanitize_for_json(_get_species_detail(species_name, 'birds'))
+        return JsonResponse(detail, json_dumps_params={'allow_nan': False})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@require_http_methods(["GET"])
+def get_insects_species_detail(request):
+    try:
+        species_name = str(request.GET.get('species', '')).strip()
+        if not species_name:
+            return JsonResponse({'error': 'Species name required'}, status=400)
+        detail = _sanitize_for_json(_get_species_detail(species_name, 'insects'))
+        return JsonResponse(detail, json_dumps_params={'allow_nan': False})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+def _get_species_photos_generic(request, category):
     try:
         species_name = str(request.GET.get('species', '')).strip()
         if not species_name:
             return JsonResponse({'error': 'Species name required'}, status=400)
         
-        df = _load_animals_data()
+        df = _load_category_data(category)
         species_data = _filter_species_rows(df, species_name)
         
         if species_data.empty:
