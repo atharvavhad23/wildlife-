@@ -36,4 +36,6 @@ urlpatterns = [
     path('api/animals/species/', views.get_species_detail, name='species_detail_api'),
     path('api/animals/species-photos/', views.get_species_photos, name='species_photos_api'),
     path('api/inat-photos/', views.get_inat_photos, name='inat_photos_api'),
+    path('api/animals/species-observations/', views.get_species_observations, name='species_obs_api'),
+    path('api/animals/cluster-timeline/', views.get_cluster_timeline, name='cluster_timeline_api'),
 ]

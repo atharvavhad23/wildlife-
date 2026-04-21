@@ -1377,6 +1377,19 @@ def _perform_clustering(n_clusters=8):
         year_min = int(cluster_data['year'].min()) if 'year' in cluster_data.columns else 0
         year_max = int(cluster_data['year'].max()) if 'year' in cluster_data.columns else 0
 
+        # Year sparkline — counts per year sorted ascending (for mini-chart)
+        year_sparkline = []
+        if 'year' in cluster_data.columns:
+            y_counts = cluster_data.groupby('year').size().reset_index(name='cnt')
+            y_counts = y_counts.sort_values('year')
+            year_sparkline = [{'y': int(r.year), 'c': int(r.cnt)} for r in y_counts.itertuples()]
+
+        # Top 3 localities
+        top_localities = []
+        if 'locality' in cluster_data.columns:
+            loc_top = cluster_data['locality'].dropna().value_counts().head(3)
+            top_localities = [str(l) for l in loc_top.index.tolist()]
+
         result['clusters'][str(cluster_id)] = {
             'species_count': len(species_list),
             'animal_count': len(cluster_data),
@@ -1388,6 +1401,8 @@ def _perform_clustering(n_clusters=8):
             'dominant_locality': dominant_locality,
             'year_min': year_min,
             'year_max': year_max,
+            'year_sparkline': year_sparkline,
+            'top_localities': top_localities,
         }
 
     with _clustering_lock:
@@ -1780,5 +1795,99 @@ def get_inat_photos(request):
                         _inat_photo_cache[obs_id] = url
 
         return JsonResponse({'photos': results})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# ---------------------------------------------------------------------------
+# Species observations — all GPS points for one species (modal mini-map)
+# ---------------------------------------------------------------------------
+@require_http_methods(["GET"])
+def get_species_observations(request):
+    """
+    Returns every observation row for a given species name.
+    ?species=Sarada+superba
+    Returns: {observations:[{lat,lon,date,locality,recordedBy,obsId,inatUrl,year}], total}
+    """
+    try:
+        species = request.GET.get('species', '').strip()
+        if not species:
+            return JsonResponse({'error': 'species param required'}, status=400)
+
+        df = _load_animals_data()
+        mask = df['scientificName'].str.contains(re.escape(species), case=False, na=False)
+        sp_df = df[mask]
+
+        observations = []
+        for row in sp_df[['decimalLatitude', 'decimalLongitude', 'eventDate',
+                           'locality', 'recordedBy', 'occurrenceID', 'year']].itertuples():
+            try:
+                lat = float(row.decimalLatitude)
+                lon = float(row.decimalLongitude)
+                if pd.isna(lat) or pd.isna(lon):
+                    continue
+                oid = str(row.occurrenceID or '')
+                m = re.search(r'/observations/(\d+)', oid)
+                observations.append({
+                    'lat': round(lat, 5),
+                    'lon': round(lon, 5),
+                    'date': str(row.eventDate or '')[:10],
+                    'locality': str(row.locality or 'Koyna Region'),
+                    'recordedBy': str(row.recordedBy or ''),
+                    'inatUrl': oid if 'inaturalist' in oid.lower() else None,
+                    'obsId': m.group(1) if m else None,
+                    'year': int(row.year) if row.year and not pd.isna(row.year) else None,
+                })
+            except Exception:
+                continue
+
+        return JsonResponse({'observations': observations, 'total': len(observations), 'species': species})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# ---------------------------------------------------------------------------
+# Cluster timeline — obs count per year for a specific cluster
+# ---------------------------------------------------------------------------
+@require_http_methods(["GET"])
+def get_cluster_timeline(request):
+    """
+    Returns year-by-year observation counts for a cluster.
+    ?clusters=8&cluster_id=0
+    Returns: {timeline:[{year,count}], total}
+    """
+    try:
+        n_clusters = int(request.GET.get('clusters', 8))
+        cluster_id = int(request.GET.get('cluster_id', 0))
+
+        cache_key = f'animals_{n_clusters}'
+        with _clustering_lock:
+            df_clean = _clustered_df_cache.get(cache_key)
+
+        if df_clean is None:
+            return JsonResponse({'error': 'Run clustering first'}, status=400)
+
+        cdf = df_clean[df_clean['cluster'] == cluster_id]
+        if cdf.empty:
+            return JsonResponse({'timeline': [], 'total': 0})
+
+        if 'year' in cdf.columns:
+            y_counts = cdf.groupby('year').size().reset_index(name='count')
+            y_counts = y_counts.sort_values('year')
+            timeline = [{'year': int(r.year), 'count': int(r.count)} for r in y_counts.itertuples()]
+        else:
+            timeline = []
+
+        # Class breakdown per year (for stacked chart)
+        class_by_year = {}
+        if 'year' in cdf.columns and 'class' in cdf.columns:
+            grp = cdf.groupby(['year', 'class']).size().reset_index(name='count')
+            for row in grp.itertuples():
+                y = int(row.year)
+                if y not in class_by_year:
+                    class_by_year[y] = {}
+                class_by_year[y][str(row.__getattribute__('class'))] = int(row.count)
+
+        return JsonResponse({'timeline': timeline, 'class_by_year': class_by_year, 'total': len(cdf)})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
