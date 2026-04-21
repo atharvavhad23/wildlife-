@@ -1273,6 +1273,7 @@ def get_insects_features(request):
 
 _animals_clustering_cache = {}
 _animals_species_cache = None
+_clustered_df_cache = {}   # key: n_clusters -> labeled DataFrame
 _clustering_lock = threading.Lock()
 
 
@@ -1292,76 +1293,107 @@ def _load_animals_data():
 
 def _perform_clustering(n_clusters=8):
     """
-    Perform K-means clustering on animals by location + taxonomy.
-    Returns: {cluster_id: [species_list], centers: [[lat, lon]], ...}
+    Perform K-means clustering on Koyna Wildlife Sanctuary animals by location + taxonomy.
+    Returns authentic geographic cluster centers (actual mean lat/lon per cluster),
+    class breakdown, dominant family/locality, and year range.
     """
     with _clustering_lock:
         cache_key = f'clusters_{n_clusters}'
         if cache_key in _animals_clustering_cache:
             return _animals_clustering_cache[cache_key]
-    
+
     df = _load_animals_data()
     if df.empty:
         return {'error': 'No data available'}
-    
-    # Prepare features: geographic + taxonomic encoding
-    df_clean = df.dropna(subset=['decimalLatitude', 'decimalLongitude'])
-    
+
+    # Filter to records with valid geographic coordinates
+    df_clean = df.dropna(subset=['decimalLatitude', 'decimalLongitude']).copy()
+
     if len(df_clean) == 0:
-        return {'error': 'No geographic data available'}
-    
-    # Feature engineering: location + class encoding
-    df_features = df_clean.copy()
-    
-    # Encode categorical features
-    class_mapping = {cls: i for i, cls in enumerate(df_features['class'].unique())}
-    order_mapping = {ord: i for i, ord in enumerate(df_features['order'].unique())}
-    
-    df_features['class_enc'] = df_features['class'].map(class_mapping).fillna(0)
-    df_features['order_enc'] = df_features['order'].map(order_mapping).fillna(0)
-    
-    # Select features for clustering
-    features_for_clustering = df_features[[
-        'decimalLatitude', 
-        'decimalLongitude', 
+        return {'error': 'No geographic data available for Koyna WLS'}
+
+    # ---------- Feature engineering for clustering ----------
+    class_mapping = {cls: i for i, cls in enumerate(df_clean['class'].unique())}
+    order_mapping = {ord_: i for i, ord_ in enumerate(df_clean['order'].unique())}
+
+    df_clean['class_enc'] = df_clean['class'].map(class_mapping).fillna(0)
+    df_clean['order_enc'] = df_clean['order'].map(order_mapping).fillna(0)
+
+    features_for_clustering = df_clean[[
+        'decimalLatitude',
+        'decimalLongitude',
         'class_enc',
         'order_enc',
-        'year'
+        'year',
     ]].fillna(0)
-    
-    # Standardize features
+
+    # Standardize before clustering (but keep raw coords for display)
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features_for_clustering)
-    
-    # Perform K-means clustering
+
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
     cluster_labels = kmeans.fit_predict(features_scaled)
-    
-    df_features['cluster'] = cluster_labels
-    
-    # Build result
+    df_clean['cluster'] = cluster_labels
+
+    # ---------- Build result using ACTUAL geographic means ----------
     result = {
         'clusters': {},
-        'centers': kmeans.cluster_centers_.tolist(),
         'n_clusters': n_clusters,
-        'total_species': len(df_clean),
+        'total_observations': len(df_clean),
+        'total_species': int(df_clean['scientificName'].nunique()),
+        'sanctuary': 'Koyna Wildlife Sanctuary, Maharashtra, India',
+        'lat_center': float(df_clean['decimalLatitude'].mean()),
+        'lon_center': float(df_clean['decimalLongitude'].mean()),
     }
-    
-    # Group species by cluster
+
     for cluster_id in range(n_clusters):
-        cluster_data = df_features[df_features['cluster'] == cluster_id]
-        species_in_cluster = cluster_data['scientificName'].unique().tolist()
+        cluster_data = df_clean[df_clean['cluster'] == cluster_id]
+        if cluster_data.empty:
+            continue
+
+        species_list = cluster_data['scientificName'].dropna().unique().tolist()
+
+        # Real geographic center (mean of actual observation coords)
+        real_lat = float(cluster_data['decimalLatitude'].mean())
+        real_lon = float(cluster_data['decimalLongitude'].mean())
+
+        # Class breakdown for this cluster
+        class_counts = cluster_data['class'].value_counts().head(6)
+        class_breakdown = {str(k): int(v) for k, v in class_counts.items()}
+
+        # Dominant taxonomic family
+        family_counts = cluster_data['family'].value_counts()
+        dominant_family = str(family_counts.index[0]) if len(family_counts) > 0 else 'Unknown'
+
+        # Dominant locality
+        locality_col = cluster_data.get('locality', None) if hasattr(cluster_data, 'get') else None
+        if 'locality' in cluster_data.columns:
+            loc_counts = cluster_data['locality'].dropna().value_counts()
+            dominant_locality = str(loc_counts.index[0]) if len(loc_counts) > 0 else 'Koyna Region'
+        else:
+            dominant_locality = 'Koyna Region'
+
+        # Year range of observations
+        year_min = int(cluster_data['year'].min()) if 'year' in cluster_data.columns else 0
+        year_max = int(cluster_data['year'].max()) if 'year' in cluster_data.columns else 0
+
         result['clusters'][str(cluster_id)] = {
-            'species_count': len(species_in_cluster),
+            'species_count': len(species_list),
             'animal_count': len(cluster_data),
-            'center_lat': float(kmeans.cluster_centers_[cluster_id][0]),
-            'center_lon': float(kmeans.cluster_centers_[cluster_id][1]),
-            'species': species_in_cluster[:10],
+            'center_lat': real_lat,
+            'center_lon': real_lon,
+            'species': species_list[:10],
+            'class_breakdown': class_breakdown,
+            'dominant_family': dominant_family,
+            'dominant_locality': dominant_locality,
+            'year_min': year_min,
+            'year_max': year_max,
         }
-    
+
     with _clustering_lock:
         _animals_clustering_cache[cache_key] = result
-    
+        _clustered_df_cache[cache_key] = df_clean   # cache labeled df for fast reuse
+
     return result
 
 
@@ -1552,5 +1584,201 @@ def get_species_photos(request):
             'nextOffset': next_offset,
             'hasMore': next_offset < total,
         })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# ---------------------------------------------------------------------------
+# NEW: Cluster detail + heatmap endpoints — USE CACHED LABELED DF
+# ---------------------------------------------------------------------------
+
+def _get_labeled_df(n_clusters):
+    """Return the pre-labeled DataFrame from cache, running clustering if needed."""
+    cache_key = f'clusters_{n_clusters}'
+    with _clustering_lock:
+        if cache_key in _clustered_df_cache:
+            return _clustered_df_cache[cache_key]
+    # Not cached yet — run clustering (which will populate the cache)
+    _perform_clustering(n_clusters)
+    with _clustering_lock:
+        return _clustered_df_cache.get(cache_key)
+
+
+@require_http_methods(["GET"])
+def get_cluster_details(request):
+    """
+    API: Return per-species details for a specific cluster.
+    Uses cached labeled DataFrame — response in <1s after first run.
+    ?clusters=N  (default 8)
+    ?cluster_id=K  (required)
+    """
+    try:
+        n_clusters = int(request.GET.get('clusters', 8))
+        n_clusters = max(3, min(20, n_clusters))
+        filter_id  = request.GET.get('cluster_id', None)
+
+        df_clean = _get_labeled_df(n_clusters)
+        if df_clean is None or df_clean.empty:
+            return JsonResponse({'error': 'No clustering data available'}, status=400)
+
+        cluster_ids = [int(filter_id)] if filter_id is not None else list(range(n_clusters))
+        result = {}
+
+        for cid in cluster_ids:
+            cdf = df_clean[df_clean['cluster'] == cid]
+            if cdf.empty:
+                continue
+
+            species_rows = []
+            for sci_name, grp in cdf.groupby('scientificName', dropna=True):
+                # Collect ALL iNaturalist observation URLs for this species in this cluster
+                inat_urls = []
+                obs_ids = []
+                for oid in grp['occurrenceID'].dropna():
+                    if 'inaturalist.org' in str(oid):
+                        m = re.search(r'/observations/(\d+)', str(oid))
+                        if m:
+                            inat_urls.append(str(oid))
+                            obs_ids.append(m.group(1))
+
+                # Also collect individual observation rows for map markers
+                obs_points = []
+                for _, row in grp.iterrows():
+                    lat = row.get('decimalLatitude')
+                    lon = row.get('decimalLongitude')
+                    if pd.notna(lat) and pd.notna(lon):
+                        oid = str(row.get('occurrenceID', ''))
+                        obs_points.append({
+                            'lat': round(float(lat), 5),
+                            'lon': round(float(lon), 5),
+                            'date': str(row.get('eventDate', ''))[:10],
+                            'locality': str(row.get('locality', '')) or 'Koyna Region',
+                            'recordedBy': str(row.get('recordedBy', '')),
+                            'inatUrl': oid if 'inaturalist.org' in oid else None,
+                        })
+
+                first = grp.iloc[0]
+                loc_series = grp['locality'].dropna().value_counts() if 'locality' in grp.columns else None
+                top_loc = str(loc_series.index[0]) if loc_series is not None and len(loc_series) > 0 else 'Koyna Region'
+
+                species_rows.append({
+                    'scientificName':   str(sci_name),
+                    'class':            str(first.get('class', '')),
+                    'order':            str(first.get('order', '')),
+                    'family':           str(first.get('family', '')),
+                    'genus':            str(first.get('genus', '')),
+                    'kingdom':          str(first.get('kingdom', 'Animalia')),
+                    'phylum':           str(first.get('phylum', '')),
+                    'taxonRank':        str(first.get('taxonRank', 'SPECIES')),
+                    'observationCount': int(len(grp)),
+                    'inatUrl':          inat_urls[0] if inat_urls else None,
+                    'allInatUrls':      inat_urls[:5],   # up to 5 for photo fallbacks
+                    'obsIds':           obs_ids[:5],     # corresponding observation IDs
+                    'centerLat':        round(float(grp['decimalLatitude'].mean()), 5),
+                    'centerLon':        round(float(grp['decimalLongitude'].mean()), 5),
+                    'topLocality':      top_loc,
+                    'yearMin':          int(grp['year'].min()) if 'year' in grp.columns else 0,
+                    'yearMax':          int(grp['year'].max()) if 'year' in grp.columns else 0,
+                    'hasImage':         len(obs_ids) > 0,
+                    'license':          str(first.get('license', '')),
+                    'basisOfRecord':    str(first.get('basisOfRecord', '')),
+                    'samplePoints':     obs_points[:3],   # up to 3 sample locations
+                })
+
+            species_rows.sort(key=lambda x: x['observationCount'], reverse=True)
+            result[str(cid)] = {
+                'cluster_id':    cid,
+                'species_count': len(species_rows),
+                'total_obs':     int(len(cdf)),
+                'species':       species_rows,
+            }
+
+        return JsonResponse({'clusters': result, 'n_clusters': n_clusters})
+    except Exception as e:
+        import traceback
+        return JsonResponse({'error': str(e), 'trace': traceback.format_exc()}, status=400)
+
+
+@require_http_methods(["GET"])
+def get_cluster_heatmap(request):
+    """
+    API: Return all observation lat/lon points with cluster label.
+    Reuses cached labeled DataFrame — instant after first clustering run.
+    ?clusters=N
+    """
+    try:
+        n_clusters = int(request.GET.get('clusters', 8))
+        n_clusters = max(3, min(20, n_clusters))
+
+        df_clean = _get_labeled_df(n_clusters)
+        if df_clean is None or df_clean.empty:
+            return JsonResponse({'points': [], 'error': 'No data'})
+
+        points = [
+            [round(float(r.decimalLatitude), 5), round(float(r.decimalLongitude), 5), int(r.cluster)]
+            for r in df_clean[['decimalLatitude', 'decimalLongitude', 'cluster']].itertuples()
+        ]
+
+        return JsonResponse({'points': points, 'n_clusters': n_clusters, 'total': len(points)})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# ---------------------------------------------------------------------------
+# iNaturalist photo proxy — fetches photo URLs server-side (no browser CORS)
+# ---------------------------------------------------------------------------
+_inat_photo_cache = {}   # obsId -> photo_url or None
+_inat_photo_lock  = threading.Lock()
+
+
+@require_http_methods(["GET"])
+def get_inat_photos(request):
+    """
+    Server-side proxy: fetch iNaturalist photo URLs for given observation IDs.
+    ?obs_ids=12345,67890,...   (max 40, comma-separated)
+    Returns: {photos: {obsId: url_or_null}}
+    Caches in memory — instant on repeated calls.
+    """
+    try:
+        raw = request.GET.get('obs_ids', '').strip()
+        if not raw:
+            return JsonResponse({'photos': {}})
+
+        obs_ids = [oid.strip() for oid in raw.split(',') if oid.strip().isdigit()][:40]
+
+        # Separate cached from uncached
+        results = {}
+        to_fetch = []
+        with _inat_photo_lock:
+            for oid in obs_ids:
+                if oid in _inat_photo_cache:
+                    results[oid] = _inat_photo_cache[oid]
+                else:
+                    to_fetch.append(oid)
+
+        def _fetch_photo(obs_id):
+            try:
+                url = f'https://api.inaturalist.org/v1/observations/{obs_id}?fields=photos'
+                req = Request(url, headers={'User-Agent': 'KoynaWildlifeApp/1.0'})
+                with urlopen(req, timeout=12) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                photos = data.get('results', [{}])[0].get('photos', [])
+                if photos:
+                    photo_url = (photos[0].get('url') or '').replace('/square.', '/medium.')
+                    return obs_id, photo_url if photo_url else None
+            except Exception:
+                pass
+            return obs_id, None
+
+        if to_fetch:
+            with ThreadPoolExecutor(max_workers=12) as executor:
+                futures = {executor.submit(_fetch_photo, oid): oid for oid in to_fetch}
+                for future in as_completed(futures):
+                    obs_id, url = future.result()
+                    results[obs_id] = url
+                    with _inat_photo_lock:
+                        _inat_photo_cache[obs_id] = url
+
+        return JsonResponse({'photos': results})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)

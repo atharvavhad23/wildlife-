@@ -1,415 +1,553 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Animal Clustering Map</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koyna WLS · Species Cluster Heatmap</title>
+<meta name="description" content="Interactive wildlife heatmap and species browser for Koyna Wildlife Sanctuary.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#07120d;--panel:#0b1a11;--card:#111e16;--border:rgba(82,183,136,.22);
+  --green:#52b788;--glow:#74c69d;--gold:#f4a261;--amber:#e76f51;--sky:#4cc9f0;
+  --text:#d8f3dc;--muted:#8aaa96;--dim:#4f7263;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;}
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f4f8fb;
-            color: #1f2937;
-        }
+/* ─ Navbar ─ */
+.nav{position:fixed;top:0;left:0;right:0;z-index:3000;height:52px;background:linear-gradient(90deg,#050e08,#0c1b12);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;}
+.nav-logo{font-size:1.05rem;font-weight:800;color:var(--glow);}
+.nav-logo span{color:var(--gold);}
+.nav-sep{width:1px;height:22px;background:var(--border);}
+.nav-sub{font-size:.72rem;color:var(--muted);}
+.nav-badge{margin-left:auto;font-size:.68rem;font-weight:700;padding:3px 12px;border-radius:20px;background:rgba(82,183,136,.1);border:1px solid var(--border);color:var(--green);}
+.nav-back{text-decoration:none;font-size:.72rem;color:var(--muted);padding:5px 11px;border:1px solid var(--border);border-radius:6px;transition:.15s;}
+.nav-back:hover{background:var(--card);color:var(--green);}
 
-        .container {
-            display: flex;
-            height: 100vh;
-        }
+/* ─ Layout ─ */
+.layout{display:flex;height:100vh;padding-top:52px;}
+#map{flex:1;z-index:1;position:relative;}
 
-        #map {
-            flex: 1;
-            z-index: 1;
-        }
+/* ─ Sidebar ─ */
+.sb{width:300px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.sb-head{padding:12px 14px 9px;border-bottom:1px solid var(--border);flex-shrink:0;background:linear-gradient(135deg,rgba(45,106,79,.4),transparent);}
+.sb-head h2{font-size:.87rem;font-weight:700;color:var(--glow);}
+.sb-head p{font-size:.64rem;color:var(--muted);margin-top:2px;}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--border);flex-shrink:0;}
+.stat{padding:8px 10px;text-align:center;border-right:1px solid var(--border);}
+.stat:last-child{border-right:none;}
+.stat-v{font-size:1.15rem;font-weight:800;color:var(--green);}
+.stat-l{font-size:.57rem;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:1px;}
+.ctrl{padding:9px 12px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px;}
+.ctrl-lbl{font-size:.7rem;color:var(--muted);white-space:nowrap;}
+.ctrl-val{font-size:.8rem;font-weight:700;color:var(--green);min-width:18px;text-align:center;}
+input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:3px;background:rgba(82,183,136,.2);border-radius:4px;outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--green);border:2px solid var(--glow);cursor:pointer;}
+.run-btn{padding:6px 13px;background:linear-gradient(135deg,#2d6a4f,#52b788);color:#fff;border:none;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;transition:.15s;}
+.run-btn:hover{filter:brightness(1.15);}
+.run-btn:disabled{opacity:.4;cursor:not-allowed;}
+.err{margin:7px 10px;padding:8px 11px;background:rgba(231,111,81,.1);border:1px solid rgba(231,111,81,.3);border-radius:6px;font-size:.72rem;color:var(--amber);}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 10px;}
 
-        .sidebar {
-            width: 350px;
-            background: white;
-            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-        }
+/* ─ Sidebar cluster cards ─ */
+.cl-scroll{flex:1;overflow-y:auto;padding:7px 8px;}
+.cl-scroll::-webkit-scrollbar{width:3px;}
+.cl-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.cc{background:var(--card);border:1px solid var(--border);border-left:4px solid transparent;border-radius:8px;padding:10px 12px;margin-bottom:7px;cursor:pointer;transition:.15s;}
+.cc:hover{background:rgba(45,106,79,.28);transform:translateX(2px);}
+.cc.active{border-left-color:var(--green);background:rgba(82,183,136,.07);}
+.cc-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.cc-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.cc-name{font-size:.82rem;font-weight:700;}
+.cc-obs{margin-left:auto;font-size:.6rem;color:var(--muted);background:rgba(255,255,255,.05);padding:2px 7px;border-radius:8px;}
+.cc-bar{display:flex;height:4px;border-radius:3px;overflow:hidden;gap:1px;margin-bottom:5px;}
+.cc-seg{border-radius:2px;}
+.cc-meta{display:grid;grid-template-columns:1fr 1fr;gap:3px 6px;font-size:.62rem;color:var(--muted);}
+.cc-meta strong{color:var(--glow);}
 
-        .sidebar-header {
-            padding: 20px;
-            background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
-            color: white;
-            border-bottom: 1px solid #e5e7eb;
-        }
+/* ─ Drawer ─ */
+.drawer{position:fixed;right:-680px;top:52px;bottom:0;width:660px;z-index:2000;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;transition:right .3s cubic-bezier(.4,0,.2,1);box-shadow:-12px 0 48px rgba(0,0,0,.7);}
+.drawer.open{right:0;}
+.dr-head{padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(45,106,79,.4),transparent);}
+.dr-title{font-size:.92rem;font-weight:700;color:var(--glow);flex:1;}
+.dr-count{font-size:.68rem;color:var(--muted);padding:3px 9px;border:1px solid var(--border);border-radius:12px;}
+.dr-close{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);padding:4px 11px;border-radius:6px;cursor:pointer;font-size:.74rem;transition:.15s;}
+.dr-close:hover{background:rgba(231,111,81,.15);color:var(--amber);}
+.dr-stats{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-bottom:1px solid var(--border);flex-shrink:0;}
+.dr-stat{padding:8px 10px;text-align:center;border-right:1px solid var(--border);}
+.dr-stat:last-child{border-right:none;}
+.dr-sv{font-size:1.05rem;font-weight:700;color:var(--green);}
+.dr-sl{font-size:.56rem;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;}
 
-        .sidebar-header h2 {
-            font-size: 1.3rem;
-            margin-bottom: 10px;
-        }
+/* filter bar */
+.dr-filter{padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;gap:6px;align-items:center;}
+.dr-search{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:.72rem;font-family:'Inter',sans-serif;outline:none;}
+.dr-search::placeholder{color:var(--dim);}
+.dr-search:focus{border-color:var(--green);}
+.chip{padding:4px 10px;border:1px solid var(--border);border-radius:12px;font-size:.62rem;font-weight:600;cursor:pointer;color:var(--muted);transition:.15s;background:transparent;white-space:nowrap;}
+.chip.on{border-color:var(--green);color:var(--green);background:rgba(82,183,136,.1);}
+.photo-status{font-size:.62rem;color:var(--dim);margin-left:auto;white-space:nowrap;}
+.photo-status.loading{color:var(--green);}
 
-        .sidebar-header p {
-            font-size: 0.85rem;
-            opacity: 0.9;
-        }
+/* ─ Species grid — 2 columns for bigger cards ─ */
+.dr-grid{flex:1;overflow-y:auto;padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;grid-auto-rows:auto;}
+.dr-grid::-webkit-scrollbar{width:4px;}
+.dr-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
 
-        .sidebar-content {
-            flex: 1;
-            padding: 20px;
-        }
+/* ─ Species card ─ */
+.sp{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:.18s;display:flex;flex-direction:column;min-height:340px;}
+.sp:hover{border-color:rgba(82,183,136,.5);transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.55);}
 
-        .controls {
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #f9fafb;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-        }
+/* photo container — fixed 160px tall */
+.sp-photo{position:relative;width:100%;height:160px;min-height:160px;overflow:hidden;background:#0c1c12;flex-shrink:0;}
 
-        .control-group {
-            margin-bottom: 12px;
-        }
+/* The actual image — covers full area */
+.sp-photo .sp-img{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  object-fit:cover;z-index:2;display:block;
+  opacity:0;transition:opacity .5s ease;
+}
+.sp-photo .sp-img.loaded{opacity:1;}
 
-        .control-group label {
-            display: block;
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-bottom: 6px;
-            color: #374151;
-        }
+/* Emoji placeholder — behind image */
+.sp-placeholder{
+  position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  background:linear-gradient(135deg,#0d2016,#183025);
+}
+.sp-placeholder .big-emoji{font-size:3rem;line-height:1;}
+.sp-placeholder .cls-label{font-size:.62rem;color:var(--muted);font-weight:500;}
 
-        .control-group input,
-        .control-group select {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 0.9rem;
-        }
+/* shimmer while fetching photo from server */
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.sp-photo.fetching::after{
+  content:'';position:absolute;top:0;left:0;width:100%;height:100%;z-index:3;
+  background:linear-gradient(90deg,transparent 25%,rgba(82,183,136,.07) 50%,transparent 75%);
+  background-size:200% 100%;animation:shimmer 1.8s infinite;pointer-events:none;
+}
 
-        .control-group button {
-            width: 100%;
-            padding: 10px;
-            background: #0f766e;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
+/* badges */
+.obs-badge{position:absolute;top:8px;right:8px;z-index:5;background:rgba(0,0,0,.72);color:var(--green);font-size:.6rem;font-weight:700;padding:3px 8px;border-radius:9px;backdrop-filter:blur(4px);}
+.cls-badge{position:absolute;bottom:8px;left:8px;z-index:5;font-size:.58rem;font-weight:700;padding:2px 8px;border-radius:9px;backdrop-filter:blur(4px);}
+.photo-credit{position:absolute;bottom:0;right:0;left:0;z-index:4;padding:3px 7px;font-size:.52rem;color:rgba(255,255,255,.65);background:linear-gradient(transparent,rgba(0,0,0,.5));text-overflow:ellipsis;overflow:hidden;white-space:nowrap;display:none;}
+.sp-photo .sp-img.loaded~.photo-credit{display:block;}
 
-        .control-group button:hover {
-            background: #115e56;
-        }
+/* card body */
+.sp-body{padding:10px 11px;flex:1;min-height:120px;display:flex;flex-direction:column;gap:3px;}
+.sp-name{font-size:.78rem;font-weight:700;font-style:italic;color:var(--text);line-height:1.35;margin-bottom:1px;}
+.sp-order{font-size:.62rem;color:var(--glow);font-weight:600;margin-bottom:4px;}
+.sp-divider{height:1px;background:var(--border);margin:4px 0;}
+.sp-rows{display:flex;flex-direction:column;gap:4px;}
+.sp-row{display:flex;justify-content:space-between;align-items:center;font-size:.62rem;}
+.sp-row .lbl{color:var(--muted);}
+.sp-row .val{color:var(--text);font-weight:600;text-align:right;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
-        .cluster-list {
-            margin-top: 20px;
-        }
+/* footer */
+.sp-foot{border-top:1px solid var(--border);display:flex;flex-shrink:0;}
+.sp-foot a,.sp-foot button{flex:1;padding:7px 4px;text-align:center;font-size:.63rem;font-weight:600;color:var(--green);text-decoration:none;background:transparent;border:none;cursor:pointer;transition:.13s;font-family:'Inter',sans-serif;}
+.sp-foot a:hover{background:rgba(82,183,136,.08);}
+.sp-foot button:hover{background:rgba(76,201,240,.08);color:var(--sky);}
+.sp-foot-sep{width:1px;background:var(--border);}
 
-        .cluster-item {
-            padding: 12px;
-            margin-bottom: 10px;
-            background: #f3f4f6;
-            border-left: 4px solid #0f766e;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+/* map overlays */
+.map-pin{position:absolute;bottom:18px;left:14px;z-index:500;background:rgba(7,18,13,.93);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:.66rem;color:var(--muted);max-width:195px;backdrop-filter:blur(8px);}
+.map-pin strong{color:var(--glow);display:block;margin-bottom:2px;}
+.hm-leg{position:absolute;bottom:18px;right:14px;z-index:500;background:rgba(7,18,13,.93);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:.63rem;color:var(--muted);min-width:160px;backdrop-filter:blur(8px);}
+.hm-leg-t{color:var(--glow);font-weight:700;margin-bottom:5px;font-size:.68rem;}
+.hm-item{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+.hm-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 
-        .cluster-item:hover {
-            background: #e5e7eb;
-            transform: translateX(4px);
-        }
+/* Leaflet popup */
+.leaflet-popup-content-wrapper{background:rgba(7,18,13,.97)!important;border:1px solid rgba(82,183,136,.3)!important;border-radius:10px!important;color:var(--text)!important;}
+.leaflet-popup-tip{background:rgba(7,18,13,.97)!important;}
+.leaflet-popup-content{margin:10px 14px!important;font-family:'Inter',sans-serif;}
+.pu-t{font-size:.9rem;font-weight:700;color:var(--glow);margin-bottom:6px;}
+.pu-r{display:flex;justify-content:space-between;font-size:.7rem;margin:2px 0;}
+.pu-r span:first-child{color:var(--muted);}
+.pu-bar{display:flex;height:5px;border-radius:3px;overflow:hidden;gap:1px;margin:6px 0;}
+.pu-btn{width:100%;padding:6px;margin-top:6px;background:linear-gradient(135deg,#2d6a4f,#52b788);color:#fff;border:none;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;}
 
-        .cluster-item.active {
-            background: #dbeafe;
-            border-left-color: #0284c7;
-        }
-
-        .cluster-title {
-            font-weight: 600;
-            font-size: 0.95rem;
-            margin-bottom: 4px;
-        }
-
-        .cluster-stats {
-            font-size: 0.8rem;
-            color: #6b7280;
-        }
-
-        .species-list {
-            margin-top: 10px;
-            font-size: 0.85rem;
-            color: #4b5563;
-            max-height: 150px;
-            overflow-y: auto;
-        }
-
-        .species-item {
-            padding: 4px 0;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        .species-item:last-child {
-            border-bottom: none;
-        }
-
-        .species-link {
-            color: #0f766e;
-            text-decoration: none;
-            cursor: pointer;
-            font-weight: 500;
-        }
-
-        .species-link:hover {
-            text-decoration: underline;
-        }
-
-        .back-btn {
-            text-decoration: none;
-            padding: 10px 16px;
-            background: #f3f4f6;
-            color: #374151;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-weight: 600;
-            text-align: center;
-            margin-top: 20px;
-            display: block;
-        }
-
-        .back-btn:hover {
-            background: #e5e7eb;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #6b7280;
-        }
-
-        .error {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 10px;
-            border: 1px solid #fecaca;
-        }
-
-        .info-box {
-            background: #e0f2fe;
-            color: #0c4a6e;
-            padding: 12px;
-            border-radius: 6px;
-            border: 1px solid #bae6fd;
-            font-size: 0.9rem;
-            margin-bottom: 15px;
-        }
-
-        /* Leaflet overrides */
-        .leaflet-popup-content {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-    </style>
+.loading-msg{grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted);font-size:.78rem;}
+</style>
 </head>
 <body>
-    <div class="container">
-        <div id="map"></div>
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <h2>Animal Clusters</h2>
-                <p>Interactive clustering map with species information</p>
-            </div>
-            <div class="sidebar-content">
-                <div class="info-box">
-                    Click on map clusters to explore species. Click species names to view details.
-                </div>
+<nav class="nav">
+  <div class="nav-logo">🌿 Koyna <span>WLS</span></div>
+  <div class="nav-sep"></div>
+  <div class="nav-sub">Animal Species · Heatmap &amp; Cluster Explorer</div>
+  <div class="nav-badge" id="navBadge">Starting…</div>
+  <a class="nav-back" href="/animals/">← Prediction</a>
+</nav>
 
-                <div class="controls">
-                    <div class="control-group">
-                        <label for="clusterSlider">Number of Clusters: <span id="clusterCount">8</span></label>
-                        <input type="range" id="clusterSlider" min="3" max="15" value="8" />
-                    </div>
-                    <div class="control-group">
-                        <button id="updateBtn">Recalculate Clusters</button>
-                    </div>
-                </div>
-
-                <div id="errorBox" class="error" style="display:none;"></div>
-
-                <div class="cluster-list" id="clusterList">
-                    <div class="loading">Loading clusters...</div>
-                </div>
-
-                <a class="back-btn" href="/animals/">← Back to Prediction</a>
-            </div>
-        </div>
+<div class="layout">
+  <aside class="sb">
+    <div class="sb-head">
+      <h2>🔬 Cluster Explorer</h2>
+      <p>Click any cluster to explore species with photos</p>
     </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-v" id="stO">—</div><div class="stat-l">Observations</div></div>
+      <div class="stat"><div class="stat-v" id="stS">—</div><div class="stat-l">Species</div></div>
+      <div class="stat"><div class="stat-v" id="stC">—</div><div class="stat-l">Clusters</div></div>
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-lbl">Clusters:</div>
+      <div class="ctrl-val" id="cv">8</div>
+      <input type="range" id="csl" min="3" max="15" value="8">
+      <button class="run-btn" id="runBtn" onclick="boot()">▶ Run</button>
+    </div>
+    <div id="errBox" class="err" style="display:none;"></div>
+    <div class="cl-scroll" id="clList">
+      <div style="text-align:center;padding:30px 16px;color:var(--muted);">
+        <div class="spin"></div>Running K-Means clustering…
+      </div>
+    </div>
+  </aside>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        // Initialize map
-        const map = L.map('map').setView([17.4, 73.8], 10);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors',
-            maxZoom: 19,
-        }).addTo(map);
+  <div id="map">
+    <div class="map-pin">
+      <strong>📍 Koyna Wildlife Sanctuary</strong>
+      Maharashtra, India<br>17.34–17.79°N · 73.46–73.85°E
+    </div>
+    <div class="hm-leg" id="hml" style="display:none;">
+      <div class="hm-leg-t">🔥 Observation Density</div>
+      <div id="hmItems"></div>
+    </div>
+  </div>
+</div>
 
-        let currentMarkers = [];
-        let currentClusters = null;
+<!-- Drawer -->
+<div class="drawer" id="drawer">
+  <div class="dr-head">
+    <div class="dr-title" id="drTitle">Species Explorer</div>
+    <div class="dr-count" id="drCount"></div>
+    <button class="dr-close" onclick="closeDrawer()">✕ Close</button>
+  </div>
+  <div class="dr-stats" id="drStats"></div>
+  <div class="dr-filter">
+    <input type="text" class="dr-search" id="drSearch" placeholder="🔍  Filter species…">
+    <button class="chip on" id="fcAll" onclick="fClass('all')">All</button>
+    <button class="chip" id="fcMam" onclick="fClass('Mammalia')">🐾 Mammals</button>
+    <button class="chip" id="fcAmp" onclick="fClass('Amphibia')">🐸 Amphibia</button>
+    <button class="chip" id="fcRep" onclick="fClass('Squamata')">🦎 Reptiles</button>
+    <div class="photo-status" id="photoStatus"></div>
+  </div>
+  <div class="dr-grid" id="drGrid">
+    <div class="loading-msg">Click a cluster to explore species</div>
+  </div>
+</div>
 
-        // Cluster slider
-        document.getElementById('clusterSlider').addEventListener('input', (e) => {
-            document.getElementById('clusterCount').textContent = e.target.value;
-        });
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const KOYNA=[17.529,73.706],ZOOM=11,BOUNDS=[[17.34,73.46],[17.79,73.85]];
+const COLORS=['#52b788','#f4a261','#4cc9f0','#f72585','#7209b7',
+  '#3a86ff','#fb8500','#06d6a0','#ef233c','#8338ec',
+  '#ffbe0b','#a8dadc','#e07a5f','#90be6d','#f2cc8f'];
+const CC={Amphibia:'#4cc9f0',Squamata:'#2d9d78',Mammalia:'#f4a261',
+  Arachnida:'#e07a5f',Malacostraca:'#8338ec',Testudines:'#74c69d',
+  Crocodylia:'#e63946',Clitellata:'#e9c46a',Gastropoda:'#f3722c',
+  Diplopoda:'#90be6d',Insecta:'#ffbe0b'};
+const CE={Amphibia:'🐸',Squamata:'🦎',Mammalia:'🐾',Arachnida:'🕷️',
+  Malacostraca:'🦀',Testudines:'🐢',Crocodylia:'🐊',
+  Clitellata:'🪱',Gastropoda:'🐌',Diplopoda:'🐛',Insecta:'🦋'};
+function ccls(c){return CC[c]||'#89b4a0';}
+function ecls(c){return CE[c]||'🦎';}
+function esc(t){if(!t)return'';return String(t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
 
-        // Update button
-        document.getElementById('updateBtn').addEventListener('click', loadClusters);
+// ── Map ────────────────────────────────────────────────────────────────────
+const map=L.map('map').setView(KOYNA,ZOOM);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri',maxZoom:19}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{opacity:.65,maxZoom:19}).addTo(map);
+L.rectangle(BOUNDS,{color:'#52b788',weight:1.5,opacity:.55,fill:false,dashArray:'7 5'}).addTo(map).bindTooltip('Koyna WLS boundary',{direction:'top'});
 
-        // Initial load
-        window.addEventListener('DOMContentLoaded', loadClusters);
+// ── State ──────────────────────────────────────────────────────────────────
+let heatLayers=[],clMarkers=[],clMeta=null,activeCid=null,nC=8;
+let curSpecies=[],filterCls='all';
 
-        async function loadClusters() {
-            const n = document.getElementById('clusterSlider').value;
-            const errorBox = document.getElementById('errorBox');
-            errorBox.style.display = 'none';
+// ── Slider ─────────────────────────────────────────────────────────────────
+document.getElementById('csl').addEventListener('input',e=>document.getElementById('cv').textContent=e.target.value);
+document.getElementById('drSearch').addEventListener('input',applyFilter);
 
-            try {
-                const response = await fetch(`{{ clustering_api }}?clusters=${n}`);
-                const data = await response.json();
+// ── BOOT ───────────────────────────────────────────────────────────────────
+async function boot(){
+  nC=parseInt(document.getElementById('csl').value);
+  const btn=document.getElementById('runBtn');
+  btn.disabled=true;btn.textContent='⏳';
+  hideErr();clearHeat();clearMarkers();
+  setClList('<div style="text-align:center;padding:28px 14px;color:var(--muted);"><div class="spin"></div>Running K-Means on 10,000 observations…</div>');
+  try{
+    const [mR,hR]=await Promise.all([
+      fetch(`/api/animals/clustering/?clusters=${nC}`),
+      fetch(`/api/animals/cluster-heatmap/?clusters=${nC}`)
+    ]);
+    const meta=await mR.json(),heat=await hR.json();
+    if(meta.error){showErr(meta.error);return;}
+    clMeta=meta;
+    document.getElementById('stO').textContent=(meta.total_observations||0).toLocaleString();
+    document.getElementById('stS').textContent=(meta.total_species||0).toLocaleString();
+    document.getElementById('stC').textContent=meta.n_clusters||0;
+    document.getElementById('navBadge').textContent=`${meta.n_clusters} clusters · ${meta.total_observations} obs`;
+    renderHeatmap(heat.points);
+    renderMarkers(meta);
+    renderSidebar(meta);
+    renderLegend(meta);
+  }catch(e){showErr('Failed: '+e.message);console.error(e);}
+  finally{btn.disabled=false;btn.textContent='▶ Run';}
+}
 
-                if (data.error) {
-                    showError(data.error);
-                    return;
-                }
+// ── Heatmap ────────────────────────────────────────────────────────────────
+function renderHeatmap(pts){
+  clearHeat();
+  const byCid={};
+  for(const [lat,lon,cid] of pts)(byCid[cid]=byCid[cid]||[]).push([lat,lon,1]);
+  Object.entries(byCid).forEach(([cid,p])=>{
+    const col=COLORS[parseInt(cid)%COLORS.length];
+    heatLayers.push(L.heatLayer(p,{radius:22,blur:18,maxZoom:14,max:1,
+      gradient:{0:'transparent',0.35:col+'33',0.65:col+'99',1:col}}).addTo(map));
+  });
+}
 
-                currentClusters = data;
-                renderMap(data);
-                renderClusterList(data);
-            } catch (e) {
-                showError('Failed to load clusters: ' + e.message);
-            }
-        }
+// ── Cluster markers ────────────────────────────────────────────────────────
+function renderMarkers(meta){
+  clearMarkers();
+  const ents=Object.entries(meta.clusters);
+  const mx=Math.max(...ents.map(([,c])=>c.animal_count));
+  ents.forEach(([cid,cl],idx)=>{
+    const col=COLORS[idx%COLORS.length],r=13+(cl.animal_count/mx)*17;
+    const icon=L.divIcon({className:'',
+      html:`<div style="width:${r*2}px;height:${r*2}px;border-radius:50%;background:${col};border:2.5px solid rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif;font-size:${Math.max(9,r*.7)}px;font-weight:800;color:#fff;box-shadow:0 3px 14px rgba(0,0,0,.6);cursor:pointer;">${idx+1}</div>`,
+      iconSize:[r*2,r*2],iconAnchor:[r,r]});
+    const segs=Object.entries(cl.class_breakdown||{}).map(([c,n])=>`<div style="background:${ccls(c)};flex:${n};border-radius:2px;"></div>`).join('');
+    const topSp=(cl.species||[]).slice(0,3).map(s=>`<div style="font-style:italic;font-size:.68rem;color:#8aaa96;padding:1px 0">• ${esc(s)}</div>`).join('');
+    const m=L.marker([cl.center_lat,cl.center_lon],{icon});
+    m.bindPopup(`<div class="pu-t">Cluster ${idx+1}</div>
+      <div class="pu-r"><span>Observations</span><span>${cl.animal_count.toLocaleString()}</span></div>
+      <div class="pu-r"><span>Species</span><span>${cl.species_count}</span></div>
+      <div class="pu-r"><span>Family</span><span>${esc(cl.dominant_family||'—')}</span></div>
+      <div class="pu-r"><span>Years</span><span>${cl.year_min}–${cl.year_max}</span></div>
+      <div class="pu-bar">${segs}</div>${topSp}
+      <button class="pu-btn" onclick="openCluster('${cid}',${idx})">🔍 Explore Species &amp; Photos</button>`,{maxWidth:255});
+    m.on('click',()=>openCluster(cid,idx));
+    m.addTo(map);clMarkers.push(m);
+  });
+}
 
-        function renderMap(data) {
-            // Clear old markers
-            currentMarkers.forEach(m => map.removeLayer(m));
-            currentMarkers = [];
+// ── Sidebar ────────────────────────────────────────────────────────────────
+function renderSidebar(meta){
+  const c=document.getElementById('clList');c.innerHTML='';
+  Object.entries(meta.clusters).forEach(([cid,cl],idx)=>{
+    const col=COLORS[idx%COLORS.length];
+    const segs=Object.entries(cl.class_breakdown||{}).map(([k,v])=>`<div class="cc-seg" style="background:${ccls(k)};flex:${v}"></div>`).join('');
+    const d=document.createElement('div');
+    d.className='cc';d.id=`cc-${cid}`;d.style.borderLeftColor=col;d.onclick=()=>openCluster(cid,idx);
+    d.innerHTML=`<div class="cc-row">
+      <div class="cc-dot" style="background:${col}"></div>
+      <div class="cc-name" style="color:${col}">Cluster ${idx+1}</div>
+      <div class="cc-obs">${cl.animal_count.toLocaleString()} obs</div>
+    </div>
+    <div class="cc-bar">${segs}</div>
+    <div class="cc-meta">
+      <div>Species: <strong>${cl.species_count}</strong></div>
+      <div>Family: <strong>${esc((cl.dominant_family||'—').substring(0,13))}</strong></div>
+      <div>Years: <strong>${cl.year_min}–${cl.year_max}</strong></div>
+      <div>Area: <strong>${esc((cl.dominant_locality||'Koyna').substring(0,13))}</strong></div>
+    </div>`;
+    c.appendChild(d);
+  });
+}
 
-            if (!data.clusters) return;
+function renderLegend(meta){
+  const lg=document.getElementById('hml'),it=document.getElementById('hmItems');
+  it.innerHTML='';
+  Object.entries(meta.clusters).forEach(([,cl],idx)=>{
+    const col=COLORS[idx%COLORS.length];
+    it.innerHTML+=`<div class="hm-item"><div class="hm-dot" style="background:${col}"></div>Cluster ${idx+1} <span style="color:var(--dim);margin-left:3px">(${cl.species_count} sp)</span></div>`;
+  });
+  lg.style.display='block';
+}
 
-            // Define colors for clusters
-            const colors = [
-                '#ef4444', '#f97316', '#eab308', '#22c55e', '#10b981',
-                '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#8b5cf6',
-                '#d946ef', '#ec4899', '#f43f5e', '#6366f1', '#64748b'
-            ];
+// ── Open Drawer ────────────────────────────────────────────────────────────
+async function openCluster(cid,idx){
+  activeCid=cid;
+  const col=COLORS[idx%COLORS.length];
+  document.querySelectorAll('.cc').forEach(e=>e.classList.remove('active'));
+  const card=document.getElementById(`cc-${cid}`);
+  if(card){card.classList.add('active');card.scrollIntoView({behavior:'smooth',block:'nearest'});}
+  document.getElementById('drTitle').textContent=`Cluster ${idx+1} — Species Explorer`;
+  document.getElementById('drTitle').style.color=col;
+  document.getElementById('drCount').textContent='Loading…';
+  document.getElementById('drStats').innerHTML='';
+  document.getElementById('drSearch').value='';
+  document.getElementById('photoStatus').textContent='';
+  filterCls='all';resetChips();
+  setGrid('<div class="loading-msg"><div class="spin" style="margin:0 auto 12px;"></div>Loading species data…<br><small style="opacity:.5;font-size:.63rem;">Uses server cache — usually &lt;1s</small></div>');
+  document.getElementById('drawer').classList.add('open');
+  const cl=clMeta?.clusters?.[cid];
+  if(cl)map.flyTo([cl.center_lat,cl.center_lon],12,{animate:true,duration:.7});
 
-            Object.entries(data.clusters).forEach((entry, idx) => {
-                const [clusterId, cluster] = entry;
-                const color = colors[idx % colors.length];
+  try{
+    const r=await fetch(`/api/animals/cluster-details/?clusters=${nC}&cluster_id=${cid}`);
+    const data=await r.json();
+    if(data.error){setGrid('<div class="loading-msg">⚠ '+esc(data.error)+'</div>');return;}
+    const clData=data.clusters[String(cid)];
+    if(!clData){setGrid('<div class="loading-msg">⚠ No data for cluster.</div>');return;}
+    curSpecies=clData.species;
+    document.getElementById('drCount').textContent=clData.species_count+' species';
+    const inatCnt=clData.species.filter(s=>s.hasImage).length;
+    const cls=[...new Set(clData.species.map(s=>s.class).filter(Boolean))].length;
+    document.getElementById('drStats').innerHTML=`
+      <div class="dr-stat"><div class="dr-sv">${clData.species_count}</div><div class="dr-sl">Species</div></div>
+      <div class="dr-stat"><div class="dr-sv">${clData.total_obs.toLocaleString()}</div><div class="dr-sl">Observations</div></div>
+      <div class="dr-stat"><div class="dr-sv" style="color:${col}">${inatCnt}</div><div class="dr-sl">With Photos</div></div>
+      <div class="dr-stat"><div class="dr-sv">${cls}</div><div class="dr-sl">Classes</div></div>`;
+    applyFilter();
+    // Batch-load all photos from server proxy
+    loadAllPhotos(clData.species);
+  }catch(e){setGrid('<div class="loading-msg">⚠ Error: '+esc(e.message)+'</div>');console.error(e);}
+}
 
-                // Create marker for cluster center
-                const marker = L.circleMarker(
-                    [cluster.center_lat, cluster.center_lon],
-                    {
-                        radius: 15 + (cluster.animal_count / 50),
-                        fillColor: color,
-                        color: '#fff',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.7
-                    }
-                );
+// ── Filter ─────────────────────────────────────────────────────────────────
+function fClass(cls){filterCls=cls;resetChips();const m={all:'fcAll',Mammalia:'fcMam',Amphibia:'fcAmp',Squamata:'fcRep'};if(m[cls])document.getElementById(m[cls]).classList.add('on');applyFilter();}
+function resetChips(){document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));}
+function applyFilter(){
+  const q=(document.getElementById('drSearch').value||'').toLowerCase();
+  let f=curSpecies;
+  if(filterCls!=='all')f=f.filter(s=>s.class===filterCls);
+  if(q)f=f.filter(s=>(s.scientificName||'').toLowerCase().includes(q)||(s.family||'').toLowerCase().includes(q)||(s.order||'').toLowerCase().includes(q));
+  buildGrid(f);
+}
 
-                marker.bindPopup(`
-                    <div>
-                        <strong>Cluster ${parseInt(clusterId) + 1}</strong><br/>
-                        Species: ${cluster.species_count}<br/>
-                        Observations: ${cluster.animal_count}<br/>
-                        <button onclick="selectCluster('${clusterId}')" style="
-                            width: 100%; padding: 6px; margin-top: 8px;
-                            background: ${color}; color: white;
-                            border: none; border-radius: 4px; cursor: pointer;
-                        ">View Details</button>
-                    </div>
-                `);
+// ── Build grid ─────────────────────────────────────────────────────────────
+function buildGrid(species){
+  const grid=document.getElementById('drGrid');
+  grid.innerHTML='';
+  if(!species.length){setGrid('<div class="loading-msg">No species match the filter.</div>');return;}
+  const frag=document.createDocumentFragment();
+  species.forEach(sp=>frag.appendChild(makeCard(sp)));
+  grid.appendChild(frag);
+}
 
-                marker.addTo(map);
-                currentMarkers.push(marker);
-            });
+// safe CSS id from species name
+function sid(name){return 'sp_'+(name||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,35);}
 
-            // Fit map to bounds
-            if (currentMarkers.length > 0) {
-                const group = new L.featureGroup(currentMarkers);
-                map.fitBounds(group.getBounds(), { padding: [100, 50] });
-            }
-        }
+// ── Species card ───────────────────────────────────────────────────────────
+function makeCard(sp){
+  const col=ccls(sp.class),emoji=ecls(sp.class),id=sid(sp.scientificName);
+  const card=document.createElement('div');card.className='sp';card.dataset.id=id;
+  const foot=[]
+  if(sp.inatUrl) foot.push(`<a href="${esc(sp.inatUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 iNaturalist</a>`);
+  if(sp.centerLat){if(foot.length)foot.push('<div class="sp-foot-sep"></div>');foot.push(`<button onclick="flyTo(${sp.centerLat},${sp.centerLon},event)">📍 Map</button>`);}
+  card.innerHTML=`
+    <div class="sp-photo" id="ph_${id}">
+      <div class="sp-placeholder">
+        <div class="big-emoji">${emoji}</div>
+        <div class="cls-label">${esc(sp.class)||'Species'}</div>
+      </div>
+      <img class="sp-img" id="img_${id}" src="" alt="${esc(sp.scientificName)}">
+      <div class="obs-badge">${sp.observationCount} obs</div>
+      <div class="cls-badge" style="background:${col}25;color:${col};border:1px solid ${col}40">${esc(sp.class)}</div>
+      <div class="photo-credit" id="cred_${id}"></div>
+    </div>
+    <div class="sp-body">
+      <div class="sp-name">${esc(sp.scientificName)}</div>
+      <div class="sp-order">${esc(sp.order||'—')} · ${esc(sp.family||'—')}</div>
+      <div class="sp-divider"></div>
+      <div class="sp-rows">
+        <div class="sp-row"><span class="lbl">Genus</span><span class="val">${esc(sp.genus||'—')}</span></div>
+        <div class="sp-row"><span class="lbl">Location</span><span class="val">${esc((sp.topLocality||'Koyna').substring(0,22))}</span></div>
+        <div class="sp-row"><span class="lbl">Years</span><span class="val">${sp.yearMin||'?'}–${sp.yearMax||'?'}</span></div>
+        <div class="sp-row"><span class="lbl">Kingdom</span><span class="val">${esc(sp.kingdom||'Animalia')}</span></div>
+      </div>
+    </div>
+    ${foot.length?`<div class="sp-foot">${foot.join('')}</div>`:''}`;
+  return card;
+}
 
-        function renderClusterList(data) {
-            const container = document.getElementById('clusterList');
-            container.innerHTML = '';
+// ── SERVER-SIDE BATCH photo loading ───────────────────────────────────────
+// Collect all obsIds from species with images, call /api/inat-photos/ in
+// batches of 30, then assign each photo URL to the correct img element.
+async function loadAllPhotos(species){
+  // Collect species that have obsIds
+  const needPhoto=species.filter(sp=>sp.obsIds&&sp.obsIds.length>0);
+  if(!needPhoto.length) return;
 
-            if (!data.clusters) return;
+  // Build map: obsId → species (for first obsId of each species)
+  const obsToSp={};
+  needPhoto.forEach(sp=>{
+    sp.obsIds.forEach(oid=>{ if(!obsToSp[oid]) obsToSp[oid]=sp; });
+  });
 
-            Object.entries(data.clusters).forEach((entry, idx) => {
-                const [clusterId, cluster] = entry;
-                const div = document.createElement('div');
-                div.className = 'cluster-item';
-                div.onclick = () => selectCluster(clusterId);
+  const allObsIds=[...new Set(needPhoto.flatMap(sp=>sp.obsIds.slice(0,2)))];
+  const total=allObsIds.length;
+  const ps=document.getElementById('photoStatus');
+  ps.textContent=`Loading ${needPhoto.length} photos…`;ps.className='photo-status loading';
 
-                const speciesList = cluster.species.slice(0, 3)
-                    .map(s => `<div class="species-item">
-                        <a class="species-link" onclick="viewSpecies('${s}', event)">${escapeHtml(s)}</a>
-                    </div>`)
-                    .join('');
+  // Add shimmer on photo containers
+  needPhoto.forEach(sp=>{const ph=document.getElementById(`ph_${sid(sp.scientificName)}`);if(ph)ph.classList.add('fetching');});
 
-                div.innerHTML = `
-                    <div class="cluster-title">Cluster ${parseInt(clusterId) + 1}</div>
-                    <div class="cluster-stats">
-                        ${cluster.species_count} species | ${cluster.animal_count} observations
-                    </div>
-                    <div class="species-list">
-                        ${speciesList}
-                        ${cluster.species.length > 3 ? `<div class="species-item">... and ${cluster.species.length - 3} more</div>` : ''}
-                    </div>
-                `;
+  // Batch requests (30 per call)
+  const BATCH=30;
+  const photoMap={};
+  for(let i=0;i<allObsIds.length;i+=BATCH){
+    const batch=allObsIds.slice(i,i+BATCH);
+    try{
+      const r=await fetch(`/api/inat-photos/?obs_ids=${batch.join(',')}`);
+      const d=await r.json();
+      Object.assign(photoMap,d.photos||{});
+    }catch(e){console.warn('Photo batch failed',e);}
+  }
 
-                container.appendChild(div);
-            });
-        }
+  // Assign photos to cards
+  let loaded=0;
+  needPhoto.forEach(sp=>{
+    const imgEl=document.getElementById(`img_${sid(sp.scientificName)}`);
+    const phEl=document.getElementById(`ph_${sid(sp.scientificName)}`);
+    if(!imgEl||!phEl) return;
 
-        function selectCluster(clusterId) {
-            document.querySelectorAll('.cluster-item').forEach(el => {
-                el.classList.remove('active');
-            });
-            event.currentTarget.classList.add('active');
-        }
+    // Find first successful URL for this species
+    let url=null;
+    for(const oid of sp.obsIds){
+      if(photoMap[oid]){url=photoMap[oid];break;}
+    }
 
-        function viewSpecies(speciesName, event) {
-            event.stopPropagation();
-            window.location.href = `/animals/species/?species=${encodeURIComponent(speciesName)}`;
-        }
+    phEl.classList.remove('fetching');
 
-        function showError(msg) {
-            const errorBox = document.getElementById('errorBox');
-            errorBox.textContent = msg;
-            errorBox.style.display = 'block';
-        }
+    if(url){
+      imgEl.onload=()=>{
+        imgEl.classList.add('loaded');
+        loaded++;
+        ps.textContent=`${loaded}/${needPhoto.length} photos loaded`;
+        if(loaded>=needPhoto.length){ps.textContent='✓ All photos loaded';ps.className='photo-status';}
+      };
+      imgEl.onerror=()=>{imgEl.src='';};
+      imgEl.src=url;   // ← set AFTER onload/onerror attached
+    }
+  });
 
-        function escapeHtml(text) {
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text.replace(/[&<>"']/g, m => map[m]);
-        }
-    </script>
+  if(!loaded&&total>0){ps.textContent='Photos unavailable';ps.className='photo-status';}
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function flyTo(lat,lon,ev){ev.stopPropagation();map.flyTo([lat,lon],14,{animate:true,duration:.6});}
+function clearHeat(){heatLayers.forEach(l=>{try{map.removeLayer(l);}catch(_){}});heatLayers=[];}
+function clearMarkers(){clMarkers.forEach(m=>{try{map.removeLayer(m);}catch(_){}});clMarkers=[];}
+function closeDrawer(){document.getElementById('drawer').classList.remove('open');activeCid=null;document.querySelectorAll('.cc').forEach(e=>e.classList.remove('active'));}
+function setGrid(html){document.getElementById('drGrid').innerHTML=html;}
+function setClList(html){document.getElementById('clList').innerHTML=html;}
+function showErr(msg){document.getElementById('errBox').textContent='⚠ '+msg;document.getElementById('errBox').style.display='block';}
+function hideErr(){document.getElementById('errBox').style.display='none';}
+
+window.openCluster=openCluster;
+window.flyTo=flyTo;
+window.fClass=fClass;
+
+window.addEventListener('DOMContentLoaded',boot);
+</script>
 </body>
 </html>
