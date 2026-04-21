@@ -20,6 +20,8 @@
                 <a href="/" class="rounded-lg px-3 py-2 text-sm bg-slate-200 hover:bg-slate-300">Home</a>
                 {% if species_label == 'Birds' %}
                 <a href="/birds/" class="rounded-lg px-3 py-2 text-sm bg-teal-700 text-white hover:bg-teal-800">Back to Birds</a>
+                {% elif species_label == 'Insects' %}
+                <a href="/insects/" class="rounded-lg px-3 py-2 text-sm bg-amber-700 text-white hover:bg-amber-800">Back to Insects</a>
                 {% else %}
                 <a href="/animals/" class="rounded-lg px-3 py-2 text-sm bg-emerald-700 text-white hover:bg-emerald-800">Back to Animals</a>
                 {% endif %}
@@ -57,6 +59,23 @@
                         </ul>
                     </div>
                 </div>
+
+                {% if species_label == 'Insects' and engineered_summary %}
+                <div class="bg-white rounded-2xl shadow p-5">
+                    <h2 class="text-lg font-semibold text-slate-800">Engineered Features Used</h2>
+                    <p class="mt-1 text-sm text-slate-500">Auto-derived features used by the insects model</p>
+                    <div class="mt-3 max-h-72 overflow-auto">
+                        <ul class="divide-y divide-slate-200 text-sm">
+                            {% for item in engineered_summary %}
+                            <li class="py-2 flex items-center justify-between">
+                                <span class="text-slate-600">{{ item.label }}</span>
+                                <span class="font-semibold text-slate-900">{{ item.value }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% endif %}
 
                 <div class="bg-white rounded-2xl shadow p-5">
                     <h2 class="text-lg font-semibold text-slate-800">Prediction</h2>

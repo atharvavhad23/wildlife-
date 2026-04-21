@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animal Clustering Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f4f8fb;
+            color: #1f2937;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        #map {
+            flex: 1;
+            z-index: 1;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: white;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+            color: white;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+        }
+
+        .sidebar-header p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            padding: 20px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #374151;
+        }
+
+        .control-group input,
+        .control-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .control-group button {
+            width: 100%;
+            padding: 10px;
+            background: #0f766e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .control-group button:hover {
+            background: #115e56;
+        }
+
+        .cluster-list {
+            margin-top: 20px;
+        }
+
+        .cluster-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #f3f4f6;
+            border-left: 4px solid #0f766e;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .cluster-item:hover {
+            background: #e5e7eb;
+            transform: translateX(4px);
+        }
+
+        .cluster-item.active {
+            background: #dbeafe;
+            border-left-color: #0284c7;
+        }
+
+        .cluster-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+        }
+
+        .cluster-stats {
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
+
+        .species-list {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #4b5563;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .species-item {
+            padding: 4px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .species-item:last-child {
+            border-bottom: none;
+        }
+
+        .species-link {
+            color: #0f766e;
+            text-decoration: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .species-link:hover {
+            text-decoration: underline;
+        }
+
+        .back-btn {
+            text-decoration: none;
+            padding: 10px 16px;
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-weight: 600;
+            text-align: center;
+            margin-top: 20px;
+            display: block;
+        }
+
+        .back-btn:hover {
+            background: #e5e7eb;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6b7280;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border: 1px solid #fecaca;
+        }
+
+        .info-box {
+            background: #e0f2fe;
+            color: #0c4a6e;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #bae6fd;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+
+        /* Leaflet overrides */
+        .leaflet-popup-content {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="map"></div>
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Animal Clusters</h2>
+                <p>Interactive clustering map with species information</p>
+            </div>
+            <div class="sidebar-content">
+                <div class="info-box">
+                    Click on map clusters to explore species. Click species names to view details.
+                </div>
+
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="clusterSlider">Number of Clusters: <span id="clusterCount">8</span></label>
+                        <input type="range" id="clusterSlider" min="3" max="15" value="8" />
+                    </div>
+                    <div class="control-group">
+                        <button id="updateBtn">Recalculate Clusters</button>
+                    </div>
+                </div>
+
+                <div id="errorBox" class="error" style="display:none;"></div>
+
+                <div class="cluster-list" id="clusterList">
+                    <div class="loading">Loading clusters...</div>
+                </div>
+
+                <a class="back-btn" href="/animals/">← Back to Prediction</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([17.4, 73.8], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19,
+        }).addTo(map);
+
+        let currentMarkers = [];
+        let currentClusters = null;
+
+        // Cluster slider
+        document.getElementById('clusterSlider').addEventListener('input', (e) => {
+            document.getElementById('clusterCount').textContent = e.target.value;
+        });
+
+        // Update button
+        document.getElementById('updateBtn').addEventListener('click', loadClusters);
+
+        // Initial load
+        window.addEventListener('DOMContentLoaded', loadClusters);
+
+        async function loadClusters() {
+            const n = document.getElementById('clusterSlider').value;
+            const errorBox = document.getElementById('errorBox');
+            errorBox.style.display = 'none';
+
+            try {
+                const response = await fetch(`{{ clustering_api }}?clusters=${n}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+
+                currentClusters = data;
+                renderMap(data);
+                renderClusterList(data);
+            } catch (e) {
+                showError('Failed to load clusters: ' + e.message);
+            }
+        }
+
+        function renderMap(data) {
+            // Clear old markers
+            currentMarkers.forEach(m => map.removeLayer(m));
+            currentMarkers = [];
+
+            if (!data.clusters) return;
+
+            // Define colors for clusters
+            const colors = [
+                '#ef4444', '#f97316', '#eab308', '#22c55e', '#10b981',
+                '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#8b5cf6',
+                '#d946ef', '#ec4899', '#f43f5e', '#6366f1', '#64748b'
+            ];
+
+            Object.entries(data.clusters).forEach((entry, idx) => {
+                const [clusterId, cluster] = entry;
+                const color = colors[idx % colors.length];
+
+                // Create marker for cluster center
+                const marker = L.circleMarker(
+                    [cluster.center_lat, cluster.center_lon],
+                    {
+                        radius: 15 + (cluster.animal_count / 50),
+                        fillColor: color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.7
+                    }
+                );
+
+                marker.bindPopup(`
+                    <div>
+                        <strong>Cluster ${parseInt(clusterId) + 1}</strong><br/>
+                        Species: ${cluster.species_count}<br/>
+                        Observations: ${cluster.animal_count}<br/>
+                        <button onclick="selectCluster('${clusterId}')" style="
+                            width: 100%; padding: 6px; margin-top: 8px;
+                            background: ${color}; color: white;
+                            border: none; border-radius: 4px; cursor: pointer;
+                        ">View Details</button>
+                    </div>
+                `);
+
+                marker.addTo(map);
+                currentMarkers.push(marker);
+            });
+
+            // Fit map to bounds
+            if (currentMarkers.length > 0) {
+                const group = new L.featureGroup(currentMarkers);
+                map.fitBounds(group.getBounds(), { padding: [100, 50] });
+            }
+        }
+
+        function renderClusterList(data) {
+            const container = document.getElementById('clusterList');
+            container.innerHTML = '';
+
+            if (!data.clusters) return;
+
+            Object.entries(data.clusters).forEach((entry, idx) => {
+                const [clusterId, cluster] = entry;
+                const div = document.createElement('div');
+                div.className = 'cluster-item';
+                div.onclick = () => selectCluster(clusterId);
+
+                const speciesList = cluster.species.slice(0, 3)
+                    .map(s => `<div class="species-item">
+                        <a class="species-link" onclick="viewSpecies('${s}', event)">${escapeHtml(s)}</a>
+                    </div>`)
+                    .join('');
+
+                div.innerHTML = `
+                    <div class="cluster-title">Cluster ${parseInt(clusterId) + 1}</div>
+                    <div class="cluster-stats">
+                        ${cluster.species_count} species | ${cluster.animal_count} observations
+                    </div>
+                    <div class="species-list">
+                        ${speciesList}
+                        ${cluster.species.length > 3 ? `<div class="species-item">... and ${cluster.species.length - 3} more</div>` : ''}
+                    </div>
+                `;
+
+                container.appendChild(div);
+            });
+        }
+
+        function selectCluster(clusterId) {
+            document.querySelectorAll('.cluster-item').forEach(el => {
+                el.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+        }
+
+        function viewSpecies(speciesName, event) {
+            event.stopPropagation();
+            window.location.href = `/animals/species/?species=${encodeURIComponent(speciesName)}`;
+        }
+
+        function showError(msg) {
+            const errorBox = document.getElementById('errorBox');
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+    </script>
+</body>
+</html>

@@ -400,6 +400,34 @@
             line-height: 1.5;
         }
 
+        .photos-link-box {
+            margin-bottom: 30px;
+            background: #F6FEFD;
+            border: 1px solid #C9F0ED;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .photos-link-box p {
+            color: #4a7e7b;
+            font-size: 0.95em;
+        }
+
+        .photos-link-btn {
+            display: inline-block;
+            padding: 10px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            background: #2b8f89;
+            color: #fff;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
         @media (max-width: 768px) {
             .header h1 {
                 font-size: 1.8em;
@@ -438,7 +466,13 @@
                 <p>ℹ️ <strong>How to use:</strong> Fill in the bird and environmental details below. After prediction, you will be redirected to the full conservation report page.</p>
             </div>
 
+            <div class="photos-link-box">
+                <p><strong>Photo Gallery:</strong> Open a separate page to browse all bird observation photos with faster loading.</p>
+                <a href="/birds/photos/" class="photos-link-btn">View Bird Photos</a>
+            </div>
+
             <form id="predictionForm">
+                {% csrf_token %}
                 <h2 class="section-title">🕐 Time & Location Information</h2>
                 <div class="form-section" id="formContainer-time">
                     <!-- Time fields will be inserted here -->

@@ -112,6 +112,10 @@
             background: linear-gradient(135deg, #4ECDC4 0%, #44B5AA 100%);
         }
 
+        .card-insects {
+            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+        }
+
         .card-header h3 {
             font-size: 2.5em;
             margin-bottom: 10px;
@@ -192,6 +196,16 @@
             box-shadow: 0 10px 25px rgba(78, 205, 196, 0.4);
         }
 
+        .btn-insects {
+            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+            color: white;
+        }
+
+        .btn-insects:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
+        }
+
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -259,20 +273,20 @@
         <div class="intro-section">
             <h2>Welcome to Wildlife Prediction</h2>
             <p>Use machine learning to predict wildlife population density in different areas of the Koyna region.</p>
-            <p>Select below whether you want to predict animal or bird population density based on environmental and temporal factors.</p>
+            <p>Select whether you want to predict animal, bird, or insect population density based on environmental and temporal factors.</p>
             <div class="flow-note">Flow: Home → Prediction Form → Detailed Dashboard</div>
 
             <div class="stats">
                 <div class="stat">
-                    <div class="stat-number">2</div>
+                    <div class="stat-number">3</div>
                     <div class="stat-label">Prediction Models</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-number">15+</div>
+                    <div class="stat-number">13+</div>
                     <div class="stat-label">Features Used</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-number">98%+</div>
+                    <div class="stat-number">89%+</div>
                     <div class="stat-label">Accuracy</div>
                 </div>
             </div>
@@ -314,6 +328,25 @@
                         <li>Habitat Preferences</li>
                     </ul>
                     <button class="btn btn-birds">Predict Birds Density →</button>
+                </div>
+            </a>
+
+            <!-- Insects Card -->
+            <a href="/insects/" class="card">
+                <div class="card-header card-insects">
+                    <div class="icon">🦋</div>
+                    <h3>Insects</h3>
+                    <p>Invertebrate Species</p>
+                </div>
+                <div class="card-body">
+                    <h4>Predict Insect Population</h4>
+                    <ul>
+                        <li>Pollinator & Arthropod Trends</li>
+                        <li>Micro-Habitat Density Signals</li>
+                        <li>Seasonal Emergence Patterns</li>
+                        <li>Taxonomy-Aware Predictions</li>
+                    </ul>
+                    <button class="btn btn-insects">Predict Insects Density →</button>
                 </div>
             </a>
         </div>

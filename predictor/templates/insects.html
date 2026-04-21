@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Animal Population Density Predictor</title>
+    <title>Insect Population Density Predictor</title>
     <style>
         * {
             margin: 0;
@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            background: linear-gradient(135deg, #4ECDC4 0%, #44B5AA 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -31,7 +31,7 @@
         }
 
         .header {
-            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            background: linear-gradient(135deg, #4ECDC4 0%, #44B5AA 100%);
             color: white;
             padding: 50px 30px;
             text-align: center;
@@ -79,11 +79,11 @@
         .section-title {
             font-size: 1.3em;
             font-weight: 700;
-            color: #27ae60;
+            color: #44B5AA;
             margin-top: 30px;
             margin-bottom: 20px;
             padding-bottom: 10px;
-            border-bottom: 3px solid #2ecc71;
+            border-bottom: 3px solid #4ECDC4;
         }
 
         .form-section {
@@ -117,7 +117,7 @@
 
         label {
             font-weight: 700;
-            color: #27ae60;
+            color: #44B5AA;
             margin-bottom: 8px;
             font-size: 1em;
             display: flex;
@@ -141,24 +141,24 @@
         .label-desc {
             font-size: 0.8em;
             font-weight: 500;
-            color: #52BE80;
+            color: #72CCCF;
             margin-top: 2px;
         }
 
         input {
             padding: 12px;
-            border: 2px solid #A9DFBF;
+            border: 2px solid #B2E6E2;
             border-radius: 8px;
             font-size: 1em;
             transition: all 0.3s;
-            background: #F0FDF4;
+            background: #F0FFFE;
         }
 
         input:focus {
             outline: none;
-            border-color: #2ecc71;
+            border-color: #4ECDC4;
             background: white;
-            box-shadow: 0 0 0 4px rgba(46, 204, 113, 0.1);
+            box-shadow: 0 0 0 4px rgba(78, 205, 196, 0.1);
         }
 
         .input-hint {
@@ -170,7 +170,7 @@
         }
 
         .hint-label {
-            color: #52BE80;
+            color: #72CCCF;
             font-weight: 600;
         }
 
@@ -195,13 +195,13 @@
         }
 
         .predict-btn {
-            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            background: linear-gradient(135deg, #4ECDC4 0%, #44B5AA 100%);
             color: white;
         }
 
         .predict-btn:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(46, 204, 113, 0.4);
+            box-shadow: 0 10px 25px rgba(78, 205, 196, 0.4);
         }
 
         .reset-btn {
@@ -222,7 +222,7 @@
 
         .result-section {
             display: none;
-            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            background: linear-gradient(135deg, #4ECDC4 0%, #44B5AA 100%);
             padding: 40px;
             border-radius: 12px;
             color: white;
@@ -302,7 +302,7 @@
 
         .spinner {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #2ecc71;
+            border-top: 4px solid #4ECDC4;
             border-radius: 50%;
             width: 50px;
             height: 50px;
@@ -387,23 +387,23 @@
         }
 
         .info-box {
-            background: #F0FDF4;
+            background: #E0F7F6;
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 30px;
-            border-left: 5px solid #2ecc71;
+            border-left: 5px solid #4ECDC4;
         }
 
         .info-box p {
-            color: #27ae60;
+            color: #44B5AA;
             font-size: 1em;
             line-height: 1.5;
         }
 
         .photos-link-box {
             margin-bottom: 30px;
-            background: #FAFFFC;
-            border: 1px solid #D4EFDF;
+            background: #F6FEFD;
+            border: 1px solid #C9F0ED;
             border-radius: 12px;
             padding: 20px;
             display: flex;
@@ -413,7 +413,7 @@
         }
 
         .photos-link-box p {
-            color: #4f6f5f;
+            color: #4a7e7b;
             font-size: 0.95em;
         }
 
@@ -422,42 +422,10 @@
             padding: 10px 16px;
             border-radius: 8px;
             text-decoration: none;
-            background: #27ae60;
+            background: #2b8f89;
             color: #fff;
             font-weight: 700;
             white-space: nowrap;
-        }
-
-        .clustering-link-box {
-            margin-bottom: 30px;
-            background: #FEF3C7;
-            border: 1px solid #FCD34D;
-            border-radius: 12px;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-        }
-
-        .clustering-link-box p {
-            color: #78350f;
-            font-size: 0.95em;
-        }
-
-        .clustering-link-btn {
-            display: inline-block;
-            padding: 10px 16px;
-            border-radius: 8px;
-            text-decoration: none;
-            background: #f59e0b;
-            color: #fff;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-
-        .clustering-link-btn:hover {
-            background: #d97706;
         }
 
         @media (max-width: 768px) {
@@ -486,8 +454,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🦁 Animal Population Density Predictor</h1>
-            <p>Estimate how many animals you'll find in a protected region</p>
+            <h1>🦅 Insect Population Density Predictor</h1>
+            <p>Predict how many insects you'll find in an area</p>
             <div class="nav-links">
                 <a href="/" class="nav-link">← Back to Home</a>
             </div>
@@ -495,39 +463,29 @@
 
         <div class="content">
             <div class="info-box">
-                <p>ℹ️ <strong>How to use:</strong> Enter the environmental and ecological factors below. After prediction, you will be redirected to the full conservation report page.</p>
+                <p>ℹ️ <strong>How to use:</strong> Fill in the insect and environmental details below. After prediction, you will be redirected to the full conservation report page.</p>
             </div>
 
             <div class="photos-link-box">
-                <p><strong>Photo Gallery:</strong> Open a separate page to browse all animal observation photos with faster loading.</p>
-                <a href="/animals/photos/" class="photos-link-btn">View Animal Photos</a>
-            </div>
-
-            <div class="clustering-link-box">
-                <p><strong>🗺️ Clustering Map:</strong> Explore animal species clusters by geographic location with interactive mapping and detailed species information.</p>
-                <a href="/animals/clustering/" class="clustering-link-btn">Open Clustering Map</a>
+                <p><strong>Photo Gallery:</strong> Open a separate page to browse all insect observation photos with faster loading.</p>
+                <a href="/insects/photos/" class="photos-link-btn">View Insect Photos</a>
             </div>
 
             <form id="predictionForm">
                 {% csrf_token %}
-                <h2 class="section-title">📍 Location & Time Information</h2>
-                <div class="form-section" id="formContainer-location">
-                    <!-- Location fields will be inserted here -->
+                <h2 class="section-title">🕐 Time & Location Information</h2>
+                <div class="form-section" id="formContainer-time">
+                    <!-- Time fields will be inserted here -->
                 </div>
 
-                <h2 class="section-title">🦅 Animal & Species Details</h2>
+                <h2 class="section-title">🦋 Insect Taxonomy Details</h2>
                 <div class="form-section" id="formContainer-species">
                     <!-- Species fields will be inserted here -->
                 </div>
 
-                <h2 class="section-title">🌍 Environmental Factors</h2>
-                <div class="form-section" id="formContainer-environment">
+                <h2 class="section-title">🌍 Environmental & Other Factors</h2>
+                <div class="form-section" id="formContainer-env">
                     <!-- Environmental fields will be inserted here -->
-                </div>
-
-                <h2 class="section-title">📊 Other Information</h2>
-                <div class="form-section" id="formContainer-other">
-                    <!-- Other fields will be inserted here -->
                 </div>
 
                 <div class="buttons">
@@ -538,8 +496,8 @@
 
             <div class="loading" id="loading">
                 <div class="spinner"></div>
-                <p><strong>Analyzing ecosystem data...</strong></p>
-                <p>Our AI is calculating wildlife density...</p>
+                <p><strong>Analyzing data...</strong></p>
+                <p>Our AI is working to predict the insect population...</p>
             </div>
 
             <div class="error-section" id="errorSection">
@@ -548,9 +506,9 @@
 
             <div class="result-section" id="resultSection">
                 <div class="result-header">✅ Prediction Complete!</div>
-                <div class="result-header">Estimated Animal Population Density</div>
+                <div class="result-header">Expected Insect Sightings</div>
                 <div class="result-value" id="predictionResult">0</div>
-                <div class="result-unit">animals per sq. km</div>
+                <div class="result-unit">insects per observation area</div>
                 <div class="stats" id="statsContainer"></div>
                 <div class="insights" id="intelligencePanel"></div>
             </div>
@@ -560,34 +518,30 @@
     <script>
         let features = [];
         let featureRanges = {};
-        const dropdownFeatures = ['phylum_enc', 'class_enc', 'order_enc', 'family_enc', 'taxonRank_enc', 'basisOfRecord_enc', 'season_enc'];
+        const dropdownFeatures = ['order_enc', 'family_enc', 'taxonRank_enc', 'basisOfRecord_enc', 'season_enc'];
         const sliderFeatures = ['coordinateUncertaintyInMeters', 'lat_grid', 'lon_grid', 'species_richness'];
 
         const fieldDescriptions = {
-            // These keys match exactly what `/features/animals/` returns.
+            // These keys match exactly what `/features/insects/` returns.
             'coordinateUncertaintyInMeters': { name: 'GPS Accuracy (meters)', desc: 'How accurate the location is (lower is better)', icon: '📍' },
             'day': { name: 'Day of Month', desc: 'Day of observation (1–31)', icon: '🗓️' },
             'month': { name: 'Month', desc: 'Month of observation (1–12)', icon: '📅' },
-            'year': { name: 'Year', desc: 'Year when observation was recorded', icon: '📆' },
+            'year': { name: 'Year', desc: 'Year when sighting was recorded', icon: '📆' },
             'decade': { name: 'Decade', desc: 'Decade group derived from year', icon: '⏰' },
             'season_enc': { name: 'Season Code', desc: 'Season of observation (encoded)', icon: '🌦️' },
             'lat_grid': { name: 'Latitude Grid', desc: 'North–South grid location', icon: '🧭' },
             'lon_grid': { name: 'Longitude Grid', desc: 'East–West grid location', icon: '🧭' },
-            'species_richness': { name: 'Biodiversity (Species Richness)', desc: 'How many different species in the area', icon: '🌈' },
-
-            'phylum_enc': { name: 'Phylum Code', desc: 'Broad animal group (encoded)', icon: '🧬' },
-            'class_enc': { name: 'Class Code', desc: 'Animal class (encoded)', icon: '🏷️' },
-            'order_enc': { name: 'Order Code', desc: 'Animal order (encoded)', icon: '🦁' },
-            'family_enc': { name: 'Family Code', desc: 'Animal family (encoded)', icon: '🐾' },
+            'order_enc': { name: 'Insect Order Code', desc: 'Major insect group (encoded)', icon: '🦋' },
+            'family_enc': { name: 'Insect Family Code', desc: 'Insect family (encoded)', icon: '🐛' },
             'taxonRank_enc': { name: 'Taxonomic Rank Code', desc: 'How specific the classification is (encoded)', icon: '📊' },
-            'basisOfRecord_enc': { name: 'Record Type Code', desc: 'Type of observation record (encoded)', icon: '📋' },
+            'basisOfRecord_enc': { name: 'Record Type Code', desc: 'How this record was collected (encoded)', icon: '📋' },
+            'species_richness': { name: 'Biodiversity (Species Richness)', desc: 'How many different species in the area', icon: '🌈' },
         };
 
         const fieldCategories = {
-            'location': ['lat_grid', 'lon_grid', 'coordinateUncertaintyInMeters'],
-            'species': ['phylum_enc', 'class_enc', 'order_enc', 'family_enc', 'taxonRank_enc', 'basisOfRecord_enc'],
-            'environment': ['species_richness', 'season_enc'],
-            'other': ['day', 'month', 'year', 'decade'],
+            'time': ['day', 'month', 'year', 'decade', 'season_enc'],
+            'species': ['order_enc', 'family_enc', 'taxonRank_enc', 'basisOfRecord_enc'],
+            'env': ['lat_grid', 'lon_grid', 'coordinateUncertaintyInMeters', 'species_richness'],
         };
 
         function getCookie(name) {
@@ -614,15 +568,14 @@
 
         async function loadFeatures() {
             try {
-                const response = await fetch('/features/animals/');
+                const response = await fetch('/features/insects/');
                 const data = await response.json();
                 featureRanges = data;
 
                 const containers = {
-                    'location': document.getElementById('formContainer-location'),
+                    'time': document.getElementById('formContainer-time'),
                     'species': document.getElementById('formContainer-species'),
-                    'environment': document.getElementById('formContainer-environment'),
-                    'other': document.getElementById('formContainer-other'),
+                    'env': document.getElementById('formContainer-env'),
                 };
 
                 Object.values(containers).forEach(c => c.innerHTML = '');
@@ -631,7 +584,7 @@
                     features.push(feature);
                     const desc = fieldDescriptions[feature] || { name: feature, desc: '', icon: '📌' };
                     
-                    let category = 'other';
+                    let category = 'env';
                     for (const [cat, fields] of Object.entries(fieldCategories)) {
                         if (fields.includes(feature)) {
                             category = cat;
@@ -663,9 +616,9 @@
                             select.name = feature;
                             select.required = true;
                             select.style.padding = '12px';
-                            select.style.border = '2px solid #A9DFBF';
+                            select.style.border = '2px solid #B2E6E2';
                             select.style.borderRadius = '8px';
-                            select.style.background = '#F0FDF4';
+                            select.style.background = '#F0FFFE';
                             for (let val = Math.round(ranges.min); val <= Math.round(ranges.max); val++) {
                                 const opt = document.createElement('option');
                                 opt.value = val;
@@ -743,7 +696,7 @@
                 const form = document.getElementById('predictionForm');
                 const formData = new FormData(form);
                 const data = Object.fromEntries(formData);
-                submitToReport('/dashboard/animals/', data);
+                submitToReport('/dashboard/insects/', data);
             });
 
             document.getElementById('resetBtn').addEventListener('click', () => {
@@ -785,7 +738,7 @@
             document.getElementById('errorSection').classList.remove('show');
 
             try {
-                const response = await fetch('/predict/animals/', {
+                const response = await fetch('/predict/insects/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -814,25 +767,23 @@
             document.getElementById('predictionResult').textContent = displayValue;
             
             let densityLevel = 'Low';
-            if (prediction > 50) {
-                densityLevel = 'Very High - Abundant Wildlife';
-            } else if (prediction > 20) {
-                densityLevel = 'High - Many Animals';
-            } else if (prediction > 5) {
-                densityLevel = 'Medium - Moderate Population';
+            if (prediction > 5) {
+                densityLevel = 'High - Many Insects';
+            } else if (prediction > 2) {
+                densityLevel = 'Medium - Some Insects';
             } else {
-                densityLevel = 'Low - Sparse Population';
+                densityLevel = 'Low - Few Insects';
             }
 
             const statsContainer = document.getElementById('statsContainer');
             statsContainer.innerHTML = `
                 <div class="stat-box">
                     <div class="stat-value">${displayValue}</div>
-                    <div class="stat-label">Density/sq.km</div>
+                    <div class="stat-label">Expected Count</div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-value">${densityLevel}</div>
-                    <div class="stat-label">Population Level</div>
+                    <div class="stat-label">Insect Activity</div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-value">${(displayValue * 0.7).toFixed(0)}</div>
@@ -863,7 +814,7 @@
                 <div class="risk-box risk-${riskLevel}">
                     <div><strong>Risk Level:</strong> ${decision.risk_level || 'Medium'}</div>
                     <div><strong>Status:</strong> ${decision.status || 'Declining'}</div>
-                    <div style="margin-top: 8px;"><strong>Recommendation:</strong> ${decision.recommendation || 'Continue monitoring and protect habitats.'}</div>
+                    <div style="margin-top: 8px;"><strong>Recommendation:</strong> ${decision.recommendation || 'Continue habitat protection and monitoring.'}</div>
                 </div>
             `;
 
@@ -877,3 +828,4 @@
     </script>
 </body>
 </html>
+
