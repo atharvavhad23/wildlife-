@@ -5,6 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 import joblib
 import pandas as pd
 import numpy as np
+import math
 import json
 import re
 from urllib.parse import quote_plus
@@ -67,6 +68,90 @@ def _safe_float(value, default=None):
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _safe_number(value, default=0.0):
+    """Return finite float, otherwise fallback default."""
+    try:
+        num = float(value)
+        if math.isfinite(num):
+            return num
+    except (TypeError, ValueError):
+        pass
+    return default
+
+
+def _safe_text(value, default='Unknown'):
+    """Normalize missing/NaN text values for display and JSON safety."""
+    if value is None:
+        return default
+    if isinstance(value, float) and not math.isfinite(value):
+        return default
+    text = str(value).strip()
+    if not text or text.lower() in {'nan', 'none', 'null'}:
+        return default
+    return text
+
+
+def _sanitize_for_json(value):
+    """Recursively remove NaN/Inf values so browser JSON parsing never fails."""
+    if isinstance(value, dict):
+        return {k: _sanitize_for_json(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_for_json(v) for v in value]
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    return value
+
+
+def _normalize_species_text(value: str) -> str:
+    text = _safe_text(value, '').lower().strip()
+    return re.sub(r'\s+', ' ', text)
+
+
+def _species_core_name(value: str) -> str:
+    """Strip author/year suffix patterns to improve species matching."""
+    text = _normalize_species_text(value)
+    text = re.sub(r'\([^)]*\)', ' ', text)
+    text = text.split(',')[0].strip()
+    return re.sub(r'\s+', ' ', text)
+
+
+def _filter_species_rows(df: pd.DataFrame, species_name: str) -> pd.DataFrame:
+    """Find species rows robustly across naming variants and author suffixes."""
+    if df.empty or 'scientificName' not in df.columns:
+        return pd.DataFrame()
+
+    query = _normalize_species_text(species_name)
+    if not query:
+        return pd.DataFrame()
+
+    sci = df['scientificName'].fillna('').astype(str)
+    norm = sci.map(_normalize_species_text)
+
+    # 1) Exact normalized match.
+    exact = df[norm == query]
+    if not exact.empty:
+        return exact
+
+    # 2) Literal contains (no regex interpretation of special chars).
+    literal = df[sci.str.contains(species_name, case=False, na=False, regex=False)]
+    if not literal.empty:
+        return literal
+
+    # 3) Match by core species name without author/year text.
+    query_core = _species_core_name(species_name)
+    if query_core:
+        norm_core = norm.map(_species_core_name)
+        core = df[(norm_core == query_core) | norm_core.str.startswith(query_core + ' ', na=False)]
+        if not core.empty:
+            return core
+
+        core_literal = df[sci.str.contains(query_core, case=False, na=False, regex=False)]
+        if not core_literal.empty:
+            return core_literal
+
+    return pd.DataFrame()
 
 
 def _extract_animals_lat_lon(payload: dict) -> tuple[float, float]:
@@ -1273,7 +1358,6 @@ def get_insects_features(request):
 
 _animals_clustering_cache = {}
 _animals_species_cache = None
-_clustered_df_cache = {}   # key: n_clusters -> labeled DataFrame
 _clustering_lock = threading.Lock()
 
 
@@ -1293,122 +1377,83 @@ def _load_animals_data():
 
 def _perform_clustering(n_clusters=8):
     """
-    Perform K-means clustering on Koyna Wildlife Sanctuary animals by location + taxonomy.
-    Returns authentic geographic cluster centers (actual mean lat/lon per cluster),
-    class breakdown, dominant family/locality, and year range.
+    Perform K-means clustering on animals by location + taxonomy.
+    Returns: {cluster_id: [species_list], centers: [[lat, lon]], ...}
     """
     with _clustering_lock:
         cache_key = f'clusters_{n_clusters}'
         if cache_key in _animals_clustering_cache:
             return _animals_clustering_cache[cache_key]
-
+    
     df = _load_animals_data()
     if df.empty:
         return {'error': 'No data available'}
-
-    # Filter to records with valid geographic coordinates
-    df_clean = df.dropna(subset=['decimalLatitude', 'decimalLongitude']).copy()
-
+    
+    # Prepare features: geographic + taxonomic encoding
+    df_clean = df.dropna(subset=['decimalLatitude', 'decimalLongitude'])
+    
     if len(df_clean) == 0:
-        return {'error': 'No geographic data available for Koyna WLS'}
-
-    # ---------- Feature engineering for clustering ----------
-    class_mapping = {cls: i for i, cls in enumerate(df_clean['class'].unique())}
-    order_mapping = {ord_: i for i, ord_ in enumerate(df_clean['order'].unique())}
-
-    df_clean['class_enc'] = df_clean['class'].map(class_mapping).fillna(0)
-    df_clean['order_enc'] = df_clean['order'].map(order_mapping).fillna(0)
-
-    features_for_clustering = df_clean[[
-        'decimalLatitude',
-        'decimalLongitude',
+        return {'error': 'No geographic data available'}
+    
+    # Feature engineering: location + class encoding
+    df_features = df_clean.copy()
+    
+    # Encode categorical features
+    class_mapping = {cls: i for i, cls in enumerate(df_features['class'].unique())}
+    order_mapping = {ord: i for i, ord in enumerate(df_features['order'].unique())}
+    
+    df_features['class_enc'] = df_features['class'].map(class_mapping).fillna(0)
+    df_features['order_enc'] = df_features['order'].map(order_mapping).fillna(0)
+    
+    # Select features for clustering
+    features_for_clustering = df_features[[
+        'decimalLatitude', 
+        'decimalLongitude', 
         'class_enc',
         'order_enc',
-        'year',
+        'year'
     ]].fillna(0)
-
-    # Standardize before clustering (but keep raw coords for display)
+    
+    # Standardize features
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features_for_clustering)
-
+    
+    # Perform K-means clustering
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
     cluster_labels = kmeans.fit_predict(features_scaled)
-    df_clean['cluster'] = cluster_labels
-
-    # ---------- Build result using ACTUAL geographic means ----------
+    
+    df_features['cluster'] = cluster_labels
+    
+    # Build result
     result = {
         'clusters': {},
+        'centers': [],
         'n_clusters': n_clusters,
-        'total_observations': len(df_clean),
-        'total_species': int(df_clean['scientificName'].nunique()),
-        'sanctuary': 'Koyna Wildlife Sanctuary, Maharashtra, India',
-        'lat_center': float(df_clean['decimalLatitude'].mean()),
-        'lon_center': float(df_clean['decimalLongitude'].mean()),
+        'total_species': len(df_clean),
     }
-
+    
+    # Group species by cluster
     for cluster_id in range(n_clusters):
-        cluster_data = df_clean[df_clean['cluster'] == cluster_id]
-        if cluster_data.empty:
-            continue
+        cluster_data = df_features[df_features['cluster'] == cluster_id]
+        species_in_cluster = cluster_data['scientificName'].unique().tolist()
 
-        species_list = cluster_data['scientificName'].dropna().unique().tolist()
+        # Use geographic mean in original coordinate space for map display.
+        center_lat = float(cluster_data['decimalLatitude'].mean()) if len(cluster_data) else 0.0
+        center_lon = float(cluster_data['decimalLongitude'].mean()) if len(cluster_data) else 0.0
 
-        # Real geographic center (mean of actual observation coords)
-        real_lat = float(cluster_data['decimalLatitude'].mean())
-        real_lon = float(cluster_data['decimalLongitude'].mean())
-
-        # Class breakdown for this cluster
-        class_counts = cluster_data['class'].value_counts().head(6)
-        class_breakdown = {str(k): int(v) for k, v in class_counts.items()}
-
-        # Dominant taxonomic family
-        family_counts = cluster_data['family'].value_counts()
-        dominant_family = str(family_counts.index[0]) if len(family_counts) > 0 else 'Unknown'
-
-        # Dominant locality
-        locality_col = cluster_data.get('locality', None) if hasattr(cluster_data, 'get') else None
-        if 'locality' in cluster_data.columns:
-            loc_counts = cluster_data['locality'].dropna().value_counts()
-            dominant_locality = str(loc_counts.index[0]) if len(loc_counts) > 0 else 'Koyna Region'
-        else:
-            dominant_locality = 'Koyna Region'
-
-        # Year range of observations
-        year_min = int(cluster_data['year'].min()) if 'year' in cluster_data.columns else 0
-        year_max = int(cluster_data['year'].max()) if 'year' in cluster_data.columns else 0
-
-        # Year sparkline — counts per year sorted ascending (for mini-chart)
-        year_sparkline = []
-        if 'year' in cluster_data.columns:
-            y_counts = cluster_data.groupby('year').size().reset_index(name='cnt')
-            y_counts = y_counts.sort_values('year')
-            year_sparkline = [{'y': int(r.year), 'c': int(r.cnt)} for r in y_counts.itertuples()]
-
-        # Top 3 localities
-        top_localities = []
-        if 'locality' in cluster_data.columns:
-            loc_top = cluster_data['locality'].dropna().value_counts().head(3)
-            top_localities = [str(l) for l in loc_top.index.tolist()]
+        result['centers'].append([center_lat, center_lon])
 
         result['clusters'][str(cluster_id)] = {
-            'species_count': len(species_list),
+            'species_count': len(species_in_cluster),
             'animal_count': len(cluster_data),
-            'center_lat': real_lat,
-            'center_lon': real_lon,
-            'species': species_list[:10],
-            'class_breakdown': class_breakdown,
-            'dominant_family': dominant_family,
-            'dominant_locality': dominant_locality,
-            'year_min': year_min,
-            'year_max': year_max,
-            'year_sparkline': year_sparkline,
-            'top_localities': top_localities,
+            'center_lat': center_lat,
+            'center_lon': center_lon,
+            'species': species_in_cluster[:10],
         }
-
+    
     with _clustering_lock:
         _animals_clustering_cache[cache_key] = result
-        _clustered_df_cache[cache_key] = df_clean   # cache labeled df for fast reuse
-
+    
     return result
 
 
@@ -1422,7 +1467,7 @@ def _get_species_detail(species_name):
         return {'error': 'No data available'}
     
     # Filter by species name
-    species_data = df[df['scientificName'].str.contains(species_name, case=False, na=False)]
+    species_data = _filter_species_rows(df, species_name)
     
     if species_data.empty:
         return {'error': 'Species not found'}
@@ -1431,42 +1476,42 @@ def _get_species_detail(species_name):
     first_record = species_data.iloc[0]
     
     detail = {
-        'scientificName': first_record.get('scientificName', 'Unknown'),
-        'species': first_record.get('species', 'Unknown'),
-        'class': first_record.get('class', 'Unknown'),
-        'order': first_record.get('order', 'Unknown'),
-        'family': first_record.get('family', 'Unknown'),
-        'genus': first_record.get('genus', 'Unknown'),
-        'kingdom': first_record.get('kingdom', 'Animalia'),
-        'phylum': first_record.get('phylum', 'Unknown'),
+        'scientificName': _safe_text(first_record.get('scientificName'), 'Unknown'),
+        'species': _safe_text(first_record.get('species'), 'Unknown'),
+        'class': _safe_text(first_record.get('class'), 'Unknown'),
+        'order': _safe_text(first_record.get('order'), 'Unknown'),
+        'family': _safe_text(first_record.get('family'), 'Unknown'),
+        'genus': _safe_text(first_record.get('genus'), 'Unknown'),
+        'kingdom': _safe_text(first_record.get('kingdom'), 'Animalia'),
+        'phylum': _safe_text(first_record.get('phylum'), 'Unknown'),
         'observationCount': len(species_data),
         'locations': [],
         'occurrenceUrls': [],
         'dateRange': {
-            'earliest': species_data['eventDate'].min() if 'eventDate' in species_data.columns else '',
-            'latest': species_data['eventDate'].max() if 'eventDate' in species_data.columns else '',
+            'earliest': _safe_text(species_data['eventDate'].min(), '') if 'eventDate' in species_data.columns else '',
+            'latest': _safe_text(species_data['eventDate'].max(), '') if 'eventDate' in species_data.columns else '',
         },
         'geographicRange': {
-            'minLat': float(species_data['decimalLatitude'].min()) if 'decimalLatitude' in species_data.columns else 0,
-            'maxLat': float(species_data['decimalLatitude'].max()) if 'decimalLatitude' in species_data.columns else 0,
-            'minLon': float(species_data['decimalLongitude'].min()) if 'decimalLongitude' in species_data.columns else 0,
-            'maxLon': float(species_data['decimalLongitude'].max()) if 'decimalLongitude' in species_data.columns else 0,
-            'centerLat': float(species_data['decimalLatitude'].mean()) if 'decimalLatitude' in species_data.columns else 0,
-            'centerLon': float(species_data['decimalLongitude'].mean()) if 'decimalLongitude' in species_data.columns else 0,
+            'minLat': _safe_number(species_data['decimalLatitude'].min(), 0.0) if 'decimalLatitude' in species_data.columns else 0.0,
+            'maxLat': _safe_number(species_data['decimalLatitude'].max(), 0.0) if 'decimalLatitude' in species_data.columns else 0.0,
+            'minLon': _safe_number(species_data['decimalLongitude'].min(), 0.0) if 'decimalLongitude' in species_data.columns else 0.0,
+            'maxLon': _safe_number(species_data['decimalLongitude'].max(), 0.0) if 'decimalLongitude' in species_data.columns else 0.0,
+            'centerLat': _safe_number(species_data['decimalLatitude'].mean(), 0.0) if 'decimalLatitude' in species_data.columns else 0.0,
+            'centerLon': _safe_number(species_data['decimalLongitude'].mean(), 0.0) if 'decimalLongitude' in species_data.columns else 0.0,
         },
     }
     
     # Collect all observations
     for _, row in species_data.iterrows():
         loc = {
-            'latitude': float(row.get('decimalLatitude', 0)),
-            'longitude': float(row.get('decimalLongitude', 0)),
-            'locality': str(row.get('locality', 'Unknown')),
-            'eventDate': str(row.get('eventDate', '')),
-            'occurrenceID': str(row.get('occurrenceID', '')),
+            'latitude': _safe_number(row.get('decimalLatitude', 0), 0.0),
+            'longitude': _safe_number(row.get('decimalLongitude', 0), 0.0),
+            'locality': _safe_text(row.get('locality'), 'Unknown locality'),
+            'eventDate': _safe_text(row.get('eventDate'), ''),
+            'occurrenceID': _safe_text(row.get('occurrenceID'), ''),
         }
         detail['locations'].append(loc)
-        detail['occurrenceUrls'].append(str(row.get('occurrenceID', '')))
+        detail['occurrenceUrls'].append(_safe_text(row.get('occurrenceID'), ''))
     
     return detail
 
@@ -1501,8 +1546,8 @@ def get_species_detail(request):
         if not species_name:
             return JsonResponse({'error': 'Species name required'}, status=400)
         
-        detail = _get_species_detail(species_name)
-        return JsonResponse(detail)
+        detail = _sanitize_for_json(_get_species_detail(species_name))
+        return JsonResponse(detail, json_dumps_params={'allow_nan': False})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
 
@@ -1534,7 +1579,7 @@ def get_species_photos(request):
             return JsonResponse({'error': 'Species name required'}, status=400)
         
         df = _load_animals_data()
-        species_data = df[df['scientificName'].str.contains(species_name, case=False, na=False)]
+        species_data = _filter_species_rows(df, species_name)
         
         if species_data.empty:
             return JsonResponse({'error': 'Species not found'}, status=404)
@@ -1599,295 +1644,5 @@ def get_species_photos(request):
             'nextOffset': next_offset,
             'hasMore': next_offset < total,
         })
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
-
-# ---------------------------------------------------------------------------
-# NEW: Cluster detail + heatmap endpoints — USE CACHED LABELED DF
-# ---------------------------------------------------------------------------
-
-def _get_labeled_df(n_clusters):
-    """Return the pre-labeled DataFrame from cache, running clustering if needed."""
-    cache_key = f'clusters_{n_clusters}'
-    with _clustering_lock:
-        if cache_key in _clustered_df_cache:
-            return _clustered_df_cache[cache_key]
-    # Not cached yet — run clustering (which will populate the cache)
-    _perform_clustering(n_clusters)
-    with _clustering_lock:
-        return _clustered_df_cache.get(cache_key)
-
-
-@require_http_methods(["GET"])
-def get_cluster_details(request):
-    """
-    API: Return per-species details for a specific cluster.
-    Uses cached labeled DataFrame — response in <1s after first run.
-    ?clusters=N  (default 8)
-    ?cluster_id=K  (required)
-    """
-    try:
-        n_clusters = int(request.GET.get('clusters', 8))
-        n_clusters = max(3, min(20, n_clusters))
-        filter_id  = request.GET.get('cluster_id', None)
-
-        df_clean = _get_labeled_df(n_clusters)
-        if df_clean is None or df_clean.empty:
-            return JsonResponse({'error': 'No clustering data available'}, status=400)
-
-        cluster_ids = [int(filter_id)] if filter_id is not None else list(range(n_clusters))
-        result = {}
-
-        for cid in cluster_ids:
-            cdf = df_clean[df_clean['cluster'] == cid]
-            if cdf.empty:
-                continue
-
-            species_rows = []
-            for sci_name, grp in cdf.groupby('scientificName', dropna=True):
-                # Collect ALL iNaturalist observation URLs for this species in this cluster
-                inat_urls = []
-                obs_ids = []
-                for oid in grp['occurrenceID'].dropna():
-                    if 'inaturalist.org' in str(oid):
-                        m = re.search(r'/observations/(\d+)', str(oid))
-                        if m:
-                            inat_urls.append(str(oid))
-                            obs_ids.append(m.group(1))
-
-                # Also collect individual observation rows for map markers
-                obs_points = []
-                for _, row in grp.iterrows():
-                    lat = row.get('decimalLatitude')
-                    lon = row.get('decimalLongitude')
-                    if pd.notna(lat) and pd.notna(lon):
-                        oid = str(row.get('occurrenceID', ''))
-                        obs_points.append({
-                            'lat': round(float(lat), 5),
-                            'lon': round(float(lon), 5),
-                            'date': str(row.get('eventDate', ''))[:10],
-                            'locality': str(row.get('locality', '')) or 'Koyna Region',
-                            'recordedBy': str(row.get('recordedBy', '')),
-                            'inatUrl': oid if 'inaturalist.org' in oid else None,
-                        })
-
-                first = grp.iloc[0]
-                loc_series = grp['locality'].dropna().value_counts() if 'locality' in grp.columns else None
-                top_loc = str(loc_series.index[0]) if loc_series is not None and len(loc_series) > 0 else 'Koyna Region'
-
-                species_rows.append({
-                    'scientificName':   str(sci_name),
-                    'class':            str(first.get('class', '')),
-                    'order':            str(first.get('order', '')),
-                    'family':           str(first.get('family', '')),
-                    'genus':            str(first.get('genus', '')),
-                    'kingdom':          str(first.get('kingdom', 'Animalia')),
-                    'phylum':           str(first.get('phylum', '')),
-                    'taxonRank':        str(first.get('taxonRank', 'SPECIES')),
-                    'observationCount': int(len(grp)),
-                    'inatUrl':          inat_urls[0] if inat_urls else None,
-                    'allInatUrls':      inat_urls[:5],   # up to 5 for photo fallbacks
-                    'obsIds':           obs_ids[:5],     # corresponding observation IDs
-                    'centerLat':        round(float(grp['decimalLatitude'].mean()), 5),
-                    'centerLon':        round(float(grp['decimalLongitude'].mean()), 5),
-                    'topLocality':      top_loc,
-                    'yearMin':          int(grp['year'].min()) if 'year' in grp.columns else 0,
-                    'yearMax':          int(grp['year'].max()) if 'year' in grp.columns else 0,
-                    'hasImage':         len(obs_ids) > 0,
-                    'license':          str(first.get('license', '')),
-                    'basisOfRecord':    str(first.get('basisOfRecord', '')),
-                    'samplePoints':     obs_points[:3],   # up to 3 sample locations
-                })
-
-            species_rows.sort(key=lambda x: x['observationCount'], reverse=True)
-            result[str(cid)] = {
-                'cluster_id':    cid,
-                'species_count': len(species_rows),
-                'total_obs':     int(len(cdf)),
-                'species':       species_rows,
-            }
-
-        return JsonResponse({'clusters': result, 'n_clusters': n_clusters})
-    except Exception as e:
-        import traceback
-        return JsonResponse({'error': str(e), 'trace': traceback.format_exc()}, status=400)
-
-
-@require_http_methods(["GET"])
-def get_cluster_heatmap(request):
-    """
-    API: Return all observation lat/lon points with cluster label.
-    Reuses cached labeled DataFrame — instant after first clustering run.
-    ?clusters=N
-    """
-    try:
-        n_clusters = int(request.GET.get('clusters', 8))
-        n_clusters = max(3, min(20, n_clusters))
-
-        df_clean = _get_labeled_df(n_clusters)
-        if df_clean is None or df_clean.empty:
-            return JsonResponse({'points': [], 'error': 'No data'})
-
-        points = [
-            [round(float(r.decimalLatitude), 5), round(float(r.decimalLongitude), 5), int(r.cluster)]
-            for r in df_clean[['decimalLatitude', 'decimalLongitude', 'cluster']].itertuples()
-        ]
-
-        return JsonResponse({'points': points, 'n_clusters': n_clusters, 'total': len(points)})
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
-
-# ---------------------------------------------------------------------------
-# iNaturalist photo proxy — fetches photo URLs server-side (no browser CORS)
-# ---------------------------------------------------------------------------
-_inat_photo_cache = {}   # obsId -> photo_url or None
-_inat_photo_lock  = threading.Lock()
-
-
-@require_http_methods(["GET"])
-def get_inat_photos(request):
-    """
-    Server-side proxy: fetch iNaturalist photo URLs for given observation IDs.
-    ?obs_ids=12345,67890,...   (max 40, comma-separated)
-    Returns: {photos: {obsId: url_or_null}}
-    Caches in memory — instant on repeated calls.
-    """
-    try:
-        raw = request.GET.get('obs_ids', '').strip()
-        if not raw:
-            return JsonResponse({'photos': {}})
-
-        obs_ids = [oid.strip() for oid in raw.split(',') if oid.strip().isdigit()][:40]
-
-        # Separate cached from uncached
-        results = {}
-        to_fetch = []
-        with _inat_photo_lock:
-            for oid in obs_ids:
-                if oid in _inat_photo_cache:
-                    results[oid] = _inat_photo_cache[oid]
-                else:
-                    to_fetch.append(oid)
-
-        def _fetch_photo(obs_id):
-            try:
-                url = f'https://api.inaturalist.org/v1/observations/{obs_id}?fields=photos'
-                req = Request(url, headers={'User-Agent': 'KoynaWildlifeApp/1.0'})
-                with urlopen(req, timeout=12) as resp:
-                    data = json.loads(resp.read().decode('utf-8'))
-                photos = data.get('results', [{}])[0].get('photos', [])
-                if photos:
-                    photo_url = (photos[0].get('url') or '').replace('/square.', '/medium.')
-                    return obs_id, photo_url if photo_url else None
-            except Exception:
-                pass
-            return obs_id, None
-
-        if to_fetch:
-            with ThreadPoolExecutor(max_workers=12) as executor:
-                futures = {executor.submit(_fetch_photo, oid): oid for oid in to_fetch}
-                for future in as_completed(futures):
-                    obs_id, url = future.result()
-                    results[obs_id] = url
-                    with _inat_photo_lock:
-                        _inat_photo_cache[obs_id] = url
-
-        return JsonResponse({'photos': results})
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
-
-# ---------------------------------------------------------------------------
-# Species observations — all GPS points for one species (modal mini-map)
-# ---------------------------------------------------------------------------
-@require_http_methods(["GET"])
-def get_species_observations(request):
-    """
-    Returns every observation row for a given species name.
-    ?species=Sarada+superba
-    Returns: {observations:[{lat,lon,date,locality,recordedBy,obsId,inatUrl,year}], total}
-    """
-    try:
-        species = request.GET.get('species', '').strip()
-        if not species:
-            return JsonResponse({'error': 'species param required'}, status=400)
-
-        df = _load_animals_data()
-        mask = df['scientificName'].str.contains(re.escape(species), case=False, na=False)
-        sp_df = df[mask]
-
-        observations = []
-        for row in sp_df[['decimalLatitude', 'decimalLongitude', 'eventDate',
-                           'locality', 'recordedBy', 'occurrenceID', 'year']].itertuples():
-            try:
-                lat = float(row.decimalLatitude)
-                lon = float(row.decimalLongitude)
-                if pd.isna(lat) or pd.isna(lon):
-                    continue
-                oid = str(row.occurrenceID or '')
-                m = re.search(r'/observations/(\d+)', oid)
-                observations.append({
-                    'lat': round(lat, 5),
-                    'lon': round(lon, 5),
-                    'date': str(row.eventDate or '')[:10],
-                    'locality': str(row.locality or 'Koyna Region'),
-                    'recordedBy': str(row.recordedBy or ''),
-                    'inatUrl': oid if 'inaturalist' in oid.lower() else None,
-                    'obsId': m.group(1) if m else None,
-                    'year': int(row.year) if row.year and not pd.isna(row.year) else None,
-                })
-            except Exception:
-                continue
-
-        return JsonResponse({'observations': observations, 'total': len(observations), 'species': species})
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
-
-# ---------------------------------------------------------------------------
-# Cluster timeline — obs count per year for a specific cluster
-# ---------------------------------------------------------------------------
-@require_http_methods(["GET"])
-def get_cluster_timeline(request):
-    """
-    Returns year-by-year observation counts for a cluster.
-    ?clusters=8&cluster_id=0
-    Returns: {timeline:[{year,count}], total}
-    """
-    try:
-        n_clusters = int(request.GET.get('clusters', 8))
-        cluster_id = int(request.GET.get('cluster_id', 0))
-
-        cache_key = f'animals_{n_clusters}'
-        with _clustering_lock:
-            df_clean = _clustered_df_cache.get(cache_key)
-
-        if df_clean is None:
-            return JsonResponse({'error': 'Run clustering first'}, status=400)
-
-        cdf = df_clean[df_clean['cluster'] == cluster_id]
-        if cdf.empty:
-            return JsonResponse({'timeline': [], 'total': 0})
-
-        if 'year' in cdf.columns:
-            y_counts = cdf.groupby('year').size().reset_index(name='count')
-            y_counts = y_counts.sort_values('year')
-            timeline = [{'year': int(r.year), 'count': int(r.count)} for r in y_counts.itertuples()]
-        else:
-            timeline = []
-
-        # Class breakdown per year (for stacked chart)
-        class_by_year = {}
-        if 'year' in cdf.columns and 'class' in cdf.columns:
-            grp = cdf.groupby(['year', 'class']).size().reset_index(name='count')
-            for row in grp.itertuples():
-                y = int(row.year)
-                if y not in class_by_year:
-                    class_by_year[y] = {}
-                class_by_year[y][str(row.__getattribute__('class'))] = int(row.count)
-
-        return JsonResponse({'timeline': timeline, 'class_by_year': class_by_year, 'total': len(cdf)})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)

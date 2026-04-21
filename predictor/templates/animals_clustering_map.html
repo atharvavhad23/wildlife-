@@ -1,1082 +1,415 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Koyna WLS · Species Cluster Heatmap</title>
-<meta name="description" content="Interactive biodiversity heatmap, cluster explorer and species deep-dive for Koyna Wildlife Sanctuary.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<style>
-/* ─── Reset & tokens ─────────────────────────────────────────────────────── */
-*{margin:0;padding:0;box-sizing:border-box;}
-:root{
-  --bg:#07120d;--panel:#0b1a11;--card:#111e16;--card2:#141f19;--border:rgba(82,183,136,.2);
-  --green:#52b788;--glow:#74c69d;--gold:#f4a261;--amber:#e76f51;--sky:#4cc9f0;--pink:#f72585;
-  --text:#d8f3dc;--muted:#8aaa96;--dim:#4f7263;
-}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animal Clustering Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-/* ─── Navbar ──────────────────────────────────────────────────────────────── */
-.nav{position:fixed;top:0;left:0;right:0;z-index:4000;height:52px;background:linear-gradient(90deg,#050e08,#0c1b12);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;}
-.nav-logo{font-size:1.05rem;font-weight:800;color:var(--glow);}
-.nav-logo span{color:var(--gold);}
-.nav-sep{width:1px;height:22px;background:var(--border);}
-.nav-sub{font-size:.72rem;color:var(--muted);}
-.nav-badge{margin-left:auto;font-size:.67rem;font-weight:700;padding:3px 11px;border-radius:20px;background:rgba(82,183,136,.1);border:1px solid var(--border);color:var(--green);}
-.nav-btn{text-decoration:none;font-size:.7rem;color:var(--muted);padding:4px 10px;border:1px solid var(--border);border-radius:6px;transition:.14s;cursor:pointer;background:transparent;}
-.nav-btn:hover{background:var(--card);color:var(--green);}
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f4f8fb;
+            color: #1f2937;
+        }
 
-/* ─── Layout ──────────────────────────────────────────────────────────────── */
-.layout{display:flex;height:100vh;padding-top:52px;}
-#map{flex:1;z-index:1;position:relative;transition:all .3s;}
+        .container {
+            display: flex;
+            height: 100vh;
+        }
 
-/* ─── Sidebar ─────────────────────────────────────────────────────────────── */
-.sb{width:298px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
-.sb-head{padding:11px 13px 9px;border-bottom:1px solid var(--border);flex-shrink:0;background:linear-gradient(135deg,rgba(45,106,79,.4),transparent);}
-.sb-head h2{font-size:.86rem;font-weight:700;color:var(--glow);}
-.sb-head p{font-size:.63rem;color:var(--muted);margin-top:2px;}
-.stats{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--border);flex-shrink:0;}
-.stat{padding:7px 8px;text-align:center;border-right:1px solid var(--border);}
-.stat:last-child{border-right:none;}
-.stat-v{font-size:1.1rem;font-weight:800;color:var(--green);}
-.stat-l{font-size:.56rem;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:1px;}
-.ctrl{padding:8px 11px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:7px;}
-.ctrl-lbl{font-size:.68rem;color:var(--muted);white-space:nowrap;}
-.ctrl-val{font-size:.78rem;font-weight:700;color:var(--green);min-width:16px;text-align:center;}
-input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:3px;background:rgba(82,183,136,.2);border-radius:4px;outline:none;cursor:pointer;}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--green);border:2px solid var(--glow);cursor:pointer;}
-.run-btn{padding:5px 12px;background:linear-gradient(135deg,#2d6a4f,#52b788);color:#fff;border:none;border-radius:6px;font-size:.68rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:.14s;}
-.run-btn:disabled{opacity:.4;cursor:not-allowed;}
+        #map {
+            flex: 1;
+            z-index: 1;
+        }
 
-/* year filter row */
-.yr-filter{padding:7px 11px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:8px;font-size:.68rem;color:var(--muted);}
-.yr-filter span{white-space:nowrap;}
-.yr-range{flex:1;display:flex;align-items:center;gap:5px;font-size:.66rem;color:var(--glow);font-weight:700;}
+        .sidebar {
+            width: 350px;
+            background: white;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
 
-/* class toggle row */
-.cls-toggles{padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;flex-wrap:wrap;gap:4px;}
-.cls-chip{font-size:.6rem;font-weight:600;padding:3px 8px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:.13s;}
-.cls-chip.on{color:#fff;}
+        .sidebar-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+            color: white;
+            border-bottom: 1px solid #e5e7eb;
+        }
 
-/* view toggle */
-.view-row{padding:6px 11px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;gap:5px;align-items:center;font-size:.66rem;color:var(--muted);}
-.view-btn{padding:3px 9px;border:1px solid var(--border);border-radius:6px;font-size:.62rem;font-weight:600;cursor:pointer;background:transparent;color:var(--muted);transition:.13s;}
-.view-btn.on{background:rgba(82,183,136,.12);color:var(--green);border-color:var(--green);}
+        .sidebar-header h2 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+        }
 
-.err{margin:6px 10px;padding:7px 10px;background:rgba(231,111,81,.1);border:1px solid rgba(231,111,81,.3);border-radius:6px;font-size:.7rem;color:var(--amber);}
-@keyframes spin{to{transform:rotate(360deg);}}
-.spin{width:26px;height:26px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 9px;}
+        .sidebar-header p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
 
-/* cluster cards */
-.cl-scroll{flex:1;overflow-y:auto;padding:6px 8px;}
-.cl-scroll::-webkit-scrollbar{width:3px;}
-.cl-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-.cc{background:var(--card);border:1px solid var(--border);border-left:4px solid transparent;border-radius:8px;padding:9px 11px;margin-bottom:6px;cursor:pointer;transition:.14s;}
-.cc:hover{background:rgba(45,106,79,.25);transform:translateX(2px);}
-.cc.active{border-left-color:var(--green);background:rgba(82,183,136,.07);}
-.cc-row{display:flex;align-items:center;gap:5px;margin-bottom:4px;}
-.cc-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-.cc-name{font-size:.8rem;font-weight:700;}
-.cc-obs{margin-left:auto;font-size:.58rem;color:var(--muted);background:rgba(255,255,255,.05);padding:1px 6px;border-radius:8px;}
-.cc-bar{display:flex;height:3px;border-radius:3px;overflow:hidden;gap:1px;margin-bottom:5px;}
-.cc-seg{border-radius:2px;}
-.cc-meta{display:grid;grid-template-columns:1fr 1fr;gap:2px 5px;font-size:.6rem;color:var(--muted);}
-.cc-meta strong{color:var(--glow);}
+        .sidebar-content {
+            flex: 1;
+            padding: 20px;
+        }
 
-/* sparkline SVG */
-.cc-spark{margin-top:5px;width:100%;height:28px;}
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
 
-/* ─── Drawer ──────────────────────────────────────────────────────────────── */
-.drawer{position:fixed;right:-680px;top:52px;bottom:0;width:660px;z-index:2000;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;transition:right .3s cubic-bezier(.4,0,.2,1);box-shadow:-14px 0 52px rgba(0,0,0,.75);}
-.drawer.open{right:0;}
-.dr-head{padding:11px 14px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:9px;background:linear-gradient(135deg,rgba(45,106,79,.4),transparent);}
-.dr-title{font-size:.9rem;font-weight:700;color:var(--glow);flex:1;}
-.dr-count{font-size:.66rem;color:var(--muted);padding:2px 8px;border:1px solid var(--border);border-radius:12px;}
-.dr-actions{display:flex;gap:5px;}
-.dr-action-btn{padding:4px 9px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-size:.63rem;font-weight:600;border-radius:6px;cursor:pointer;transition:.13s;}
-.dr-action-btn:hover{background:rgba(82,183,136,.1);color:var(--green);border-color:var(--green);}
-.dr-close{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:.72rem;transition:.13s;}
-.dr-close:hover{background:rgba(231,111,81,.15);color:var(--amber);}
-.dr-stats-row{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--border);flex-shrink:0;}
-.dr-stat{padding:7px 8px;text-align:center;border-right:1px solid var(--border);}
-.dr-stat:last-child{border-right:none;}
-.dr-sv{font-size:.98rem;font-weight:700;color:var(--green);}
-.dr-sl{font-size:.54rem;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;}
+        .control-group {
+            margin-bottom: 12px;
+        }
 
-/* timeline chart in drawer */
-.dr-timeline{padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
-.dr-tl-title{font-size:.63rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;}
-.dr-tl-title span{color:var(--dim);}
-.tl-chart-wrap{height:52px;position:relative;overflow:hidden;}
-.tl-svg{width:100%;height:100%;}
+        .control-group label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #374151;
+        }
 
-/* filter bar */
-.dr-filter{padding:7px 11px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;gap:5px;align-items:center;}
-.dr-search{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);font-size:.7rem;font-family:'Inter',sans-serif;outline:none;}
-.dr-search::placeholder{color:var(--dim);}
-.dr-search:focus{border-color:var(--green);}
-.chip{padding:3px 9px;border:1px solid var(--border);border-radius:11px;font-size:.61rem;font-weight:600;cursor:pointer;color:var(--muted);transition:.13s;background:transparent;white-space:nowrap;}
-.chip.on{border-color:var(--green);color:var(--green);background:rgba(82,183,136,.1);}
-.photo-status{font-size:.6rem;color:var(--dim);margin-left:auto;white-space:nowrap;}
-.photo-status.loading{color:var(--green);}
+        .control-group input,
+        .control-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
 
-/* Shannon metric bar */
-.biodiv-bar{padding:6px 12px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:10px;font-size:.62rem;}
-.bd-label{color:var(--muted);white-space:nowrap;}
-.bd-track{flex:1;height:5px;background:rgba(82,183,136,.12);border-radius:4px;overflow:hidden;}
-.bd-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--sky));border-radius:4px;transition:width .6s ease;}
-.bd-val{color:var(--glow);font-weight:700;white-space:nowrap;}
+        .control-group button {
+            width: 100%;
+            padding: 10px;
+            background: #0f766e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
 
-/* grid */
-.dr-grid{flex:1;overflow-y:auto;padding:10px 11px;display:grid;grid-template-columns:1fr 1fr;gap:11px;grid-auto-rows:auto;}
-.dr-grid::-webkit-scrollbar{width:4px;}
-.dr-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+        .control-group button:hover {
+            background: #115e56;
+        }
 
-/* species card */
-.sp{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:.18s;display:flex;flex-direction:column;min-height:330px;cursor:pointer;}
-.sp:hover{border-color:rgba(82,183,136,.52);transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.55);}
+        .cluster-list {
+            margin-top: 20px;
+        }
 
-.sp-photo{position:relative;width:100%;height:155px;min-height:155px;overflow:hidden;background:#0c1c12;flex-shrink:0;}
-.sp-photo .sp-img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:2;opacity:0;transition:opacity .5s;}
-.sp-photo .sp-img.loaded{opacity:1;}
-.sp-placeholder{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:linear-gradient(135deg,#0d2016,#183025);}
-.sp-placeholder .big-emoji{font-size:2.8rem;}
-.sp-placeholder .cls-label{font-size:.6rem;color:var(--muted);}
-.obs-badge{position:absolute;top:7px;right:7px;z-index:5;background:rgba(0,0,0,.72);color:var(--green);font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:8px;backdrop-filter:blur(4px);}
-.cls-badge{position:absolute;bottom:7px;left:7px;z-index:5;font-size:.57rem;font-weight:700;padding:2px 7px;border-radius:8px;backdrop-filter:blur(4px);}
-.sp-body{padding:9px 10px;flex:1;display:flex;flex-direction:column;gap:3px;min-height:110px;}
-.sp-name{font-size:.75rem;font-weight:700;font-style:italic;color:var(--text);line-height:1.3;}
-.sp-order{font-size:.6rem;color:var(--glow);font-weight:600;margin-bottom:3px;}
-.sp-divider{height:1px;background:var(--border);margin:3px 0;}
-.sp-rows{display:flex;flex-direction:column;gap:3px;}
-.sp-row{display:flex;justify-content:space-between;font-size:.6rem;}
-.sp-row .lbl{color:var(--muted);}
-.sp-row .val{color:var(--text);font-weight:600;text-align:right;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.sp-foot{border-top:1px solid var(--border);display:flex;flex-shrink:0;}
-.sp-foot a,.sp-foot button{flex:1;padding:6px 3px;text-align:center;font-size:.6rem;font-weight:600;color:var(--green);text-decoration:none;background:transparent;border:none;cursor:pointer;transition:.12s;font-family:'Inter',sans-serif;}
-.sp-foot a:hover{background:rgba(82,183,136,.08);}
-.sp-foot button:hover{background:rgba(76,201,240,.08);color:var(--sky);}
-.sp-foot-sep{width:1px;background:var(--border);}
+        .cluster-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #f3f4f6;
+            border-left: 4px solid #0f766e;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
 
-/* ─── Species Detail Modal ────────────────────────────────────────────────── */
-.modal-overlay{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(5px);}
-.modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;width:100%;max-width:900px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.9);}
-.modal-head{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(45,106,79,.45),transparent);flex-shrink:0;}
-.modal-title{font-size:1rem;font-weight:800;font-style:italic;color:var(--text);}
-.modal-badge{font-size:.68rem;font-weight:700;padding:3px 10px;border-radius:12px;margin-left:4px;}
-.modal-close{margin-left:auto;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:7px;cursor:pointer;font-size:.75rem;transition:.13s;}
-.modal-close:hover{background:rgba(231,111,81,.15);color:var(--amber);}
-.modal-body{display:flex;flex:1;overflow:hidden;}
-.modal-left{width:340px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border);overflow-y:auto;}
-.modal-left::-webkit-scrollbar{width:3px;}
-.modal-left::-webkit-scrollbar-thumb{background:var(--border);}
-.modal-right{flex:1;display:flex;flex-direction:column;overflow-y:auto;}
-.modal-right::-webkit-scrollbar{width:3px;}
-.modal-right::-webkit-scrollbar-thumb{background:var(--border);}
+        .cluster-item:hover {
+            background: #e5e7eb;
+            transform: translateX(4px);
+        }
 
-/* Gallery */
-.gallery-main{position:relative;width:100%;height:220px;background:#0a1a10;overflow:hidden;flex-shrink:0;}
-.gal-img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .4s;}
-.gal-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:4rem;background:linear-gradient(135deg,#0d2016,#183025);}
-.gal-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:5;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.2);color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:.13s;}
-.gal-nav:hover{background:rgba(82,183,136,.5);}
-.gal-prev{left:8px;}
-.gal-next{right:8px;}
-.gal-counter{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.65);color:#fff;font-size:.6rem;padding:2px 7px;border-radius:8px;backdrop-filter:blur(4px);}
-.gal-credit{position:absolute;bottom:0;left:0;right:0;padding:4px 8px;background:linear-gradient(transparent,rgba(0,0,0,.6));font-size:.58rem;color:rgba(255,255,255,.7);text-overflow:ellipsis;overflow:hidden;white-space:nowrap;}
+        .cluster-item.active {
+            background: #dbeafe;
+            border-left-color: #0284c7;
+        }
 
-.gal-strip{display:flex;gap:4px;padding:6px;overflow-x:auto;background:rgba(0,0,0,.3);flex-shrink:0;}
-.gal-strip::-webkit-scrollbar{height:3px;}
-.gal-strip::-webkit-scrollbar-thumb{background:var(--border);}
-.gal-thumb{width:42px;height:42px;border-radius:5px;overflow:hidden;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:.13s;}
-.gal-thumb.active{border-color:var(--green);}
-.gal-thumb img{width:100%;height:100%;object-fit:cover;}
+        .cluster-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+        }
 
-/* Taxonomy table in modal */
-.tax-table{padding:10px 13px;border-top:1px solid var(--border);}
-.tax-row{display:flex;justify-content:space-between;font-size:.66rem;padding:4px 0;border-bottom:1px solid rgba(82,183,136,.08);}
-.tax-row:last-child{border-bottom:none;}
-.tax-row .tk{color:var(--muted);}
-.tax-row .tv{color:var(--text);font-weight:600;text-align:right;}
+        .cluster-stats {
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
 
-/* Mini-map in modal */
-.modal-map-wrap{padding:10px 12px 0;}
-.modal-map-label{font-size:.63rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
-#modalMap{height:200px;border-radius:9px;overflow:hidden;border:1px solid var(--border);}
+        .species-list {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            color: #4b5563;
+            max-height: 150px;
+            overflow-y: auto;
+        }
 
-/* Modal year histogram */
-.modal-hist{padding:10px 12px;}
-.hist-label{font-size:.63rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
-.hist-svg{width:100%;height:70px;}
+        .species-item {
+            padding: 4px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
 
-/* Observation list in modal */
-.modal-obs{padding:0 12px 12px;}
-.obs-label{font-size:.63rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
-.obs-item{display:flex;justify-content:space-between;align-items:center;font-size:.63rem;padding:5px 8px;border-radius:6px;margin-bottom:3px;background:rgba(255,255,255,.03);gap:6px;}
-.obs-item a{color:var(--green);text-decoration:none;font-size:.59rem;flex-shrink:0;}
-.obs-item a:hover{text-decoration:underline;}
-.obs-date{color:var(--muted);}
-.obs-loc{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.obs-by{color:var(--dim);font-size:.57rem;}
+        .species-item:last-child {
+            border-bottom: none;
+        }
 
-/* ─── Map overlays ────────────────────────────────────────────────────────── */
-.map-pin{position:absolute;bottom:18px;left:14px;z-index:500;background:rgba(7,18,13,.93);border:1px solid var(--border);border-radius:8px;padding:7px 11px;font-size:.65rem;color:var(--muted);max-width:190px;backdrop-filter:blur(8px);}
-.map-pin strong{color:var(--glow);display:block;margin-bottom:2px;}
-.hm-leg{position:absolute;bottom:18px;right:14px;z-index:500;background:rgba(7,18,13,.93);border:1px solid var(--border);border-radius:8px;padding:7px 11px;font-size:.62rem;color:var(--muted);min-width:155px;backdrop-filter:blur(8px);}
-.hm-leg-t{color:var(--glow);font-weight:700;margin-bottom:4px;font-size:.67rem;}
-.hm-item{display:flex;align-items:center;gap:5px;margin-bottom:2px;}
-.hm-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-.fullscreen-btn{position:absolute;top:12px;right:14px;z-index:500;background:rgba(7,18,13,.9);border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:.65rem;color:var(--muted);cursor:pointer;backdrop-filter:blur(6px);transition:.13s;}
-.fullscreen-btn:hover{color:var(--green);border-color:var(--green);}
+        .species-link {
+            color: #0f766e;
+            text-decoration: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
 
-/* Leaflet popup */
-.leaflet-popup-content-wrapper{background:rgba(7,18,13,.97)!important;border:1px solid rgba(82,183,136,.3)!important;border-radius:10px!important;color:var(--text)!important;}
-.leaflet-popup-tip{background:rgba(7,18,13,.97)!important;}
-.leaflet-popup-content{margin:10px 13px!important;font-family:'Inter',sans-serif;}
-.pu-t{font-size:.88rem;font-weight:700;color:var(--glow);margin-bottom:5px;}
-.pu-r{display:flex;justify-content:space-between;font-size:.68rem;margin:2px 0;}
-.pu-r span:first-child{color:var(--muted);}
-.pu-bar{display:flex;height:5px;border-radius:3px;overflow:hidden;gap:1px;margin:5px 0;}
-.pu-btn{width:100%;padding:6px;margin-top:5px;background:linear-gradient(135deg,#2d6a4f,#52b788);color:#fff;border:none;border-radius:6px;font-size:.68rem;font-weight:700;cursor:pointer;}
+        .species-link:hover {
+            text-decoration: underline;
+        }
 
-/* fullscreen state */
-body.fullscreen .sb{display:none;}
-body.fullscreen #map{flex:1;}
-body.fullscreen .drawer{top:52px;}
-</style>
+        .back-btn {
+            text-decoration: none;
+            padding: 10px 16px;
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-weight: 600;
+            text-align: center;
+            margin-top: 20px;
+            display: block;
+        }
+
+        .back-btn:hover {
+            background: #e5e7eb;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6b7280;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border: 1px solid #fecaca;
+        }
+
+        .info-box {
+            background: #e0f2fe;
+            color: #0c4a6e;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #bae6fd;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+
+        /* Leaflet overrides */
+        .leaflet-popup-content {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <div id="map"></div>
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Animal Clusters</h2>
+                <p>Interactive clustering map with species information</p>
+            </div>
+            <div class="sidebar-content">
+                <div class="info-box">
+                    Click on map clusters to explore species. Click species names to view details.
+                </div>
 
-<!-- Navbar -->
-<nav class="nav">
-  <div class="nav-logo">🌿 Koyna <span>WLS</span></div>
-  <div class="nav-sep"></div>
-  <div class="nav-sub">Animal Biodiversity · Cluster Heatmap Explorer</div>
-  <div class="nav-badge" id="navBadge">Starting…</div>
-  <button class="nav-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
-  <a class="nav-btn" href="/animals/">← Prediction</a>
-</nav>
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="clusterSlider">Number of Clusters: <span id="clusterCount">8</span></label>
+                        <input type="range" id="clusterSlider" min="3" max="15" value="8" />
+                    </div>
+                    <div class="control-group">
+                        <button id="updateBtn">Recalculate Clusters</button>
+                    </div>
+                </div>
 
-<div class="layout">
-  <!-- ── Sidebar ── -->
-  <aside class="sb" id="sidebar">
-    <div class="sb-head">
-      <h2>🔬 Cluster Explorer</h2>
-      <p>Click any cluster card or map marker to explore species</p>
-    </div>
+                <div id="errorBox" class="error" style="display:none;"></div>
 
-    <div class="stats">
-      <div class="stat"><div class="stat-v" id="stO">—</div><div class="stat-l">Observations</div></div>
-      <div class="stat"><div class="stat-v" id="stS">—</div><div class="stat-l">Species</div></div>
-      <div class="stat"><div class="stat-v" id="stC">—</div><div class="stat-l">Clusters</div></div>
-    </div>
+                <div class="cluster-list" id="clusterList">
+                    <div class="loading">Loading clusters...</div>
+                </div>
 
-    <!-- Cluster count ctrl -->
-    <div class="ctrl">
-      <div class="ctrl-lbl">Clusters:</div>
-      <div class="ctrl-val" id="cv">8</div>
-      <input type="range" id="csl" min="3" max="15" value="8">
-      <button class="run-btn" id="runBtn" onclick="boot()">▶ Run</button>
-    </div>
-
-    <!-- Year range filter -->
-    <div class="yr-filter">
-      <span>Years:</span>
-      <div class="yr-range">
-        <input type="number" id="yrFrom" value="1913" min="1900" max="2025" style="width:46px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--glow);padding:2px 4px;font-size:.66rem;font-family:inherit;">
-        <span style="color:var(--dim);">–</span>
-        <input type="number" id="yrTo" value="2025" min="1900" max="2025" style="width:46px;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--glow);padding:2px 4px;font-size:.66rem;font-family:inherit;">
-      </div>
-      <button class="run-btn" onclick="applyYearFilter()" style="padding:4px 9px;font-size:.62rem;">Apply</button>
-    </div>
-
-    <!-- Class toggles -->
-    <div class="cls-toggles" id="clsToggles">
-      <span style="font-size:.6rem;color:var(--muted);align-self:center;margin-right:2px;">Show:</span>
-      <button class="cls-chip on" data-cls="all" onclick="toggleClsFilter('all')">All</button>
-    </div>
-
-    <!-- View mode toggle -->
-    <div class="view-row">
-      <span>View:</span>
-      <button class="view-btn on" id="vHeat" onclick="switchView('heat')">🔥 Heatmap</button>
-      <button class="view-btn" id="vDots" onclick="switchView('dots')">• Dots</button>
-      <button class="view-btn" id="vBoth" onclick="switchView('both')">Both</button>
-    </div>
-
-    <div id="errBox" class="err" style="display:none;"></div>
-    <div class="cl-scroll" id="clList">
-      <div style="text-align:center;padding:28px 14px;color:var(--muted);">
-        <div class="spin"></div>Running K-Means clustering…
-      </div>
-    </div>
-  </aside>
-
-  <!-- ── Map ── -->
-  <div id="map">
-    <div class="map-pin">
-      <strong>📍 Koyna Wildlife Sanctuary</strong>
-      Maharashtra, India · 17.34–17.79°N
-    </div>
-    <div class="hm-leg" id="hml" style="display:none;">
-      <div class="hm-leg-t">🔥 Observation Density</div>
-      <div id="hmItems"></div>
-    </div>
-    <button class="fullscreen-btn" onclick="toggleFullscreen()">⛶</button>
-  </div>
-</div>
-
-<!-- ── Species Drawer ── -->
-<div class="drawer" id="drawer">
-  <div class="dr-head">
-    <div class="dr-title" id="drTitle">Species Explorer</div>
-    <div class="dr-count" id="drCount"></div>
-    <div class="dr-actions">
-      <button class="dr-action-btn" id="exportBtn" onclick="exportCSV()" style="display:none;">⬇ Export CSV</button>
-      <button class="dr-action-btn" id="timelineBtn" onclick="toggleTimeline()" style="display:none;">📈 Timeline</button>
-    </div>
-    <button class="dr-close" onclick="closeDrawer()">✕ Close</button>
-  </div>
-  <div class="dr-stats-row" id="drStats"></div>
-
-  <!-- Timeline chart (hidden by default) -->
-  <div class="dr-timeline" id="drTimeline" style="display:none;">
-    <div class="dr-tl-title">Observations per Year <span id="tlRange"></span></div>
-    <div class="tl-chart-wrap"><svg class="tl-svg" id="tlSvg"></svg></div>
-  </div>
-
-  <!-- Shannon biodiversity -->
-  <div class="biodiv-bar" id="biodivBar" style="display:none;">
-    <span class="bd-label">Shannon H′:</span>
-    <div class="bd-track"><div class="bd-fill" id="bdFill" style="width:0%"></div></div>
-    <span class="bd-val" id="bdVal">–</span>
-    <span style="font-size:.58rem;color:var(--dim);margin-left:6px;" id="bdInterp"></span>
-  </div>
-
-  <div class="dr-filter">
-    <input type="text" class="dr-search" id="drSearch" placeholder="🔍  Filter species…">
-    <button class="chip on" id="fcAll" onclick="fClass('all')">All</button>
-    <button class="chip" id="fcMam"  onclick="fClass('Mammalia')">🐾 Mammals</button>
-    <button class="chip" id="fcAmp"  onclick="fClass('Amphibia')">🐸 Amphibia</button>
-    <button class="chip" id="fcRep"  onclick="fClass('Squamata')">🦎 Reptiles</button>
-    <div class="photo-status" id="photoStatus"></div>
-  </div>
-  <div class="dr-grid" id="drGrid">
-    <div style="grid-column:1/-1;text-align:center;padding:38px;color:var(--muted);">Click a cluster to explore species</div>
-  </div>
-</div>
-
-<!-- ── Species Detail Modal ── -->
-<div class="modal-overlay" id="spModal" style="display:none;" onclick="closeModalClickOutside(event)">
-  <div class="modal" id="modalBox">
-    <div class="modal-head">
-      <div>
-        <span class="modal-title" id="modalTitle">–</span>
-        <span class="modal-badge" id="modalBadge"></span>
-      </div>
-      <button class="modal-close" onclick="closeModal()">✕ Close</button>
-    </div>
-    <div class="modal-body">
-      <!-- Left: gallery + taxonomy -->
-      <div class="modal-left">
-        <div class="gallery-main">
-          <div class="gal-placeholder" id="galPlaceholder">🦎</div>
-          <img class="gal-img" id="galImg" src="" alt="" style="display:none;">
-          <button class="gal-nav gal-prev" onclick="galNav(-1)">‹</button>
-          <button class="gal-nav gal-next" onclick="galNav(1)">›</button>
-          <div class="gal-counter" id="galCounter"></div>
-          <div class="gal-credit" id="galCredit"></div>
+                <a class="back-btn" href="/animals/">← Back to Prediction</a>
+            </div>
         </div>
-        <div class="gal-strip" id="galStrip"></div>
-        <div class="tax-table" id="taxTable"></div>
-      </div>
-      <!-- Right: mini-map + histogram + obs list -->
-      <div class="modal-right">
-        <div class="modal-map-wrap">
-          <div class="modal-map-label">📍 Observation Locations (all records)</div>
-          <div id="modalMap"></div>
-        </div>
-        <div class="modal-hist">
-          <div class="hist-label">Observations by Year</div>
-          <svg class="hist-svg" id="histSvg"></svg>
-        </div>
-        <div class="modal-obs">
-          <div class="obs-label">Recent Observations</div>
-          <div id="modalObsList"></div>
-        </div>
-      </div>
     </div>
-  </div>
-</div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-<script>
-// ──────────────────────  CONSTANTS  ──────────────────────────────────────────
-const KOYNA=[17.529,73.706],ZOOM=11,BOUNDS=[[17.34,73.46],[17.79,73.85]];
-const COLORS=['#52b788','#f4a261','#4cc9f0','#f72585','#7209b7',
-  '#3a86ff','#fb8500','#06d6a0','#ef233c','#8338ec',
-  '#ffbe0b','#a8dadc','#e07a5f','#90be6d','#f2cc8f'];
-const CC={Amphibia:'#4cc9f0',Squamata:'#2d9d78',Mammalia:'#f4a261',
-  Arachnida:'#e07a5f',Malacostraca:'#8338ec',Testudines:'#74c69d',
-  Crocodylia:'#e63946',Clitellata:'#e9c46a',Gastropoda:'#f3722c',
-  Diplopoda:'#90be6d',Insecta:'#ffbe0b'};
-const CE={Amphibia:'🐸',Squamata:'🦎',Mammalia:'🐾',Arachnida:'🕷️',
-  Malacostraca:'🦀',Testudines:'🐢',Crocodylia:'🐊',
-  Clitellata:'🪱',Gastropoda:'🐌',Diplopoda:'🐛',Insecta:'🦋'};
-function ccls(c){return CC[c]||'#89b4a0';}
-function ecls(c){return CE[c]||'🦎';}
-function esc(t){if(!t)return'';return String(t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([17.4, 73.8], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19,
+        }).addTo(map);
 
-// ──────────────────────  MAP SETUP  ──────────────────────────────────────────
-const map=L.map('map').setView(KOYNA,ZOOM);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  {attribution:'Esri',maxZoom:19}).addTo(map);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
-  {opacity:.65,maxZoom:19}).addTo(map);
-L.rectangle(BOUNDS,{color:'#52b788',weight:1.5,opacity:.5,fill:false,dashArray:'7 5'})
-  .addTo(map).bindTooltip('Koyna WLS boundary',{direction:'top'});
+        let currentMarkers = [];
+        let currentClusters = null;
 
-// ──────────────────────  STATE  ──────────────────────────────────────────────
-let heatLayers=[],dotLayers=[],clMarkers=[],clMeta=null,activeCid=null,nC=8;
-let curSpecies=[],filterCls='all',viewMode='heat';
-let clsFilter='all',yrFrom=1913,yrTo=2025;
-let timelineVisible=false,currentClData=null;
-let fullscreenOn=false;
+        // Cluster slider
+        document.getElementById('clusterSlider').addEventListener('input', (e) => {
+            document.getElementById('clusterCount').textContent = e.target.value;
+        });
 
-// ──────────────────────  CONTROLS  ───────────────────────────────────────────
-document.getElementById('csl').addEventListener('input',e=>document.getElementById('cv').textContent=e.target.value);
-document.getElementById('drSearch').addEventListener('input',applyFilter);
+        // Update button
+        document.getElementById('updateBtn').addEventListener('click', loadClusters);
 
-function applyYearFilter(){
-  yrFrom=parseInt(document.getElementById('yrFrom').value)||1913;
-  yrTo=parseInt(document.getElementById('yrTo').value)||2025;
-  if(clMeta) applyLayerFilters();
-}
+        // Initial load
+        window.addEventListener('DOMContentLoaded', loadClusters);
 
-// ──────────────────────  BOOT  ───────────────────────────────────────────────
-async function boot(){
-  nC=parseInt(document.getElementById('csl').value);
-  const btn=document.getElementById('runBtn');
-  btn.disabled=true;btn.textContent='⏳';
-  hideErr();clearHeat();clearDots();clearMarkers();
-  document.getElementById('clList').innerHTML='<div style="text-align:center;padding:26px 12px;color:var(--muted);"><div class="spin"></div>Running K-Means…</div>';
-  try{
-    const [mR,hR]=await Promise.all([
-      fetch(`/api/animals/clustering/?clusters=${nC}`),
-      fetch(`/api/animals/cluster-heatmap/?clusters=${nC}`)
-    ]);
-    const meta=await mR.json(),heat=await hR.json();
-    if(meta.error){showErr(meta.error);return;}
-    clMeta=meta;
-    document.getElementById('stO').textContent=(meta.total_observations||0).toLocaleString();
-    document.getElementById('stS').textContent=(meta.total_species||0).toLocaleString();
-    document.getElementById('stC').textContent=meta.n_clusters||0;
-    document.getElementById('navBadge').textContent=`${meta.n_clusters} clusters · ${meta.total_observations} obs`;
-    renderHeatmap(heat.points);
-    if(viewMode==='dots'||viewMode==='both') renderDots(heat.points);
-    renderMarkers(meta);
-    renderSidebar(meta);
-    renderLegend(meta);
-    buildClsChips(meta);
-  }catch(e){showErr('Failed: '+e.message);console.error(e);}
-  finally{btn.disabled=false;btn.textContent='▶ Run';}
-}
+        async function loadClusters() {
+            const n = document.getElementById('clusterSlider').value;
+            const errorBox = document.getElementById('errorBox');
+            errorBox.style.display = 'none';
 
-// ──────────────────────  HEATMAP  ────────────────────────────────────────────
-function renderHeatmap(pts,cidsToShow=null){
-  clearHeat();
-  const byCid={};
-  for(const [lat,lon,cid] of pts) (byCid[cid]=byCid[cid]||[]).push([lat,lon,1]);
-  Object.entries(byCid).forEach(([cid,p])=>{
-    if(cidsToShow&&!cidsToShow.has(parseInt(cid))) return;
-    const col=COLORS[parseInt(cid)%COLORS.length];
-    heatLayers.push(L.heatLayer(p,{radius:22,blur:18,maxZoom:14,max:1,
-      gradient:{0:'transparent',0.35:col+'33',0.65:col+'99',1:col}}).addTo(map));
-  });
-  if(viewMode==='heat'||viewMode==='both') heatLayers.forEach(l=>l.addTo(map));
-}
+            try {
+                const response = await fetch(`{{ clustering_api }}?clusters=${n}`);
+                const data = await response.json();
 
-function renderDots(pts,cidsToShow=null){
-  clearDots();
-  const sample=pts.filter((_,i)=>i%3===0); // show every 3rd for performance
-  const grp=L.layerGroup();
-  for(const [lat,lon,cid] of sample){
-    if(cidsToShow&&!cidsToShow.has(parseInt(cid))) continue;
-    const col=COLORS[parseInt(cid)%COLORS.length];
-    L.circleMarker([lat,lon],{radius:3,color:col,weight:0,fillColor:col,fillOpacity:.6}).addTo(grp);
-  }
-  dotLayers.push(grp);
-  grp.addTo(map);
-}
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
 
-function applyLayerFilters(){
-  // figure out which cluster IDs match year filter
-  if(!clMeta) return;
-  clearHeat();clearDots();
-  // For class/year filters we just hide/show layers; full re-fetch not needed
-  // Just re-render already-fetched points (stored in window._rawPts)
-  if(!window._rawPts) return;
-  let pts=window._rawPts;
-  // year filter — filter by matching cluster year_min/year_max
-  const cidsOk=new Set();
-  Object.entries(clMeta.clusters).forEach(([cid,cl])=>{
-    const ok=(cl.year_min<=yrTo&&cl.year_max>=yrFrom);
-    if(clsFilter==='all'||Object.keys(cl.class_breakdown||{}).includes(clsFilter)){
-      if(ok) cidsOk.add(parseInt(cid));
-    }
-  });
-  if(viewMode!=='dots') renderHeatmap(pts,cidsOk);
-  if(viewMode!=='heat') renderDots(pts,cidsOk);
-}
+                currentClusters = data;
+                renderMap(data);
+                renderClusterList(data);
+            } catch (e) {
+                showError('Failed to load clusters: ' + e.message);
+            }
+        }
 
-// View mode toggle
-function switchView(mode){
-  viewMode=mode;
-  document.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('on'));
-  document.getElementById('vHeat').classList.toggle('on',mode==='heat'||mode==='both');
-  document.getElementById('vDots').classList.toggle('on',mode==='dots'||mode==='both');
-  document.getElementById('vBoth').classList.toggle('on',mode==='both');
-  heatLayers.forEach(l=>{
-    if(mode==='dots'){try{map.removeLayer(l);}catch(_){}}
-    else{try{map.addLayer(l);}catch(_){}}
-  });
-  dotLayers.forEach(l=>{
-    if(mode==='heat'){try{map.removeLayer(l);}catch(_){}}
-    else{try{map.addLayer(l);}catch(_){}}
-  });
-  if((mode==='dots'||mode==='both')&&dotLayers.length===0&&window._rawPts) renderDots(window._rawPts);
-}
+        function renderMap(data) {
+            // Clear old markers
+            currentMarkers.forEach(m => map.removeLayer(m));
+            currentMarkers = [];
 
-// Fullscreen
-function toggleFullscreen(){
-  fullscreenOn=!fullscreenOn;
-  document.body.classList.toggle('fullscreen',fullscreenOn);
-  setTimeout(()=>map.invalidateSize(),320);
-}
+            if (!data.clusters) return;
 
-// Class filter chips
-function buildClsChips(meta){
-  const allCls=new Set();
-  Object.values(meta.clusters).forEach(cl=>Object.keys(cl.class_breakdown||{}).forEach(c=>allCls.add(c)));
-  const row=document.getElementById('clsToggles');
-  row.innerHTML='<span style="font-size:.6rem;color:var(--muted);align-self:center;margin-right:2px;">Show:</span><button class="cls-chip on" data-cls="all" onclick="toggleClsFilter(\'all\')">All</button>';
-  [...allCls].sort().forEach(cls=>{
-    const col=ccls(cls);
-    const em=ecls(cls);
-    const btn=document.createElement('button');
-    btn.className='cls-chip';btn.dataset.cls=cls;
-    btn.style.cssText=`border-color:${col}55;color:${col};`;
-    btn.innerHTML=`${em} ${cls.substring(0,7)}`;
-    btn.onclick=()=>toggleClsFilter(cls);
-    row.appendChild(btn);
-  });
-}
+            // Define colors for clusters
+            const colors = [
+                '#ef4444', '#f97316', '#eab308', '#22c55e', '#10b981',
+                '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#8b5cf6',
+                '#d946ef', '#ec4899', '#f43f5e', '#6366f1', '#64748b'
+            ];
 
-function toggleClsFilter(cls){
-  clsFilter=cls;
-  document.querySelectorAll('.cls-chip').forEach(b=>{
-    b.classList.toggle('on',b.dataset.cls===cls);
-    if(b.classList.contains('on')){
-      const c=ccls(b.dataset.cls);
-      b.style.background=cls==='all'?'rgba(82,183,136,.15)':`${c}22`;
-    }else{b.style.background='transparent';}
-  });
-  applyLayerFilters();
-}
+            Object.entries(data.clusters).forEach((entry, idx) => {
+                const [clusterId, cluster] = entry;
+                const color = colors[idx % colors.length];
 
-// ──────────────────────  CLUSTER MARKERS  ────────────────────────────────────
-function renderMarkers(meta){
-  clearMarkers();
-  const ents=Object.entries(meta.clusters);
-  const mx=Math.max(...ents.map(([,c])=>c.animal_count));
-  ents.forEach(([cid,cl],idx)=>{
-    const col=COLORS[idx%COLORS.length],r=13+(cl.animal_count/mx)*17;
-    const icon=L.divIcon({className:'',
-      html:`<div style="width:${r*2}px;height:${r*2}px;border-radius:50%;background:${col};border:2.5px solid rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif;font-size:${Math.max(9,r*.7)}px;font-weight:800;color:#fff;box-shadow:0 3px 14px rgba(0,0,0,.65);cursor:pointer;">${idx+1}</div>`,
-      iconSize:[r*2,r*2],iconAnchor:[r,r]});
-    const segs=Object.entries(cl.class_breakdown||{}).map(([c,n])=>`<div style="background:${ccls(c)};flex:${n};border-radius:2px;"></div>`).join('');
-    const topSp=(cl.species||[]).slice(0,3).map(s=>`<div style="font-style:italic;font-size:.67rem;color:#8aaa96;padding:1px 0">• ${esc(s)}</div>`).join('');
-    const m=L.marker([cl.center_lat,cl.center_lon],{icon});
-    m.bindPopup(`<div class="pu-t">Cluster ${idx+1}</div>
-      <div class="pu-r"><span>Observations</span><span>${cl.animal_count.toLocaleString()}</span></div>
-      <div class="pu-r"><span>Species</span><span>${cl.species_count}</span></div>
-      <div class="pu-r"><span>Dominant family</span><span>${esc(cl.dominant_family||'—')}</span></div>
-      <div class="pu-r"><span>Years</span><span>${cl.year_min}–${cl.year_max}</span></div>
-      <div class="pu-bar">${segs}</div>${topSp}
-      <button class="pu-btn" onclick="openCluster('${cid}',${idx})">🔍 Explore Species &amp; Photos</button>`,{maxWidth:255});
-    m.on('click',()=>openCluster(cid,idx));
-    m.addTo(map);clMarkers.push(m);
-  });
-}
+                // Create marker for cluster center
+                const marker = L.circleMarker(
+                    [cluster.center_lat, cluster.center_lon],
+                    {
+                        radius: 15 + (cluster.animal_count / 50),
+                        fillColor: color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.7
+                    }
+                );
 
-// ──────────────────────  SIDEBAR CLUSTER CARDS  ──────────────────────────────
-function renderSidebar(meta){
-  const c=document.getElementById('clList');c.innerHTML='';
-  Object.entries(meta.clusters).forEach(([cid,cl],idx)=>{
-    const col=COLORS[idx%COLORS.length];
-    const segs=Object.entries(cl.class_breakdown||{}).map(([k,v])=>`<div class="cc-seg" style="background:${ccls(k)};flex:${v}"></div>`).join('');
-    const spark=makeSpark(cl.year_sparkline||[],col);
-    const d=document.createElement('div');
-    d.className='cc';d.id=`cc-${cid}`;d.style.borderLeftColor=col;d.onclick=()=>openCluster(cid,idx);
-    d.innerHTML=`<div class="cc-row">
-        <div class="cc-dot" style="background:${col}"></div>
-        <div class="cc-name" style="color:${col}">Cluster ${idx+1}</div>
-        <div class="cc-obs">${cl.animal_count.toLocaleString()} obs</div>
-      </div>
-      <div class="cc-bar">${segs}</div>
-      <div class="cc-meta">
-        <div>Species: <strong>${cl.species_count}</strong></div>
-        <div>Family: <strong>${esc((cl.dominant_family||'—').substring(0,13))}</strong></div>
-        <div>Years: <strong>${cl.year_min}–${cl.year_max}</strong></div>
-        <div>Area: <strong>${esc((cl.dominant_locality||'Koyna').substring(0,13))}</strong></div>
-      </div>
-      ${spark}`;
-    c.appendChild(d);
-  });
-}
+                marker.bindPopup(`
+                    <div>
+                        <strong>Cluster ${parseInt(clusterId) + 1}</strong><br/>
+                        Species: ${cluster.species_count}<br/>
+                        Observations: ${cluster.animal_count}<br/>
+                        <button onclick="selectCluster('${clusterId}')" style="
+                            width: 100%; padding: 6px; margin-top: 8px;
+                            background: ${color}; color: white;
+                            border: none; border-radius: 4px; cursor: pointer;
+                        ">View Details</button>
+                    </div>
+                `);
 
-// SVG sparkline for sidebar cluster card
-function makeSpark(data,col){
-  if(!data||data.length<2) return '';
-  const W=270,H=28,pad=2;
-  const counts=data.map(d=>d.c);
-  const mx=Math.max(...counts)||1;
-  const pts=data.map((d,i)=>{
-    const x=pad+((i/(data.length-1))*(W-2*pad));
-    const y=H-pad-((d.c/mx)*(H-2*pad));
-    return `${x},${y}`;
-  }).join(' ');
-  const area=`M${pts.split(' ')[0]} L${pts} L${W-pad},${H-pad} L${pad},${H-pad}Z`;
-  return `<svg class="cc-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-    <defs><linearGradient id="sg${col.replace('#','')}" x1="0" x2="0" y1="0" y2="1">
-      <stop offset="0%" stop-color="${col}" stop-opacity=".4"/>
-      <stop offset="100%" stop-color="${col}" stop-opacity=".03"/>
-    </linearGradient></defs>
-    <path d="${area}" fill="url(#sg${col.replace('#','')})" />
-    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/>
-  </svg>`;
-}
+                marker.addTo(map);
+                currentMarkers.push(marker);
+            });
 
-function renderLegend(meta){
-  const lg=document.getElementById('hml'),it=document.getElementById('hmItems');
-  it.innerHTML='';
-  Object.entries(meta.clusters).forEach(([,cl],idx)=>{
-    const col=COLORS[idx%COLORS.length];
-    it.innerHTML+=`<div class="hm-item"><div class="hm-dot" style="background:${col}"></div>Cluster ${idx+1} <span style="color:var(--dim);margin-left:2px">(${cl.species_count} sp)</span></div>`;
-  });
-  lg.style.display='block';
-}
+            // Fit map to bounds
+            if (currentMarkers.length > 0) {
+                const group = new L.featureGroup(currentMarkers);
+                map.fitBounds(group.getBounds(), { padding: [100, 50] });
+            }
+        }
 
-// ──────────────────────  OPEN DRAWER  ────────────────────────────────────────
-async function openCluster(cid,idx){
-  activeCid=cid;const col=COLORS[idx%COLORS.length];
-  document.querySelectorAll('.cc').forEach(e=>e.classList.remove('active'));
-  const card=document.getElementById(`cc-${cid}`);
-  if(card){card.classList.add('active');card.scrollIntoView({behavior:'smooth',block:'nearest'});}
-  document.getElementById('drTitle').textContent=`Cluster ${idx+1} — Species Explorer`;
-  document.getElementById('drTitle').style.color=col;
-  document.getElementById('drCount').textContent='Loading…';
-  document.getElementById('drStats').innerHTML='';
-  document.getElementById('drSearch').value='';
-  document.getElementById('photoStatus').textContent='';
-  document.getElementById('exportBtn').style.display='none';
-  document.getElementById('timelineBtn').style.display='none';
-  document.getElementById('biodivBar').style.display='none';
-  document.getElementById('drTimeline').style.display='none';
-  timelineVisible=false;currentClData=null;
-  filterCls='all';resetChips();
-  setGrid('<div style="grid-column:1/-1;text-align:center;padding:36px;color:var(--muted);"><div class="spin" style="margin:0 auto 10px;"></div>Loading species data…</div>');
-  document.getElementById('drawer').classList.add('open');
-  const cl=clMeta?.clusters?.[cid];
-  if(cl) map.flyTo([cl.center_lat,cl.center_lon],12,{animate:true,duration:.7});
-  try{
-    const r=await fetch(`/api/animals/cluster-details/?clusters=${nC}&cluster_id=${cid}`);
-    const data=await r.json();
-    if(data.error){setGrid('<div style="grid-column:1/-1;padding:20px;color:var(--amber);">⚠ '+esc(data.error)+'</div>');return;}
-    const clData=data.clusters[String(cid)];
-    if(!clData){setGrid('<div style="grid-column:1/-1;padding:20px;color:var(--amber);">⚠ No data.</div>');return;}
-    currentClData=clData;
-    curSpecies=clData.species;
-    document.getElementById('drCount').textContent=clData.species_count+' species';
-    document.getElementById('exportBtn').style.display='';
-    document.getElementById('timelineBtn').style.display='';
-    const inatCnt=clData.species.filter(s=>s.hasImage).length;
-    const classes=[...new Set(clData.species.map(s=>s.class).filter(Boolean))];
-    // Shannon diversity
-    const H=calcShannon(clData.species);
-    const maxH=Math.log2(clData.species_count||1);
-    const pct=maxH>0?(H/maxH)*100:0;
-    document.getElementById('bdFill').style.width=pct+'%';
-    document.getElementById('bdVal').textContent=H.toFixed(3);
-    const interp=H<1?'Low':H<2?'Moderate':H<3?'Good':'High';
-    document.getElementById('bdInterp').textContent=`(${interp} diversity)`;
-    document.getElementById('biodivBar').style.display='flex';
-    document.getElementById('drStats').innerHTML=`
-      <div class="dr-stat"><div class="dr-sv">${clData.species_count}</div><div class="dr-sl">Species</div></div>
-      <div class="dr-stat"><div class="dr-sv">${clData.total_obs.toLocaleString()}</div><div class="dr-sl">Observations</div></div>
-      <div class="dr-stat"><div class="dr-sv" style="color:${col}">${inatCnt}</div><div class="dr-sl">With Photos</div></div>
-      <div class="dr-stat"><div class="dr-sv">${classes.length}</div><div class="dr-sl">Classes</div></div>
-      <div class="dr-stat"><div class="dr-sv">${H.toFixed(2)}</div><div class="dr-sl">Shannon H′</div></div>`;
-    applyFilter();
-    loadAllPhotos(clData.species);
-  }catch(e){setGrid('<div style="grid-column:1/-1;padding:20px;color:var(--amber);">⚠ '+esc(e.message)+'</div>');console.error(e);}
-}
+        function renderClusterList(data) {
+            const container = document.getElementById('clusterList');
+            container.innerHTML = '';
 
-// ──────────────────────  SHANNON INDEX  ──────────────────────────────────────
-function calcShannon(species){
-  const total=species.reduce((s,sp)=>s+(sp.observationCount||1),0);
-  let H=0;
-  species.forEach(sp=>{
-    const p=(sp.observationCount||1)/total;
-    if(p>0) H-=p*Math.log2(p);
-  });
-  return H;
-}
+            if (!data.clusters) return;
 
-// ──────────────────────  TIMELINE CHART  ─────────────────────────────────────
-async function toggleTimeline(){
-  timelineVisible=!timelineVisible;
-  const box=document.getElementById('drTimeline');
-  if(!timelineVisible){box.style.display='none';return;}
-  box.style.display='block';
-  if(!activeCid) return;
-  try{
-    const r=await fetch(`/api/animals/cluster-timeline/?clusters=${nC}&cluster_id=${activeCid}`);
-    const d=await r.json();
-    renderTimelineChart(d.timeline||[]);
-  }catch(e){console.error(e);}
-}
+            Object.entries(data.clusters).forEach((entry, idx) => {
+                const [clusterId, cluster] = entry;
+                const div = document.createElement('div');
+                div.className = 'cluster-item';
+                div.onclick = () => selectCluster(clusterId);
 
-function renderTimelineChart(timeline){
-  const svg=document.getElementById('tlSvg');
-  const W=svg.clientWidth||600,H=52,pad=4;
-  if(!timeline.length){svg.innerHTML='<text x="50%" y="50%" text-anchor="middle" fill="#4f7263" font-size="11">No data</text>';return;}
-  const counts=timeline.map(d=>d.count);
-  const mx=Math.max(...counts)||1;
-  const minY=timeline[0]?.year||1913,maxY=timeline[timeline.length-1]?.year||2025;
-  const range=maxY-minY||1;
-  document.getElementById('tlRange').textContent=`${minY}–${maxY}`;
-  const pts=timeline.map(d=>{
-    const x=pad+((d.year-minY)/range)*(W-2*pad);
-    const y=H-pad-((d.count/mx)*(H-2*pad));
-    return {x,y,year:d.year,count:d.count};
-  });
-  const polyPts=pts.map(p=>`${p.x},${p.y}`).join(' ');
-  const area=`M${pts[0].x},${H-pad} L${pts.map(p=>`${p.x},${p.y}`).join(' L')} L${pts[pts.length-1].x},${H-pad}Z`;
-  svg.innerHTML=`<defs>
-    <linearGradient id="tlg" x1="0" x2="0" y1="0" y2="1">
-      <stop offset="0%" stop-color="#52b788" stop-opacity=".5"/>
-      <stop offset="100%" stop-color="#52b788" stop-opacity=".03"/>
-    </linearGradient></defs>
-    <path d="${area}" fill="url(#tlg)"/>
-    <polyline points="${polyPts}" fill="none" stroke="#52b788" stroke-width="1.8" stroke-linejoin="round"/>
-    ${pts.filter((_,i)=>i%Math.ceil(pts.length/8)===0).map(p=>`<text x="${p.x}" y="${H+1}" text-anchor="middle" fill="#4f7263" font-size="7">${p.year}</text>`).join('')}`;
-}
+                const speciesList = cluster.species.slice(0, 3)
+                    .map(s => `<div class="species-item">
+                        <a class="species-link" onclick="viewSpecies('${s}', event)">${escapeHtml(s)}</a>
+                    </div>`)
+                    .join('');
 
-// ──────────────────────  EXPORT CSV  ─────────────────────────────────────────
-function exportCSV(){
-  if(!curSpecies.length) return;
-  const hdr=['scientificName','class','order','family','genus','observations','yearMin','yearMax','topLocality','inatUrl'];
-  const rows=[hdr.join(',')];
-  curSpecies.forEach(sp=>{
-    rows.push([
-      `"${sp.scientificName||''}"`,`"${sp.class||''}"`,`"${sp.order||''}"`,
-      `"${sp.family||''}"`,`"${sp.genus||''}"`,sp.observationCount||0,
-      sp.yearMin||'',sp.yearMax||'',`"${sp.topLocality||''}"`,`"${sp.inatUrl||''}"`
-    ].join(','));
-  });
-  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`koyna_cluster_${activeCid}_species.csv`;
-  a.click();URL.revokeObjectURL(a.href);
-}
+                div.innerHTML = `
+                    <div class="cluster-title">Cluster ${parseInt(clusterId) + 1}</div>
+                    <div class="cluster-stats">
+                        ${cluster.species_count} species | ${cluster.animal_count} observations
+                    </div>
+                    <div class="species-list">
+                        ${speciesList}
+                        ${cluster.species.length > 3 ? `<div class="species-item">... and ${cluster.species.length - 3} more</div>` : ''}
+                    </div>
+                `;
 
-// ──────────────────────  SPECIES FILTER  ─────────────────────────────────────
-function fClass(cls){filterCls=cls;resetChips();const m={all:'fcAll',Mammalia:'fcMam',Amphibia:'fcAmp',Squamata:'fcRep'};if(m[cls])document.getElementById(m[cls]).classList.add('on');applyFilter();}
-function resetChips(){document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));}
-function applyFilter(){
-  const q=(document.getElementById('drSearch').value||'').toLowerCase();
-  let f=curSpecies;
-  if(filterCls!=='all') f=f.filter(s=>s.class===filterCls);
-  if(q) f=f.filter(s=>(s.scientificName||'').toLowerCase().includes(q)||(s.family||'').toLowerCase().includes(q)||(s.order||'').toLowerCase().includes(q));
-  buildGrid(f);
-}
+                container.appendChild(div);
+            });
+        }
 
-// ──────────────────────  GRID + CARDS  ───────────────────────────────────────
-function buildGrid(species){
-  const grid=document.getElementById('drGrid');
-  grid.innerHTML='';
-  if(!species.length){setGrid('<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--muted);">No species match.</div>');return;}
-  const frag=document.createDocumentFragment();
-  species.forEach(sp=>frag.appendChild(makeCard(sp)));
-  grid.appendChild(frag);
-}
+        function selectCluster(clusterId) {
+            document.querySelectorAll('.cluster-item').forEach(el => {
+                el.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+        }
 
-function sid(name){return 'sp_'+(name||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,35);}
+        function viewSpecies(speciesName, event) {
+            event.stopPropagation();
+            window.location.href = `/animals/species/?species=${encodeURIComponent(speciesName)}`;
+        }
 
-function makeCard(sp){
-  const col=ccls(sp.class),emoji=ecls(sp.class),id=sid(sp.scientificName);
-  const card=document.createElement('div');card.className='sp';card.dataset.id=id;
-  card.onclick=()=>openSpeciesModal(sp);
-  const foot=[];
-  if(sp.inatUrl) foot.push(`<a href="${esc(sp.inatUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 iNat</a>`);
-  if(sp.centerLat){if(foot.length)foot.push('<div class="sp-foot-sep"></div>');foot.push(`<button onclick="flyTo(${sp.centerLat},${sp.centerLon},event)">📍 Map</button>`);}
-  if(foot.length)foot.push('<div class="sp-foot-sep"></div>');
-  foot.push(`<button onclick="event.stopPropagation();openSpeciesModal(${JSON.stringify(sp).replace(/"/g,'&quot;')})">🔍 Details</button>`);
-  card.innerHTML=`
-    <div class="sp-photo" id="ph_${id}">
-      <div class="sp-placeholder"><div class="big-emoji">${emoji}</div><div class="cls-label">${esc(sp.class)||'Species'}</div></div>
-      <img class="sp-img" id="img_${id}" src="" alt="${esc(sp.scientificName)}">
-      <div class="obs-badge">${sp.observationCount} obs</div>
-      <div class="cls-badge" style="background:${col}25;color:${col};border:1px solid ${col}44">${esc(sp.class)}</div>
-    </div>
-    <div class="sp-body">
-      <div class="sp-name">${esc(sp.scientificName)}</div>
-      <div class="sp-order">${esc(sp.order||'—')} · ${esc(sp.family||'—')}</div>
-      <div class="sp-divider"></div>
-      <div class="sp-rows">
-        <div class="sp-row"><span class="lbl">Genus</span><span class="val">${esc(sp.genus||'—')}</span></div>
-        <div class="sp-row"><span class="lbl">Location</span><span class="val">${esc((sp.topLocality||'Koyna').substring(0,20))}</span></div>
-        <div class="sp-row"><span class="lbl">Years</span><span class="val">${sp.yearMin||'?'}–${sp.yearMax||'?'}</span></div>
-        <div class="sp-row"><span class="lbl">Kingdom</span><span class="val">${esc(sp.kingdom||'Animalia')}</span></div>
-      </div>
-    </div>
-    <div class="sp-foot">${foot.join('')}</div>`;
-  return card;
-}
+        function showError(msg) {
+            const errorBox = document.getElementById('errorBox');
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
+        }
 
-// ──────────────────────  BATCH PHOTO LOADING  ────────────────────────────────
-async function loadAllPhotos(species){
-  const needPhoto=species.filter(sp=>sp.obsIds&&sp.obsIds.length>0);
-  if(!needPhoto.length) return;
-  const ps=document.getElementById('photoStatus');
-  ps.textContent=`Fetching ${needPhoto.length} photos…`;ps.className='photo-status loading';
-  const allObs=[...new Set(needPhoto.flatMap(sp=>sp.obsIds.slice(0,2)))];
-  const photoMap={};
-  for(let i=0;i<allObs.length;i+=30){
-    try{
-      const r=await fetch(`/api/inat-photos/?obs_ids=${allObs.slice(i,i+30).join(',')}`);
-      const d=await r.json();Object.assign(photoMap,d.photos||{});
-    }catch(_){}
-  }
-  let loaded=0;
-  needPhoto.forEach(sp=>{
-    const imgEl=document.getElementById(`img_${sid(sp.scientificName)}`);
-    if(!imgEl) return;
-    let url=null;
-    for(const oid of sp.obsIds){if(photoMap[oid]){url=photoMap[oid];break;}}
-    if(url){
-      imgEl.onload=()=>{imgEl.classList.add('loaded');loaded++;ps.textContent=`${loaded}/${needPhoto.length} photos loaded`;if(loaded>=needPhoto.length){ps.textContent='✓ All photos loaded';ps.className='photo-status';}};
-      imgEl.onerror=()=>{imgEl.src='';};
-      imgEl.src=url;
-    }
-  });
-}
-
-// ──────────────────────  SPECIES DETAIL MODAL  ───────────────────────────────
-let modalObs=[],modalPhotos=[],modalPhotoIdx=0,_modalMap=null;
-
-async function openSpeciesModal(sp){
-  const col=ccls(sp.class),emoji=ecls(sp.class);
-  document.getElementById('modalTitle').textContent=sp.scientificName||'—';
-  const b=document.getElementById('modalBadge');
-  b.textContent=sp.class||'';b.style.cssText=`background:${col}25;color:${col};border:1px solid ${col}44;`;
-  // Reset gallery
-  document.getElementById('galPlaceholder').textContent=emoji;
-  document.getElementById('galPlaceholder').style.display='flex';
-  document.getElementById('galImg').style.display='none';
-  document.getElementById('galImg').src='';
-  document.getElementById('galStrip').innerHTML='';
-  document.getElementById('galCounter').textContent='';
-  document.getElementById('galCredit').textContent='';
-  modalPhotos=[];modalPhotoIdx=0;
-  // Taxonomy table
-  document.getElementById('taxTable').innerHTML=`
-    <div class="tax-row"><span class="tk">Kingdom</span><span class="tv">${esc(sp.kingdom||'Animalia')}</span></div>
-    <div class="tax-row"><span class="tk">Class</span><span class="tv" style="color:${col}">${esc(sp.class||'—')}</span></div>
-    <div class="tax-row"><span class="tk">Order</span><span class="tv">${esc(sp.order||'—')}</span></div>
-    <div class="tax-row"><span class="tk">Family</span><span class="tv">${esc(sp.family||'—')}</span></div>
-    <div class="tax-row"><span class="tk">Genus</span><span class="tv">${esc(sp.genus||'—')}</span></div>
-    <div class="tax-row"><span class="tk">Observations</span><span class="tv">${sp.observationCount||0}</span></div>
-    <div class="tax-row"><span class="tk">Years Active</span><span class="tv">${sp.yearMin||'?'}–${sp.yearMax||'?'}</span></div>
-    <div class="tax-row"><span class="tk">Top Locality</span><span class="tv">${esc(sp.topLocality||'Koyna')}</span></div>`;
-  // Show modal
-  document.getElementById('spModal').style.display='flex';
-  document.body.style.overflow='hidden';
-  // Init modal map
-  setTimeout(()=>initModalMap(sp),80);
-  // Fetch observations
-  document.getElementById('modalObsList').innerHTML='<div style="padding:8px;color:var(--muted);font-size:.68rem;">Loading…</div>';
-  document.getElementById('histSvg').innerHTML='';
-  try{
-    const r=await fetch(`/api/animals/species-observations/?species=${encodeURIComponent(sp.scientificName)}`);
-    const d=await r.json();
-    modalObs=d.observations||[];
-    plotModalMap(modalObs);
-    renderModalHist(modalObs);
-    renderObsList(modalObs);
-    // Load photos for gallery
-    const obsIds=(sp.obsIds||[]).slice(0,12);
-    if(obsIds.length){loadModalPhotos(obsIds,emoji);}
-  }catch(e){console.error(e);}
-}
-
-function initModalMap(sp){
-  if(_modalMap){_modalMap.remove();_modalMap=null;}
-  _modalMap=L.map('modalMap',{zoomControl:true,scrollWheelZoom:true}).setView([sp.centerLat||17.529,sp.centerLon||73.706],12);
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18}).addTo(_modalMap);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{opacity:.6,maxZoom:18}).addTo(_modalMap);
-}
-
-function plotModalMap(obs){
-  if(!_modalMap) return;
-  const grp=L.layerGroup().addTo(_modalMap);
-  const col=ccls(curSpecies.find(s=>s.scientificName===obs[0]?.species)?.class||'');
-  obs.forEach(o=>{
-    L.circleMarker([o.lat,o.lon],{radius:5,color:col||'#52b788',weight:1.5,fillColor:col||'#52b788',fillOpacity:.7})
-      .bindPopup(`<b>${esc(o.locality)}</b><br>${o.date}<br><small>${esc(o.recordedBy)}</small>`)
-      .addTo(grp);
-  });
-  if(obs.length>0){
-    const lats=obs.map(o=>o.lat),lons=obs.map(o=>o.lon);
-    _modalMap.fitBounds([[Math.min(...lats),Math.min(...lons)],[Math.max(...lats),Math.max(...lons)]],{padding:[15,15]});
-  }
-}
-
-function renderModalHist(obs){
-  const svg=document.getElementById('histSvg');
-  const byCnt={};
-  obs.forEach(o=>{if(o.year)(byCnt[o.year]=(byCnt[o.year]||0)+1);});
-  const years=Object.keys(byCnt).map(Number).sort((a,b)=>a-b);
-  if(!years.length){svg.innerHTML='';return;}
-  const W=svg.clientWidth||300,H=70,pad=4,barW=Math.max(2,(W-2*pad)/years.length-1);
-  const mx=Math.max(...Object.values(byCnt))||1;
-  svg.innerHTML=years.map((yr,i)=>{
-    const bh=((byCnt[yr]/mx)*(H-14));
-    const x=pad+i*(barW+1);
-    return `<rect x="${x}" y="${H-14-bh}" width="${barW}" height="${bh}" fill="#52b788" fill-opacity=".75" rx="1"/>
-      ${i%Math.ceil(years.length/6)===0?`<text x="${x+barW/2}" y="${H-1}" text-anchor="middle" fill="#4f7263" font-size="7">${yr}</text>`:''}`;
-  }).join('');
-}
-
-function renderObsList(obs){
-  const el=document.getElementById('modalObsList');
-  const recent=obs.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,12);
-  el.innerHTML=recent.map(o=>`
-    <div class="obs-item">
-      <span class="obs-date">${o.date||'—'}</span>
-      <span class="obs-loc">${esc((o.locality||'Koyna').substring(0,26))}</span>
-      <span class="obs-by">${esc((o.recordedBy||'').substring(0,14))}</span>
-      ${o.inatUrl?`<a href="${esc(o.inatUrl)}" target="_blank" rel="noopener">↗ iNat</a>`:''}
-    </div>`).join('');
-}
-
-async function loadModalPhotos(obsIds,emoji){
-  try{
-    const r=await fetch(`/api/inat-photos/?obs_ids=${obsIds.join(',')}`);
-    const d=await r.json();
-    modalPhotos=obsIds.map(id=>d.photos[id]).filter(Boolean);
-    if(modalPhotos.length){
-      buildGalStrip();
-      showGalPhoto(0);
-    }
-  }catch(e){console.error(e);}
-}
-
-function buildGalStrip(){
-  const strip=document.getElementById('galStrip');
-  strip.innerHTML=modalPhotos.map((url,i)=>`
-    <div class="gal-thumb${i===0?' active':''}" onclick="showGalPhoto(${i})">
-      <img src="${esc(url.replace('/medium.','/square.'))}" alt="">
-    </div>`).join('');
-}
-
-function showGalPhoto(idx){
-  if(idx<0||idx>=modalPhotos.length) return;
-  modalPhotoIdx=idx;
-  const img=document.getElementById('galImg');
-  const ph=document.getElementById('galPlaceholder');
-  img.style.opacity='0';img.style.display='block';
-  img.onload=()=>{img.style.opacity='1';ph.style.display='none';};
-  img.onerror=()=>{img.style.display='none';ph.style.display='flex';};
-  img.src=modalPhotos[idx];
-  document.getElementById('galCounter').textContent=`${idx+1}/${modalPhotos.length}`;
-  document.querySelectorAll('.gal-thumb').forEach((t,i)=>t.classList.toggle('active',i===idx));
-}
-
-function galNav(dir){showGalPhoto((modalPhotoIdx+dir+modalPhotos.length)%modalPhotos.length);}
-
-function closeModal(){
-  document.getElementById('spModal').style.display='none';
-  document.body.style.overflow='';
-  if(_modalMap){_modalMap.remove();_modalMap=null;}
-}
-function closeModalClickOutside(e){if(e.target===document.getElementById('spModal'))closeModal();}
-
-// ──────────────────────  HELPERS  ────────────────────────────────────────────
-function flyTo(lat,lon,ev){ev.stopPropagation();map.flyTo([lat,lon],14,{animate:true,duration:.6});}
-function clearHeat(){heatLayers.forEach(l=>{try{map.removeLayer(l);}catch(_){}});heatLayers=[];}
-function clearDots(){dotLayers.forEach(l=>{try{map.removeLayer(l);}catch(_){}});dotLayers=[];}
-function clearMarkers(){clMarkers.forEach(m=>{try{map.removeLayer(m);}catch(_){}});clMarkers=[];}
-function closeDrawer(){document.getElementById('drawer').classList.remove('open');activeCid=null;document.querySelectorAll('.cc').forEach(e=>e.classList.remove('active'));}
-function setGrid(html){document.getElementById('drGrid').innerHTML=html;}
-function showErr(msg){const b=document.getElementById('errBox');b.textContent='⚠ '+msg;b.style.display='block';}
-function hideErr(){document.getElementById('errBox').style.display='none';}
-
-// Store raw pts for filter replay
-const _origFetch=fetch;
-window.addEventListener('DOMContentLoaded',boot);
-
-// Intercept heatmap data for year/class replay
-const _realBoot=boot;
-async function boot(){
-  nC=parseInt(document.getElementById('csl').value);
-  const btn=document.getElementById('runBtn');
-  btn.disabled=true;btn.textContent='⏳';
-  hideErr();clearHeat();clearDots();clearMarkers();
-  document.getElementById('clList').innerHTML='<div style="text-align:center;padding:26px 12px;color:var(--muted);"><div class="spin"></div>Running K-Means…</div>';
-  try{
-    const [mR,hR]=await Promise.all([
-      fetch(`/api/animals/clustering/?clusters=${nC}`),
-      fetch(`/api/animals/cluster-heatmap/?clusters=${nC}`)
-    ]);
-    const meta=await mR.json(),heat=await hR.json();
-    if(meta.error){showErr(meta.error);return;}
-    clMeta=meta;
-    window._rawPts=heat.points;   // store for filter replay
-    document.getElementById('stO').textContent=(meta.total_observations||0).toLocaleString();
-    document.getElementById('stS').textContent=(meta.total_species||0).toLocaleString();
-    document.getElementById('stC').textContent=meta.n_clusters||0;
-    document.getElementById('navBadge').textContent=`${meta.n_clusters} clusters · ${meta.total_observations} obs`;
-    renderHeatmap(heat.points);
-    renderMarkers(meta);
-    renderSidebar(meta);
-    renderLegend(meta);
-    buildClsChips(meta);
-  }catch(e){showErr('Failed: '+e.message);console.error(e);}
-  finally{btn.disabled=false;btn.textContent='▶ Run';}
-}
-
-// Expose globals for inline onclick
-window.openCluster=openCluster;
-window.flyTo=flyTo;
-window.fClass=fClass;
-window.openSpeciesModal=openSpeciesModal;
-window.galNav=galNav;
-window.showGalPhoto=showGalPhoto;
-window.toggleClsFilter=toggleClsFilter;
-window.switchView=switchView;
-window.toggleFullscreen=toggleFullscreen;
-window.toggleTimeline=toggleTimeline;
-window.exportCSV=exportCSV;
-window.closeModal=closeModal;
-window.closeModalClickOutside=closeModalClickOutside;
-window.closeDrawer=closeDrawer;
-window.applyYearFilter=applyYearFilter;
-</script>
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+    </script>
 </body>
 </html>

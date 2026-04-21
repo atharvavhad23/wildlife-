@@ -31,11 +31,6 @@ urlpatterns = [
     path('photos/insects/', views.get_insects_photos, name='insects_photos'),
     # API endpoints for clustering
     path('api/animals/clustering/', views.get_animals_clustering, name='animals_clustering_api'),
-    path('api/animals/cluster-details/', views.get_cluster_details, name='cluster_details_api'),
-    path('api/animals/cluster-heatmap/', views.get_cluster_heatmap, name='cluster_heatmap_api'),
     path('api/animals/species/', views.get_species_detail, name='species_detail_api'),
     path('api/animals/species-photos/', views.get_species_photos, name='species_photos_api'),
-    path('api/inat-photos/', views.get_inat_photos, name='inat_photos_api'),
-    path('api/animals/species-observations/', views.get_species_observations, name='species_obs_api'),
-    path('api/animals/cluster-timeline/', views.get_cluster_timeline, name='cluster_timeline_api'),
 ]
