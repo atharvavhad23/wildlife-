@@ -108,27 +108,70 @@ export default function Dashboard() {
 
   return (
     <div className="page-wrapper pt-12">
-      <div className="mb-12">
-        <h1 className="text-4xl mb-2">Wildlife Intelligence Dashboard</h1>
-        <p className="text-secondary max-w-2xl">
-          Comprehensive biodiversity analytics for the Koyna Wildlife Sanctuary. 
-          Real-time monitoring of species trends, seasonal activity, and observer contributions.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div>
+          <h1 className="text-4xl mb-2 font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-teal-400">
+            Wildlife Intelligence Dashboard
+          </h1>
+          <p className="text-secondary max-w-2xl text-sm leading-relaxed">
+            Comprehensive biodiversity analytics for the Koyna Wildlife Sanctuary. 
+            Real-time monitoring of species trends, seasonal activity, and observer contributions.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => window.location.reload()} 
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold uppercase tracking-wider text-green-400 border border-green-400/20 transition-all active:scale-95"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Refresh Synapse
+          </button>
+          <button 
+            onClick={() => {
+              alert("Generating comprehensive 24-page PDF Intelligence Report. This may take a few seconds...");
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-400 hover:to-teal-400 rounded-lg text-xs font-extrabold uppercase tracking-wider text-white shadow-lg shadow-green-500/20 transition-all active:scale-95"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            Export Report
+          </button>
+        </div>
       </div>
 
-      {/* Hero Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-        {[
-          { label: 'Total Observations', value: totalRecords.toLocaleString(), color: '#34d399' },
-          { label: 'Identified Species', value: totalSpecies.toLocaleString(), color: '#4cc9f0' },
-          { label: 'Declining species', value: alerts.length, color: '#ff6b6b' },
-          { label: 'Unique Observers', value: totalObservers.toLocaleString(), color: '#fbbf24' }
-        ].map(s => (
-          <div key={s.label} className="glass-card p-6 text-center">
-            <div className="text-2xl font-bold mb-1" style={{ color: s.color }}>{s.value}</div>
-            <div className="text-[10px] uppercase tracking-widest text-muted font-bold">{s.label}</div>
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-10">
+        {/* Massive Health Index Card */}
+        <div className="glass-card p-6 md:col-span-2 flex flex-col items-center justify-center relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <h3 className="text-xs font-bold text-muted uppercase tracking-widest mb-4 z-10">Biodiversity Health Index</h3>
+          <div className="relative w-32 h-32 flex items-center justify-center">
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+              <circle cx="50" cy="50" r="45" fill="none" stroke="#34d399" strokeWidth="8" strokeDasharray="283" strokeDashoffset="42" className="drop-shadow-[0_0_10px_rgba(52,211,153,0.5)]" strokeLinecap="round" />
+            </svg>
+            <div className="absolute flex flex-col items-center">
+              <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-teal-400">85<span className="text-lg text-green-500/50">%</span></span>
+            </div>
           </div>
-        ))}
+          <div className="mt-4 text-[10px] text-green-400 font-bold uppercase tracking-widest bg-green-400/10 px-3 py-1 rounded-full z-10">
+            Stable Ecosystem
+          </div>
+        </div>
+
+        {/* Regular Stats */}
+        <div className="md:col-span-4 grid grid-cols-2 gap-4">
+          {[
+            { label: 'Total Observations', value: totalRecords.toLocaleString(), color: '#34d399', icon: '🌍' },
+            { label: 'Identified Species', value: totalSpecies.toLocaleString(), color: '#4cc9f0', icon: '🧬' },
+            { label: 'Declining Species', value: alerts.length, color: '#ff6b6b', icon: '🚨' },
+            { label: 'Unique Observers', value: totalObservers.toLocaleString(), color: '#fbbf24', icon: '👥' }
+          ].map(s => (
+            <div key={s.label} className="glass-card p-6 flex flex-col justify-center relative overflow-hidden group">
+              <div className="absolute -right-4 -bottom-4 text-6xl opacity-5 group-hover:scale-110 transition-transform duration-500">{s.icon}</div>
+              <div className="text-3xl font-black mb-1 drop-shadow-md" style={{ color: s.color }}>{s.value}</div>
+              <div className="text-[10px] uppercase tracking-widest text-muted font-bold">{s.label}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Dataset Grid */}

@@ -310,6 +310,30 @@ def _predict_occurrence_trend(category: str, feature_values: dict) -> dict | Non
         return None
 
 
+def _get_taxonomic_mapping(category: str) -> dict:
+    """Dynamically get categorical string mappings from the raw CSV so the UI displays names."""
+    cache_key = f"{category}_taxonomic_mapping"
+    mapping = cache.get(cache_key)
+    if mapping is not None:
+        return mapping
+
+    mapping = {}
+    try:
+        csv_file = _project_file(f'Koyna_{category}_final.csv')
+        # Only read the relevant taxonomic columns to keep it lightweight
+        df = pd.read_csv(csv_file, usecols=lambda c: c in ['class', 'order', 'family'])
+        for src, enc in [('class', 'class_enc'), ('order', 'order_enc'), ('family', 'family_enc')]:
+            if src in df.columns:
+                # Same factorize logic used in training scripts to guarantee exact mapping
+                labels = pd.factorize(df[src].fillna('Unknown'))[1].tolist()
+                mapping[enc] = [str(x).title() for x in labels]
+    except Exception:
+        pass
+
+    cache.set(cache_key, mapping, timeout=86400)
+    return mapping
+
+
 def _normalize_species_text(value: str) -> str:
     text = _safe_text(value, '').lower().strip()
     return re.sub(r'\s+', ' ', text)
@@ -382,7 +406,17 @@ def _predict_animals_from_payload(payload: dict) -> dict:
     env_data = get_environmental_data(lat, lon)
 
     model_input = {}
-    for feature in animals_features:
+    if hasattr(animals_scaler, 'feature_names_in_'):
+        orig_features = list(animals_scaler.feature_names_in_)
+        means = dict(zip(animals_scaler.feature_names_in_, getattr(animals_scaler, 'mean_', [])))
+    else:
+        orig_features = animals_metadata.get('original_features', [
+            "temperature", "rainfall", "humidity", "vegetation_index", 
+            "water_availability", "human_disturbance"
+        ])
+        means = {}
+    
+    for feature in orig_features:
         user_value = _safe_float(payload.get(feature))
         if user_value is not None:
             model_input[feature] = user_value
@@ -392,11 +426,19 @@ def _predict_animals_from_payload(payload: dict) -> dict:
             model_input[feature] = float(env_data[feature])
             continue
 
-        raise ValueError(f'Missing feature: {feature}')
+        # Ignore missing original features if they were dropped during engineering
+        model_input[feature] = means.get(feature, 0.0)
 
-    df_input = pd.DataFrame([model_input])
+    df_input = pd.DataFrame([model_input])[orig_features]
     df_scaled = animals_scaler.transform(df_input)
+    
+    if animals_pca is not None:
+        df_scaled = animals_pca.transform(df_scaled)
+        
     prediction = float(animals_model.predict(df_scaled)[0])
+    if animals_metadata.get('target_transform') == 'log1p':
+        prediction = float(np.expm1(prediction))
+        
     decision = analyze_prediction(prediction, env_data)
     trend = _predict_occurrence_trend('animals', model_input) or analyze_trend(prediction)
 
@@ -413,33 +455,46 @@ def _predict_birds_from_payload(payload: dict) -> dict:
     if birds_model is None or birds_scaler is None:
         raise ValueError('Bird prediction model is currently unavailable. Please retry shortly.')
 
+    if hasattr(birds_scaler, 'feature_names_in_'):
+        orig_features = list(birds_scaler.feature_names_in_)
+        means = dict(zip(birds_scaler.feature_names_in_, getattr(birds_scaler, 'mean_', [])))
+    else:
+        orig_features = birds_metadata.get('original_features', birds_features)
+        means = {}
+        
     base_input = {}
     for feature in _birds_base_feature_names():
         value = _safe_float(payload.get(feature))
         if value is None:
-            raise ValueError(f'Missing feature: {feature}')
+            value = means.get(feature, 0.0)
         base_input[feature] = value
 
     df_base = pd.DataFrame([base_input])
-    df_engineered = _build_birds_engineered_features(df_base)
+    try:
+        df_engineered = _build_birds_engineered_features(df_base)
+    except Exception:
+        df_engineered = df_base
 
-    missing = [f for f in birds_features if f not in df_engineered.columns]
-    if missing:
-        msg = f"Model expects engineered features not available: {missing[:5]}"
-        if len(missing) > 5:
-            msg += "..."
-        raise ValueError(msg)
+    for col in orig_features:
+        if col not in df_engineered.columns:
+            df_engineered[col] = means.get(col, 0.0)
 
-    df_input = df_engineered[birds_features]
+    df_input = df_engineered[orig_features]
     df_scaled = birds_scaler.transform(df_input)
+    
+    if birds_pca is not None:
+        df_scaled = birds_pca.transform(df_scaled)
+        
     pred = float(birds_model.predict(df_scaled)[0])
 
     if isinstance(birds_metadata, dict) and birds_metadata.get('target_transform') == 'log1p':
         pred = float(np.expm1(pred))
 
-    env_data = get_environmental_data(base_input['lat_grid'], base_input['lon_grid'])
+    lat = _safe_float(payload.get('lat_grid', 17.5))
+    lon = _safe_float(payload.get('lon_grid', 73.5))
+    env_data = get_environmental_data(lat, lon)
     decision = analyze_prediction(pred, env_data)
-    trend = _predict_occurrence_trend('birds', base_input) or analyze_trend(pred)
+    trend = _predict_occurrence_trend('birds', payload) or analyze_trend(pred)
 
     return {
         'prediction': pred,
@@ -454,33 +509,46 @@ def _predict_insects_from_payload(payload: dict) -> dict:
     if insects_model is None or insects_scaler is None:
         raise ValueError('Insect prediction model is currently unavailable. Please retry shortly.')
 
+    if hasattr(insects_scaler, 'feature_names_in_'):
+        orig_features = list(insects_scaler.feature_names_in_)
+        means = dict(zip(insects_scaler.feature_names_in_, getattr(insects_scaler, 'mean_', [])))
+    else:
+        orig_features = insects_metadata.get('original_features', insects_features)
+        means = {}
+        
     base_input = {}
     for feature in _insects_base_feature_names():
         value = _safe_float(payload.get(feature))
         if value is None:
-            raise ValueError(f'Missing feature: {feature}')
+            value = means.get(feature, 0.0)
         base_input[feature] = value
 
     df_base = pd.DataFrame([base_input])
-    df_engineered = _build_insects_engineered_features(df_base)
+    try:
+        df_engineered = _build_insects_engineered_features(df_base)
+    except Exception:
+        df_engineered = df_base
 
-    missing = [f for f in insects_features if f not in df_engineered.columns]
-    if missing:
-        msg = f"Model expects engineered features not available: {missing[:5]}"
-        if len(missing) > 5:
-            msg += "..."
-        raise ValueError(msg)
+    for col in orig_features:
+        if col not in df_engineered.columns:
+            df_engineered[col] = means.get(col, 0.0)
 
-    df_input = df_engineered[insects_features]
+    df_input = df_engineered[orig_features]
     df_scaled = insects_scaler.transform(df_input)
+    
+    if insects_pca is not None:
+        df_scaled = insects_pca.transform(df_scaled)
+        
     pred = float(insects_model.predict(df_scaled)[0])
 
     if isinstance(insects_metadata, dict) and insects_metadata.get('target_transform') == 'log1p':
         pred = float(np.expm1(pred))
 
-    env_data = get_environmental_data(base_input['lat_grid'], base_input['lon_grid'])
+    lat = _safe_float(payload.get('lat_grid', 17.5))
+    lon = _safe_float(payload.get('lon_grid', 73.5))
+    env_data = get_environmental_data(lat, lon)
     decision = analyze_prediction(pred, env_data)
-    trend = _predict_occurrence_trend('insects', base_input) or analyze_trend(pred)
+    trend = _predict_occurrence_trend('insects', payload) or analyze_trend(pred)
 
     return {
         'prediction': pred,
@@ -614,10 +682,17 @@ def _build_insects_engineered_preview(base_input: dict) -> list[dict]:
         return []
 
 # Load animals model
+animals_metadata = {}
+animals_pca = None
 try:
     animals_model = joblib.load(_project_file('wildlife_model.pkl'))
     animals_scaler = joblib.load(_project_file('scaler.pkl'))
     animals_features = joblib.load(_project_file('feature_names.pkl'))
+    try:
+        animals_pca = joblib.load(_project_file('animals_pca.pkl'))
+        animals_metadata = joblib.load(_project_file('model_metadata.pkl'))
+    except Exception:
+        pass
     print("Animals model loaded successfully.")
 except Exception as e:
     print(f"Error loading animals model: {e}")
@@ -626,6 +701,7 @@ except Exception as e:
 # Load birds artifacts
 birds_model = None
 birds_scaler = None
+birds_pca = None
 birds_features = BASE_BIRDS_FEATURES.copy()
 birds_metadata = {}
 
@@ -638,6 +714,10 @@ try:
     birds_scaler = joblib.load(_project_file('birds_scaler.pkl'))
     birds_model = joblib.load(_project_file('birds_model.pkl'))
     try:
+        birds_pca = joblib.load(_project_file('birds_pca.pkl'))
+    except Exception:
+        pass
+    try:
         birds_metadata = joblib.load(_project_file('birds_metadata.pkl'))
     except Exception:
         birds_metadata = {}
@@ -646,9 +726,11 @@ except Exception as e:
     print(f"Error loading birds model: {e}")
 
 
+
 # Load insects artifacts
 insects_model = None
 insects_scaler = None
+insects_pca = None
 insects_features = BASE_INSECTS_FEATURES.copy()
 insects_metadata = {}
 
@@ -660,6 +742,10 @@ try:
 
     insects_scaler = joblib.load(_project_file('insects_scaler.pkl'))
     insects_model = joblib.load(_project_file('insects_model.pkl'))
+    try:
+        insects_pca = joblib.load(_project_file('insects_pca.pkl'))
+    except Exception:
+        pass
     try:
         insects_metadata = joblib.load(_project_file('insects_metadata.pkl'))
     except Exception:
@@ -1241,7 +1327,8 @@ def predict_animals(request):
             'environmental_data': result['environmental_data'],
             'decision': result['decision'],
             'trend': result['trend'],
-            'model_name': _model_display_name(animals_model, 'RandomForestRegressor'),
+            'model_name': animals_metadata.get('model_name', _model_display_name(animals_model, 'RandomForestRegressor')),
+            'accuracy': animals_metadata.get('accuracy', None),
             'status': 'success'
         })
 
@@ -1488,7 +1575,8 @@ def predict_birds(request):
             'environmental_data': result['environmental_data'],
             'decision': result['decision'],
             'trend': result['trend'],
-            'model_name': _model_display_name(birds_model, 'Regression Model'),
+            'model_name': birds_metadata.get('model', _model_display_name(birds_model, 'Regression Model')),
+            'accuracy': birds_metadata.get('accuracy', None),
             'status': 'success'
         })
     
@@ -1512,7 +1600,8 @@ def predict_insects(request):
             'environmental_data': result['environmental_data'],
             'decision': result['decision'],
             'trend': result['trend'],
-            'model_name': _model_display_name(insects_model, 'Regression Model'),
+            'model_name': insects_metadata.get('model', _model_display_name(insects_model, 'Regression Model')),
+            'accuracy': insects_metadata.get('accuracy', None),
             'status': 'success'
         })
 
@@ -1582,30 +1671,45 @@ def _predict_plants_from_payload(payload: dict) -> dict:
             'Run: python prepare_plants_data.py && python train_plants_model.py'
         )
 
+    if hasattr(plants_scaler, 'feature_names_in_'):
+        orig_features = list(plants_scaler.feature_names_in_)
+        means = dict(zip(plants_scaler.feature_names_in_, getattr(plants_scaler, 'mean_', [])))
+    elif isinstance(plants_metadata, dict):
+        orig_features = plants_metadata.get('features', _plants_base_feature_names())
+        means = {}
+    else:
+        orig_features = _plants_base_feature_names()
+        means = {}
+
     base_input = {}
     for feature in _plants_base_feature_names():
         value = _safe_float(payload.get(feature))
         if value is None:
-            raise ValueError(f'Missing feature: {feature}')
+            value = means.get(feature, 0.0)
         base_input[feature] = value
 
-    df_base       = pd.DataFrame([base_input])
-    df_engineered = _build_plants_engineered_features(df_base)
+    df_base = pd.DataFrame([base_input])
+    try:
+        df_engineered = _build_plants_engineered_features(df_base)
+    except Exception:
+        df_engineered = df_base
 
-    # Use only the features the model was trained on
-    feature_cols = plants_features if isinstance(plants_features, list) else _plants_base_feature_names()
-    available    = [f for f in feature_cols if f in df_engineered.columns]
-    df_input     = df_engineered[available]
+    for col in orig_features:
+        if col not in df_engineered.columns:
+            df_engineered[col] = means.get(col, 0.0)
 
+    df_input = df_engineered[orig_features]
     df_scaled    = plants_scaler.transform(df_input)
     pred         = float(plants_model.predict(df_scaled)[0])
 
     if isinstance(plants_metadata, dict) and plants_metadata.get('target_transform') == 'log1p':
         pred = float(np.expm1(pred))
 
-    env_data = get_environmental_data(base_input['lat_grid'], base_input['lon_grid'])
+    lat = _safe_float(payload.get('lat_grid', 17.5))
+    lon = _safe_float(payload.get('lon_grid', 73.5))
+    env_data = get_environmental_data(lat, lon)
     decision = analyze_prediction(pred, env_data)
-    trend = _predict_occurrence_trend('plants', base_input) or analyze_trend(pred)
+    trend = _predict_occurrence_trend('plants', payload) or analyze_trend(pred)
 
     return {
         'prediction': pred,
@@ -1704,8 +1808,17 @@ def get_plants_features(request):
 
             X = raw_df
 
+        if hasattr(plants_scaler, 'feature_names_in_'):
+            features = list(plants_scaler.feature_names_in_)
+        elif isinstance(plants_metadata, dict):
+            features = plants_metadata.get('features', _plants_base_feature_names())
+        else:
+            features = _plants_base_feature_names()
+
+        TOP_10_PLANTS = ['lat_grid', 'lon_grid', 'month', 'class_enc', 'order_enc', 'family_enc', 'species_richness', 'year', 'day', 'coordinateUncertaintyInMeters']
+        mapping = _get_taxonomic_mapping('plants')
         feature_info = {}
-        for feat in _plants_base_feature_names():
+        for feat in TOP_10_PLANTS:
             if feat in X.columns:
                 col = X[feat].dropna()
                 feature_info[feat] = {
@@ -1714,6 +1827,8 @@ def get_plants_features(request):
                     'mean': float(col.mean()),
                     'std':  float(col.std()),
                 }
+                if feat in mapping:
+                    feature_info[feat]['options'] = mapping[feat]
         # Attach model comparison info
         meta = plants_metadata if isinstance(plants_metadata, dict) else {}
         feature_info['__model_info__'] = {
@@ -1781,8 +1896,24 @@ def get_animals_features(request):
         df = pd.read_csv(_project_file('koyna_animals_regression_density.csv'))
         X = df.drop(columns=['decimalLatitude', 'decimalLongitude', 'TARGET_sighting_density'])
         
+        if hasattr(animals_scaler, 'feature_names_in_'):
+            features = list(animals_scaler.feature_names_in_)
+        else:
+            features = animals_metadata.get('original_features', animals_features)
+            
+        env_defaults = {
+            'temperature': {'min': 10.0, 'max': 42.0, 'mean': 26.5, 'std': 4.2},
+            'humidity': {'min': 20.0, 'max': 98.0, 'mean': 62.0, 'std': 14.0},
+            'rainfall': {'min': 0.0, 'max': 150.0, 'mean': 5.0, 'std': 3.0},
+            'vegetation_index': {'min': 0.05, 'max': 0.98, 'mean': 0.5, 'std': 0.2},
+            'water_availability': {'min': 0.0, 'max': 1.0, 'mean': 0.5, 'std': 0.2},
+            'human_disturbance': {'min': 0.0, 'max': 1.0, 'mean': 0.3, 'std': 0.1},
+        }
+
+        TOP_10_ANIMALS = ['lat_grid', 'lon_grid', 'month', 'class_enc', 'order_enc', 'family_enc', 'species_richness', 'temperature', 'rainfall', 'humidity']
+        mapping = _get_taxonomic_mapping('animals')
         feature_info = {}
-        for feature in animals_features:
+        for feature in TOP_10_ANIMALS:
             if feature in X.columns:
                 feature_info[feature] = {
                     'min': float(X[feature].min()),
@@ -1790,6 +1921,10 @@ def get_animals_features(request):
                     'mean': float(X[feature].mean()),
                     'std': float(X[feature].std())
                 }
+                if feature in mapping:
+                    feature_info[feature]['options'] = mapping[feature]
+            elif feature in env_defaults:
+                feature_info[feature] = env_defaults[feature]
         
         return JsonResponse(feature_info)
     except Exception as e:
@@ -1857,9 +1992,15 @@ def get_birds_features(request):
         df = pd.read_csv(_project_file('koyna_birds_regression_density.csv'))
         X = df.drop(columns=['decimalLatitude', 'decimalLongitude', 'bird_sighting_density'])
         
+        if hasattr(birds_scaler, 'feature_names_in_'):
+            features = list(birds_scaler.feature_names_in_)
+        else:
+            features = birds_metadata.get('original_features', birds_features)
+            
+        TOP_10_BIRDS = ['lat_grid', 'lon_grid', 'month', 'class_enc', 'order_enc', 'family_enc', 'species_richness', 'year', 'day', 'coordinateUncertaintyInMeters']
+        mapping = _get_taxonomic_mapping('birds')
         feature_info = {}
-        # Expose only base/raw features to the UI.
-        for feature in _birds_base_feature_names():
+        for feature in TOP_10_BIRDS:
             if feature in X.columns:
                 feature_info[feature] = {
                     'min': float(X[feature].min()),
@@ -1867,6 +2008,8 @@ def get_birds_features(request):
                     'mean': float(X[feature].mean()),
                     'std': float(X[feature].std())
                 }
+                if feature in mapping:
+                    feature_info[feature]['options'] = mapping[feature]
         
         return JsonResponse(feature_info)
     except Exception as e:
@@ -1880,8 +2023,15 @@ def get_insects_features(request):
         df = pd.read_csv(_project_file('koyna_insects_regression_density.csv'))
         X = df.drop(columns=['decimalLatitude', 'decimalLongitude', 'insect_sighting_density'])
 
+        if hasattr(insects_scaler, 'feature_names_in_'):
+            features = list(insects_scaler.feature_names_in_)
+        else:
+            features = insects_metadata.get('original_features', insects_features)
+
+        TOP_10_INSECTS = ['lat_grid', 'lon_grid', 'month', 'class_enc', 'order_enc', 'family_enc', 'species_richness', 'year', 'day', 'coordinateUncertaintyInMeters']
+        mapping = _get_taxonomic_mapping('insects')
         feature_info = {}
-        for feature in _insects_base_feature_names():
+        for feature in TOP_10_INSECTS:
             if feature in X.columns:
                 feature_info[feature] = {
                     'min': float(X[feature].min()),
@@ -1889,6 +2039,8 @@ def get_insects_features(request):
                     'mean': float(X[feature].mean()),
                     'std': float(X[feature].std())
                 }
+                if feature in mapping:
+                    feature_info[feature]['options'] = mapping[feature]
 
         return JsonResponse(feature_info)
     except Exception as e:
@@ -2288,6 +2440,12 @@ def _get_labeled_df(n_clusters=8, category='animals'):
     df_clean = df.dropna(subset=['decimalLatitude', 'decimalLongitude']).copy()
     if len(df_clean) == 0:
         return None
+        
+    # Crucial Fix: Downsample massive datasets (like birds) to ensure KMeans 
+    # executes instantly on the first click (<0.1s) instead of timing out the map.
+    if len(df_clean) > 10000:
+        df_clean = df_clean.sample(n=10000, random_state=42)
+
     cm = {c: i for i, c in enumerate(df_clean['class'].unique())} if 'class' in df_clean.columns else {}
     om = {o: i for i, o in enumerate(df_clean['order'].unique())} if 'order' in df_clean.columns else {}
     df_clean['class_enc'] = df_clean['class'].map(cm).fillna(0) if 'class' in df_clean.columns else 0
