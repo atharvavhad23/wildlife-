@@ -21,6 +21,10 @@ const FIELD_META = {
 
 const DROPDOWN_FEATURES = ['phylum_enc','class_enc','order_enc','family_enc','taxonRank_enc','basisOfRecord_enc','season_enc']
 const SLIDER_FEATURES = ['coordinateUncertaintyInMeters','lat_grid','lon_grid','species_richness']
+const INTEGER_FEATURES = [
+  'day', 'month', 'year', 'decade', 'species_richness',
+  'phylum_enc', 'class_enc', 'order_enc', 'family_enc', 'taxonRank_enc', 'basisOfRecord_enc', 'season_enc'
+]
 
 export function usePrediction(featuresUrl, predictUrl) {
   const [features, setFeatures] = useState({})
@@ -109,20 +113,55 @@ export function usePrediction(featuresUrl, predictUrl) {
 }
 
 // ─── Field Component ─────────────────────────────────────────────────────
-function FormField({ name, ranges, value, onChange }) {
+function FormField({ name, ranges, value, onChange, categoryLabel = 'Animals' }) {
   const meta = FIELD_META[name] || { name, desc: '', icon: '📌' }
   const isDropdown = DROPDOWN_FEATURES.includes(name)
   const isSlider = SLIDER_FEATURES.includes(name)
+  const isInteger = INTEGER_FEATURES.includes(name)
   const span = Math.round(ranges.max - ranges.min)
   const showDropdown = isDropdown && span > 0 && span <= 25
+
+  let desc = meta.desc;
+  let icon = meta.icon;
+
+  if (desc) {
+    const cat = categoryLabel.toLowerCase();
+    if (cat === 'plants') {
+      desc = desc.replace(/Broad animal/gi, 'Broad botanical').replace(/Animal/gi, 'Plant');
+    } else if (cat === 'birds') {
+      desc = desc.replace(/Broad animal/gi, 'Broad avian').replace(/Animal/gi, 'Bird');
+    } else if (cat === 'insects') {
+      desc = desc.replace(/Broad animal/gi, 'Broad invertebrate').replace(/Animal/gi, 'Insect');
+    }
+  }
+
+  if (name.includes('_enc')) {
+    const cat = categoryLabel.toLowerCase();
+    if (cat === 'plants') {
+      if (name === 'phylum_enc') icon = '🌿';
+      if (name === 'class_enc') icon = '🌱';
+      if (name === 'order_enc') icon = '🌲';
+      if (name === 'family_enc') icon = '🍃';
+    } else if (cat === 'birds') {
+      if (name === 'phylum_enc') icon = '🦅';
+      if (name === 'class_enc') icon = '🕊️';
+      if (name === 'order_enc') icon = '🪶';
+      if (name === 'family_enc') icon = '🪹';
+    } else if (cat === 'insects') {
+      if (name === 'phylum_enc') icon = '🦋';
+      if (name === 'class_enc') icon = '🐛';
+      if (name === 'order_enc') icon = '🐞';
+      if (name === 'family_enc') icon = '🐜';
+    }
+  }
 
   return (
     <div className="form-group">
       <label className="form-label">
-        <span className="lbl-icon">{meta.icon}</span>
+        <span className="lbl-icon">{icon}</span>
         <span className="lbl-text">
           <span className="lbl-name">{meta.name}</span>
-          {meta.desc && <span className="lbl-desc">{meta.desc}</span>}
+          {desc && <span className="lbl-desc">{desc}</span>}
         </span>
       </label>
 
@@ -131,10 +170,11 @@ function FormField({ name, ranges, value, onChange }) {
           className="form-input"
           value={value}
           onChange={e => onChange(name, e.target.value)}
+          style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff' }}
         >
           {Array.from({ length: Math.round(ranges.max - ranges.min) + 1 }, (_, i) => {
             const v = Math.round(ranges.min) + i
-            return <option key={v} value={v}>{v}</option>
+            return <option key={v} value={v} style={{ background: '#1a2e20', color: '#fff' }}>{v}</option>
           })}
         </select>
       ) : (
@@ -144,7 +184,7 @@ function FormField({ name, ranges, value, onChange }) {
               type="range"
               min={ranges.min}
               max={ranges.max}
-              step={0.1}
+              step={isInteger ? 1 : 0.1}
               value={value}
               onChange={e => onChange(name, e.target.value)}
             />
@@ -154,7 +194,7 @@ function FormField({ name, ranges, value, onChange }) {
             className="form-input"
             min={ranges.min}
             max={ranges.max}
-            step={0.1}
+            step={isInteger ? 1 : 0.1}
             value={value}
             onChange={e => onChange(name, e.target.value)}
           />
@@ -163,14 +203,17 @@ function FormField({ name, ranges, value, onChange }) {
 
       <div className="range-hint">
         <span>Range:</span>
-        <span>{ranges.min.toFixed(2)} – {ranges.max.toFixed(2)}</span>
+        <span>
+          {isInteger ? Math.round(ranges.min) : ranges.min.toFixed(2)} –{' '}
+          {isInteger ? Math.round(ranges.max) : ranges.max.toFixed(2)}
+        </span>
       </div>
     </div>
   )
 }
 
 // ─── Full Form ───────────────────────────────────────────────────────────
-export function PredictionForm({ features, values, setValue, loading, fetchingFeatures, onPredict, onReset, accentColor }) {
+export function PredictionForm({ features, values, setValue, loading, fetchingFeatures, onPredict, onReset, accentColor, categoryLabel = 'Animals' }) {
   if (fetchingFeatures) {
     return (
       <div className="spinner-wrap">
@@ -190,6 +233,7 @@ export function PredictionForm({ features, values, setValue, loading, fetchingFe
             ranges={ranges}
             value={values[name] ?? ranges.mean}
             onChange={setValue}
+            categoryLabel={categoryLabel}
           />
         ))}
       </div>

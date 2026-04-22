@@ -44,6 +44,7 @@ export default function PredictPage({ config }) {
           onPredict={hook.predict}
           onReset={hook.reset}
           accentColor={accentColor}
+          categoryLabel={title}
         />
       </div>
 

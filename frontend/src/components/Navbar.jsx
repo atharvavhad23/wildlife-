@@ -1,16 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { signOut } from 'firebase/auth'
-import { auth } from '../lib/firebase'
-
 export default function Navbar() {
-  const logout = async () => {
-    if (!auth) return
-    try {
-      await signOut(auth)
-    } catch {
-      // Keep UI responsive even if logout fails once.
-    }
-  }
 
   return (
     <nav className="navbar">
@@ -41,7 +30,9 @@ export default function Navbar() {
         <NavLink to="/plants" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
           <span className="nav-icon">🌿</span> Plants
         </NavLink>
-        <button type="button" className="nav-link" onClick={logout}>Logout</button>
+        <NavLink to="/profile" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} style={{ marginLeft: '12px' }}>
+          <span className="nav-icon">👤</span> Profile
+        </NavLink>
       </div>
     </nav>
   )

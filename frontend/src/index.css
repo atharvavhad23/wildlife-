@@ -285,12 +285,14 @@ input, select { font-family: 'Inter', sans-serif; }
 .cat-card.animals .cat-card-header { background: linear-gradient(135deg, #ff6b6b22, #ff4d4d11); border-bottom: 1px solid #ff6b6b33; }
 .cat-card.birds .cat-card-header { background: linear-gradient(135deg, #4ecdc422, #26c6da11); border-bottom: 1px solid #4ecdc433; }
 .cat-card.insects .cat-card-header { background: linear-gradient(135deg, #f59e0b22, #fbbf2411); border-bottom: 1px solid #f59e0b33; }
+.cat-card.plants .cat-card-header { background: linear-gradient(135deg, #10b98122, #05966911); border-bottom: 1px solid #10b98133; }
 
 .cat-emoji { font-size: 3.5rem; margin-bottom: 12px; display: block; }
 .cat-card-header h2 { font-size: 1.7rem; margin-bottom: 4px; }
 .cat-card.animals .cat-card-header h2 { color: var(--red-400); }
 .cat-card.birds .cat-card-header h2 { color: var(--teal-500); }
 .cat-card.insects .cat-card-header h2 { color: var(--amber-400); }
+.cat-card.plants .cat-card-header h2 { color: #34d399; }
 .cat-card-header p { color: var(--text-secondary); font-size: 0.95rem; }
 
 .cat-card-body { padding: 24px 28px 28px; background: rgba(8, 20, 10, 0.85); }
@@ -317,6 +319,7 @@ input, select { font-family: 'Inter', sans-serif; }
 .cat-card.animals .cat-features li::before { background: rgba(255,107,107,0.2); color: var(--red-400); }
 .cat-card.birds .cat-features li::before { background: rgba(78,205,196,0.2); color: var(--teal-500); }
 .cat-card.insects .cat-features li::before { background: rgba(245,158,11,0.2); color: var(--amber-400); }
+.cat-card.plants .cat-features li::before { background: rgba(16,185,129,0.2); color: #34d399; }
 
 .cat-btn {
   width: 100%;
@@ -331,6 +334,7 @@ input, select { font-family: 'Inter', sans-serif; }
 .cat-card.animals .cat-btn { background: linear-gradient(135deg, #ff6b6b, #e84393); color: #fff; }
 .cat-card.birds .cat-btn { background: linear-gradient(135deg, #4ecdc4, #26c6da); color: #fff; }
 .cat-card.insects .cat-btn { background: linear-gradient(135deg, #f59e0b, #f97316); color: #fff; }
+.cat-card.plants .cat-btn { background: linear-gradient(135deg, #10b981, #059669); color: #fff; }
 .cat-btn:hover { transform: scale(1.02); filter: brightness(1.1); }
 
 /* ── Section Heading ─────────────────────────────────────── */
@@ -426,6 +430,16 @@ input, select { font-family: 'Inter', sans-serif; }
   box-shadow: 0 0 0 3px rgba(46,204,113,0.1);
 }
 .form-input option { background: #0d2818; color: var(--text-primary); }
+
+/* Global Autofill Override for Dark Mode */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active{
+    -webkit-box-shadow: 0 0 0 30px #1a1f1b inset !important;
+    -webkit-text-fill-color: white !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
 
 .range-hint {
   font-size: 0.75rem;

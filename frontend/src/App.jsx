@@ -14,6 +14,7 @@ import SpeciesDetail from './pages/SpeciesDetail'
 import Dashboard from './pages/Dashboard'
 import Plants from './pages/Plants'
 import Auth from './pages/Auth'
+import Profile from './pages/Profile'
 import { auth, firebaseConfigured } from './lib/firebase'
 
 function RequireAuth({ user, authReady, children }) {
@@ -72,6 +73,7 @@ function AnimatedRoutes({ user, authReady }) {
         <Route path="/plants" element={withAuth(Plants)} />
         <Route path="/plants/clustering" element={withAuth(ClusteringMap)} />
         <Route path="/plants/species" element={withAuth(SpeciesDetail)} />
+        <Route path="/profile" element={withAuth(Profile)} />
         <Route path="*" element={withAuth(NotFound)} />
       </Routes>
     </AnimatePresence>
