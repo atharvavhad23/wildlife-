@@ -1,5 +1,7 @@
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
+import { useEffect, useState } from 'react'
+import { onAuthStateChanged } from 'firebase/auth'
 import { PageTransition } from './components/PageTransition'
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
@@ -9,6 +11,20 @@ import Insects from './pages/Insects'
 import PhotosGallery from './pages/PhotosGallery'
 import ClusteringMap from './pages/ClusteringMap'
 import SpeciesDetail from './pages/SpeciesDetail'
+import Dashboard from './pages/Dashboard'
+import Plants from './pages/Plants'
+import Auth from './pages/Auth'
+import { auth, firebaseConfigured } from './lib/firebase'
+
+function RequireAuth({ user, authReady, children }) {
+  if (!authReady) {
+    return <div className="page-wrapper" style={{ paddingTop: 64 }}>Checking authentication...</div>
+  }
+  if (!user) {
+    return <Navigate to="/auth" replace />
+  }
+  return children
+}
 
 function NotFound() {
   return (
@@ -20,7 +36,7 @@ function NotFound() {
   )
 }
 
-function AnimatedRoutes() {
+function AnimatedRoutes({ user, authReady }) {
   const location = useLocation()
   
   // A helper component to wrap elements in PageTransition
@@ -30,31 +46,63 @@ function AnimatedRoutes() {
     </PageTransition>
   )
 
+  const withAuth = (Element) => (
+    <RequireAuth user={user} authReady={authReady}>
+      {withTransition(Element)}
+    </RequireAuth>
+  )
+
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/" element={withTransition(Home)} />
-        <Route path="/animals" element={withTransition(Animals)} />
-        <Route path="/birds" element={withTransition(Birds)} />
-        <Route path="/insects" element={withTransition(Insects)} />
-        <Route path="/:species/photos" element={withTransition(PhotosGallery)} />
-        <Route path="/animals/clustering" element={withTransition(ClusteringMap)} />
-        <Route path="/animals/species" element={withTransition(SpeciesDetail)} />
-        <Route path="/birds/clustering" element={withTransition(ClusteringMap)} />
-        <Route path="/birds/species" element={withTransition(SpeciesDetail)} />
-        <Route path="/insects/clustering" element={withTransition(ClusteringMap)} />
-        <Route path="/insects/species" element={withTransition(SpeciesDetail)} />
-        <Route path="*" element={withTransition(NotFound)} />
+        <Route path="/auth" element={user ? <Navigate to="/" replace /> : withTransition(Auth)} />
+        <Route path="/" element={withAuth(Dashboard)} />
+        <Route path="/home" element={withAuth(Home)} />
+        <Route path="/dashboard" element={withAuth(Dashboard)} />
+        <Route path="/animals" element={withAuth(Animals)} />
+        <Route path="/birds" element={withAuth(Birds)} />
+        <Route path="/insects" element={withAuth(Insects)} />
+        <Route path="/:species/photos" element={withAuth(PhotosGallery)} />
+        <Route path="/animals/clustering" element={withAuth(ClusteringMap)} />
+        <Route path="/animals/species" element={withAuth(SpeciesDetail)} />
+        <Route path="/birds/clustering" element={withAuth(ClusteringMap)} />
+        <Route path="/birds/species" element={withAuth(SpeciesDetail)} />
+        <Route path="/insects/clustering" element={withAuth(ClusteringMap)} />
+        <Route path="/insects/species" element={withAuth(SpeciesDetail)} />
+        <Route path="/plants" element={withAuth(Plants)} />
+        <Route path="/plants/clustering" element={withAuth(ClusteringMap)} />
+        <Route path="/plants/species" element={withAuth(SpeciesDetail)} />
+        <Route path="*" element={withAuth(NotFound)} />
       </Routes>
     </AnimatePresence>
   )
 }
 
 export default function App() {
+  const location = useLocation()
+  const [user, setUser] = useState(null)
+  const [authReady, setAuthReady] = useState(false)
+
+  useEffect(() => {
+    if (!firebaseConfigured || !auth) {
+      setAuthReady(true)
+      return
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+      setUser(nextUser)
+      setAuthReady(true)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  const showNavbar = location.pathname !== '/auth'
+
   return (
     <>
-      <Navbar />
-      <AnimatedRoutes />
+      {showNavbar && <Navbar />}
+      <AnimatedRoutes user={user} authReady={authReady} />
     </>
   )
 }

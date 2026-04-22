@@ -1,21 +1,20 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, AreaChart, Area
+} from 'recharts'
 
 const CLUSTER_COLORS = [
   '#43a047','#4ecdc4','#fbbf24','#f97316','#a78bfa',
   '#f472b6','#34d399','#60a5fa','#fb7185','#a3e635',
 ]
 
-function ClusterBadge({ id }) {
-  return (
-    <span style={{
-      display: 'inline-block',
-      width: 12, height: 12,
-      borderRadius: '50%',
-      background: CLUSTER_COLORS[id % CLUSTER_COLORS.length],
-      marginRight: 6, flexShrink: 0,
-    }} />
-  )
+const DatasetIcon = ({ ds }) => {
+  if (ds === 'animals') return '🐾'
+  if (ds === 'birds') return '🦅'
+  if (ds === 'insects') return '🦋'
+  return '🍃'
 }
 
 let leafletAssetsPromise = null
@@ -26,7 +25,6 @@ function ensureLeafletAssets() {
   leafletAssetsPromise = new Promise((resolve, reject) => {
     const loadHeat = () => {
       if (window.L && window.L.heatLayer) return resolve(window.L)
-      if (document.querySelector('script[data-heat="true"]')) return resolve(window.L)
       const heatScript = document.createElement('script')
       heatScript.src = 'https://unpkg.com/leaflet.heat/dist/leaflet-heat.js'
       heatScript.async = true
@@ -35,141 +33,75 @@ function ensureLeafletAssets() {
       heatScript.onerror = () => reject(new Error('Failed to load Leaflet Heat script'))
       document.body.appendChild(heatScript)
     }
-
     if (!document.querySelector('link[data-leaflet="true"]')) {
       const css = document.createElement('link')
-      css.rel = 'stylesheet'
-      css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-      css.setAttribute('data-leaflet', 'true')
-      document.head.appendChild(css)
+      css.rel = 'stylesheet'; css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+      css.setAttribute('data-leaflet', 'true'); document.head.appendChild(css)
     }
-
-    const existing = document.querySelector('script[data-leaflet="true"]')
-    if (existing) {
-      if (window.L) loadHeat()
-      else existing.addEventListener('load', loadHeat)
-      return
-    }
-
     const script = document.createElement('script')
     script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-    script.async = true
-    script.setAttribute('data-leaflet', 'true')
-    script.onload = loadHeat
-    script.onerror = () => reject(new Error('Failed to load Leaflet script'))
+    script.async = true; script.setAttribute('data-leaflet', 'true')
+    script.onload = loadHeat; script.onerror = () => reject(new Error('Failed to load Leaflet script'))
     document.body.appendChild(script)
   })
-
   return leafletAssetsPromise
 }
 
+// Convex Hull Helper (Monotone Chain algorithm)
+function getConvexHull(points) {
+  if (points.length < 3) return points
+  points.sort((a, b) => a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1])
+  const upper = []
+  for (const p of points) {
+    while (upper.length >= 2 && crossProduct(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop()
+    upper.push(p)
+  }
+  const lower = []
+  for (let i = points.length - 1; i >= 0; i--) {
+    const p = points[i]
+    while (lower.length >= 2 && crossProduct(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop()
+    lower.push(p)
+  }
+  upper.pop()
+  lower.pop()
+  return upper.concat(lower)
+}
+function crossProduct(a, b, c) {
+  return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+}
+
 export default function ClusteringMap() {
+  const location = useLocation()
+  const initialCategory = location.pathname.split('/')[1] || 'animals'
+  
+  const [category, setCategory] = useState(initialCategory)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [nClusters, setNClusters] = useState(8)
-  const [layerType, setLayerType] = useState('both')
-  const [selected, setSelected] = useState(null)
+  const [layerType, setLayerType] = useState('hulls') // Default to hulls for "defined" look
+  const [selectedCluster, setSelectedCluster] = useState(null)
+  const [comparisonCluster, setComparisonCluster] = useState(null) // Feature 11: Comparison
+  const [clusterDetails, setClusterDetails] = useState(null)
+  const [compDetails, setCompDetails] = useState(null)
+  const [timeline, setTimeline] = useState([])
+  const [photosA, setPhotosA] = useState([]) // Primary cluster photos
+  const [photosB, setPhotosB] = useState([]) // Comparison cluster photos
+  const [loadingDetails, setLoadingDetails] = useState(false)
+  const [loadingPhotosA, setLoadingPhotosA] = useState(false)
+  const [loadingPhotosB, setLoadingPhotosB] = useState(false)
   const [error, setError] = useState(null)
-  const [mapReady, setMapReady] = useState(false)
+  const [mapInstance, setMapInstance] = useState(null)
+  const [showDiversity, setShowDiversity] = useState(false) // Feature 12: Diversity Hotspots
 
   useEffect(() => {
-    let map = null
-    let mounted = true
+    setCategory(location.pathname.split('/')[1] || 'animals')
+  }, [location.pathname])
 
-    const renderMap = async () => {
-      if (!data || !data.clusters || Object.keys(data.clusters).length === 0) return
-      try {
-        const L = await ensureLeafletAssets()
-        if (!mounted) return
-
-        const ids = Object.keys(data.clusters)
-        const points = ids
-          .map((id) => ({ id, ...data.clusters[id] }))
-          .filter((c) => Number.isFinite(c.center_lat) && Number.isFinite(c.center_lon))
-
-        if (points.length === 0) return
-
-        const mapEl = document.getElementById('cluster-map')
-        if (!mapEl) return
-
-        mapEl.innerHTML = ''
-        map = L.map(mapEl, { zoomControl: true })
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-          maxZoom: 18,
-          attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-        }).addTo(map)
-
-        const bounds = []
-        const heatData = []
-        let maxCount = 0
-        
-        points.forEach((c) => {
-          bounds.push([c.center_lat, c.center_lon])
-          maxCount = Math.max(maxCount, c.animal_count || 1)
-        })
-
-        if (layerType === 'markers' || layerType === 'both') {
-          points.forEach((c) => {
-            const color = CLUSTER_COLORS[Number(c.id) % CLUSTER_COLORS.length]
-            const radius = Math.min(18, Math.max(8, Math.sqrt((c.animal_count || 0) / 40)))
-
-            L.circleMarker([c.center_lat, c.center_lon], {
-              radius,
-              color,
-              fillColor: color,
-              fillOpacity: 0.75,
-              weight: 2,
-            })
-              .addTo(map)
-              .bindPopup(
-                `<b>Cluster ${c.id}</b><br/>${(c.animal_count || 0).toLocaleString()} observations<br/>${c.species_count || 0} species`
-              )
-          })
-        }
-
-        if (layerType === 'heatmap' || layerType === 'both') {
-          points.forEach((c) => {
-             heatData.push([c.center_lat, c.center_lon, (c.animal_count || 1) / maxCount])
-          })
-          if (L.heatLayer) {
-              L.heatLayer(heatData, {
-                 radius: 45,
-                 blur: 35,
-                 maxZoom: 10,
-                 gradient: {0.4: 'cyan', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red'}
-              }).addTo(map)
-          }
-        }
-
-        if (bounds.length > 1) {
-          map.fitBounds(bounds, { padding: [30, 30] })
-        } else {
-          map.setView(bounds[0], 8)
-        }
-
-        setMapReady(true)
-      } catch (e) {
-        setError(e.message)
-      }
-    }
-
-    renderMap()
-
-    return () => {
-      mounted = false
-      if (map) {
-        map.remove()
-      }
-    }
-  }, [data, layerType])
-
-  const load = async (n) => {
+  const loadData = async (cat, n) => {
     setLoading(true)
     setError(null)
-    setSelected(null)
     try {
-      const category = window.location.pathname.split('/')[1] || 'animals'
-      const res = await fetch(`/api/${category}/clustering/?clusters=${n}`)
+      const res = await fetch(`/api/cluster-heatmap/?dataset=${cat}&clusters=${n}`)
       const d = await res.json()
       if (d.error) throw new Error(d.error)
       setData(d)
@@ -180,179 +112,281 @@ export default function ClusteringMap() {
     }
   }
 
-  useEffect(() => { load(nClusters) }, [nClusters])
+  useEffect(() => { loadData(category, nClusters) }, [category, nClusters])
 
-  const clusters = data?.clusters || {}
-  const clusterIds = Object.keys(clusters).map(Number)
+  const fetchDetails = async (id, setFn) => {
+    try {
+      const res = await fetch(`/api/cluster-details/?dataset=${category}&clusters=${nClusters}&cluster_id=${id}`)
+      const d = await res.json()
+      setFn(d.clusters[id])
+      
+      const isPrimary = setFn === setClusterDetails
+      const setPhotoFn = isPrimary ? setPhotosA : setPhotosB
+      const setLoadingPhotoFn = isPrimary ? setLoadingPhotosA : setLoadingPhotosB
 
-  const category = window.location.pathname.split('/')[1] || 'animals'
-  const categoryTitle = category.charAt(0).toUpperCase() + category.slice(1)
+      if (isPrimary) {
+        const tRes = await fetch(`/api/cluster-timeline/?dataset=${category}&clusters=${nClusters}&cluster_id=${id}`)
+        const tD = await tRes.json()
+        setTimeline(tD.timeline)
+      }
+      
+      // Fetch Cluster Photos
+      setLoadingPhotoFn(true)
+      fetch(`/api/cluster-photos/?dataset=${category}&clusters=${nClusters}&cluster_id=${id}`)
+        .then(r => r.json())
+        .then(data => setPhotoFn(data.photos || []))
+        .finally(() => setLoadingPhotoFn(false))
+    } catch (e) { console.error(e) }
+  }
+
+  useEffect(() => {
+    if (selectedCluster !== null) {
+      setLoadingDetails(true)
+      fetchDetails(selectedCluster, setClusterDetails).finally(() => setLoadingDetails(false))
+    }
+  }, [selectedCluster])
+
+  useEffect(() => {
+    if (comparisonCluster !== null) fetchDetails(comparisonCluster, setCompDetails)
+  }, [comparisonCluster])
+
+  useEffect(() => {
+    let map = null
+    const initMap = async () => {
+      if (!data || !data.points) return
+      try {
+        const L = await ensureLeafletAssets()
+        const mapEl = document.getElementById('map-container')
+        if (!mapEl) return
+        mapEl.innerHTML = ''
+        map = L.map(mapEl, { zoomControl: false }).setView([17.5, 73.8], 10)
+        setMapInstance(map)
+        L.control.zoom({ position: 'bottomright' }).addTo(map)
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          attribution: 'Esri'
+        }).addTo(map)
+
+        const clusterGroups = {}
+        data.points.forEach(([lat, lon, cid]) => {
+          if (!clusterGroups[cid]) clusterGroups[cid] = []
+          clusterGroups[cid].push([lat, lon])
+        })
+
+        const bounds = []
+        Object.entries(clusterGroups).forEach(([cid, pts]) => {
+          const color = CLUSTER_COLORS[cid % CLUSTER_COLORS.length]
+          
+          // Show Hulls for "Defined" clusters
+          if (layerType === 'hulls' || layerType === 'both') {
+            const hullPts = getConvexHull(pts)
+            if (hullPts.length > 2) {
+              const poly = L.polygon(hullPts, {
+                color, weight: 2, fillColor: color, fillOpacity: 0.15, dashArray: '5, 5'
+              }).addTo(map)
+              poly.on('click', () => setSelectedCluster(cid))
+              poly.bindTooltip(`Cluster ${cid} Boundary`, { sticky: true })
+            }
+          }
+
+          if (layerType === 'markers' || layerType === 'both') {
+            pts.slice(0, 100).forEach(p => {
+              L.circleMarker(p, { radius: 3, fillColor: color, color: '#fff', weight: 0.5, fillOpacity: 0.7 })
+                .addTo(map).on('click', () => setSelectedCluster(cid))
+            })
+          }
+
+          pts.forEach(p => bounds.push(p))
+        })
+
+        // Diversity Hotspot Overlay (Shannon-like visualization)
+        if (showDiversity) {
+          const heatPts = data.points.map(p => [p[0], p[1], 0.8])
+          L.heatLayer(heatPts, { radius: 35, blur: 25, gradient: { 0.4: 'blue', 0.6: 'cyan', 0.8: 'yellow', 1.0: 'red' } }).addTo(map)
+        }
+
+        if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50] })
+      } catch (e) { console.error(e) }
+    }
+    initMap()
+    return () => { if (map) map.remove() }
+  }, [data, layerType, showDiversity])
 
   return (
-    <div className="page-wrapper">
-      {/* Header */}
-      <div style={{ padding: '48px 0 32px' }}>
-        <Link to={`/${category}`} className="back-link">← Back to {categoryTitle}</Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 8 }}>
-          <span style={{ fontSize: '3rem' }}>🗺️</span>
-          <div>
-            <h1 style={{ fontSize: '2rem', marginBottom: 4 }}>{categoryTitle} Clustering Map</h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-              K-means geographic + taxonomic clustering of all {category} observations
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="glass-card" style={{ padding: '20px 28px', marginBottom: 28, display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 600 }}>
-          Number of clusters:
-          <input
-            type="range" min={3} max={15} step={1}
-            value={nClusters}
-            onChange={e => setNClusters(Number(e.target.value))}
-            style={{ width: 140 }}
-          />
-          <span style={{ color: 'var(--dataviz-green)', fontWeight: 700, minWidth: 20 }}>{nClusters}</span>
-        </label>
-        
-        <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.1)' }} />
-
-        <label style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 600 }}>
-          View Mode:
-          <select 
-            value={layerType} 
-            onChange={e => setLayerType(e.target.value)}
-            style={{ 
-              padding: '6px 12px', 
-              borderRadius: 6, 
-              background: 'rgba(0,0,0,0.3)', 
-              color: 'white', 
-              border: '1px solid rgba(255,255,255,0.1)',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="both" style={{background: '#1a1f1b'}}>Markers + Heatmap</option>
-            <option value="markers" style={{background: '#1a1f1b'}}>Markers Only</option>
-            <option value="heatmap" style={{background: '#1a1f1b'}}>Heatmap Only</option>
-          </select>
-        </label>
-        {data && (
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginLeft: 'auto' }}>
-            {data.total_species?.toLocaleString()} total observations
-          </span>
-        )}
-      </div>
-
-      {/* Error */}
-      {error && <div className="error-box"><span>⚠️</span><span>{error}</span></div>}
-
-      {/* Loading */}
-      {loading && (
-        <div className="spinner-wrap" style={{ marginTop: 40 }}>
-          <div className="spinner" />
-          <span>Running K-means clustering…</span>
-        </div>
-      )}
-
-      {/* Cluster grid */}
-      {!loading && data && (
-        <>
-          <div className="glass-card" style={{ padding: '16px', marginBottom: 20 }}>
-            <div className="section-heading" style={{ marginBottom: 10 }}>🧭 Geographic Cluster Map</div>
-            <div id="cluster-map" style={{ width: '100%', height: 380, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }} />
-            {!mapReady && <p style={{ color: 'var(--text-muted)', marginTop: 10, fontSize: '0.85rem' }}>Preparing map…</p>}
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-black">
+      {/* Sidebar */}
+      <div className="w-[420px] flex flex-col glass-panel border-r border-white/5 z-20 overflow-hidden">
+        <div className="p-6 border-b border-white/5 bg-black/20">
+          <div className="flex items-center gap-3 mb-5">
+            <span className="text-3xl"><DatasetIcon ds={category} /></span>
+            <div>
+              <h1 className="text-lg font-bold capitalize">Defined {category} Clusters</h1>
+              <p className="text-[9px] uppercase tracking-widest text-muted font-bold">Spatial Boundaries & Diversity</p>
+            </div>
           </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px,1fr))', gap: 20 }}>
-          {clusterIds.map(id => {
-            const c = clusters[id]
-            const isSelected = selected === id
-            const color = CLUSTER_COLORS[id % CLUSTER_COLORS.length]
-            return (
-              <div
-                key={id}
-                className="glass-card"
-                style={{
-                  padding: '24px',
-                  cursor: 'pointer',
-                  borderColor: isSelected ? color : undefined,
-                  boxShadow: isSelected ? `0 0 24px ${color}40` : undefined,
-                  transition: 'all 0.2s ease',
-                }}
-                onClick={() => setSelected(isSelected ? null : id)}
-              >
-                {/* Cluster header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: `${color}22`, border: `2px solid ${color}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '0.85rem', fontWeight: 700, color,
-                  }}>{id}</div>
-                  <div>
-                    <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Cluster {id}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      {c.animal_count?.toLocaleString()} obs · {c.species_count} species
-                    </div>
-                  </div>
-                  <div style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'right' }}>
-                    <div>Lat {c.center_lat?.toFixed(2)}</div>
-                    <div>Lon {c.center_lon?.toFixed(2)}</div>
-                  </div>
-                </div>
+          <div className="flex gap-1 p-1 bg-white/5 rounded-lg mb-5">
+            {['animals', 'birds', 'insects', 'plants'].map(cat => (
+              <button key={cat} onClick={() => { setCategory(cat); setSelectedCluster(null); setComparisonCluster(null); }}
+                className={`flex-1 py-1.5 text-[9px] font-bold uppercase rounded transition-all ${category === cat ? 'bg-green-500 text-white' : 'text-muted hover:bg-white/5'}`}>
+                {cat}
+              </button>
+            ))}
+          </div>
 
-                {/* Species list */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {(c.species || []).slice(0, isSelected ? 10 : 4).map((sp, i) => (
-                    <a
-                      key={i}
-                      href={`/${category}/species?species=${encodeURIComponent(sp)}`}
-                      onClick={e => e.stopPropagation()}
-                      style={{
-                        display: 'flex', alignItems: 'center',
-                        fontSize: '0.82rem', color: 'var(--text-secondary)',
-                        padding: '6px 10px', borderRadius: 6,
-                        background: 'rgba(255,255,255,0.03)',
-                        transition: 'background 0.15s',
-                        textDecoration: 'none',
-                      }}
-                      onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
-                      onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-                    >
-                      <ClusterBadge id={id} />
-                      {sp}
-                    </a>
-                  ))}
-                  {!isSelected && c.species?.length > 4 && (
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', paddingLeft: 18 }}>
-                      +{c.species.length - 4} more • click to expand
-                    </div>
-                  )}
-                </div>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <div className="text-[9px] font-bold uppercase text-muted mb-1">Defined Limits</div>
+              <select value={layerType} onChange={e => setLayerType(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-[10px] text-primary outline-none">
+                <option value="hulls">Convex Hulls (Defined)</option>
+                <option value="markers">Observation Points</option>
+                <option value="both">Both Layers</option>
+              </select>
+            </div>
+            <div>
+              <div className="text-[9px] font-bold uppercase text-muted mb-1">Diversity View</div>
+              <button onClick={() => setShowDiversity(!showDiversity)} className={`w-full py-1 rounded text-[10px] font-bold border transition-all ${showDiversity ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-white/5 border-white/10 text-muted'}`}>
+                {showDiversity ? 'ON: Hotspots' : 'OFF: Hotspots'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+          {selectedCluster !== null ? (
+            <div className="animate-in">
+              <div className="flex justify-between items-center mb-4">
+                <button onClick={() => { setSelectedCluster(null); setComparisonCluster(null); }} className="text-[10px] font-bold uppercase text-muted hover:text-primary">← Reset</button>
+                <button onClick={() => setComparisonCluster(comparisonCluster ? null : (selectedCluster + 1) % nClusters)} 
+                  className={`text-[9px] font-bold uppercase px-3 py-1 rounded border transition-all ${comparisonCluster !== null ? 'bg-amber-500 text-black border-amber-500' : 'border-white/20 text-secondary hover:bg-white/5'}`}>
+                  {comparisonCluster !== null ? 'End Comparison' : '⚖️ Compare Cluster'}
+                </button>
               </div>
-            )
-          })}
+
+              <div className={`grid gap-4 ${comparisonCluster !== null ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {/* Cluster A */}
+                <div className="space-y-4">
+                  <ClusterDetailView 
+                    id={selectedCluster} 
+                    details={clusterDetails} 
+                    category={category} 
+                    timeline={timeline} 
+                    loading={loadingDetails} 
+                    photos={photosA}
+                    loadingPhotos={loadingPhotosA}
+                    color={CLUSTER_COLORS[selectedCluster % CLUSTER_COLORS.length]} 
+                  />
+                </div>
+                
+                {/* Cluster B (Comparison) */}
+                {comparisonCluster !== null && (
+                  <div className="space-y-4 border-l border-white/10 pl-4">
+                    <ClusterDetailView 
+                      id={comparisonCluster} 
+                      details={compDetails} 
+                      category={category} 
+                      timeline={[]} 
+                      loading={!compDetails} 
+                      photos={photosB}
+                      loadingPhotos={loadingPhotosB}
+                      color={CLUSTER_COLORS[comparisonCluster % CLUSTER_COLORS.length]} 
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="text-[10px] font-bold uppercase text-muted mb-2">Regional Hubs</div>
+              {Array.from({length: nClusters}).map((_, i) => (
+                <div key={i} onClick={() => setSelectedCluster(i)} className="p-3 bg-white/5 rounded-xl border border-white/5 hover:border-green-500/30 cursor-pointer transition-all flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs" style={{ backgroundColor: `${CLUSTER_COLORS[i % CLUSTER_COLORS.length]}22`, color: CLUSTER_COLORS[i % CLUSTER_COLORS.length] }}>{i}</div>
+                  <div className="flex-1 text-xs font-bold">Region {i}</div>
+                  <div className="text-[10px] text-muted">Explore →</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        </>
+      </div>
+
+      {/* Map */}
+      <div id="map-container" className="flex-1 relative z-10 bg-[#0a0a0a]" />
+
+      {loading && (
+        <div className="absolute inset-0 z-30 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center">
+          <div className="spinner !w-10 !h-10 border-t-green-500 mb-4" />
+          <div className="text-sm font-bold uppercase tracking-widest text-green-400">Defining Boundaries...</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ClusterDetailView({ id, details, category, timeline, loading, photos, loadingPhotos, color }) {
+  if (loading) return <div className="py-8 text-center"><div className="spinner !w-5 !h-5 mx-auto mb-2" /></div>
+  return (
+    <div className="animate-in">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+        <h2 className="text-sm font-bold">Region {id}</h2>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="bg-white/5 p-2 rounded text-center">
+          <div className="text-[14px] font-bold text-primary">{details?.species_count}</div>
+          <div className="text-[8px] text-muted uppercase">Species</div>
+        </div>
+        <div className="bg-white/5 p-2 rounded text-center">
+          <div className="text-[14px] font-bold text-primary">{details?.total_obs}</div>
+          <div className="text-[8px] text-muted uppercase">Obs</div>
+        </div>
+      </div>
+
+      {timeline.length > 0 && (
+        <div className="h-[80px] w-full mb-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={timeline}><Area type="monotone" dataKey="count" stroke={color} fill={color} fillOpacity={0.1} /></AreaChart>
+          </ResponsiveContainer>
+        </div>
       )}
 
-      {/* Legend */}
-      {!loading && data && (
-        <div className="glass-card" style={{ padding: '20px 28px', marginTop: 32 }}>
-          <div className="section-heading">📊 Cluster Legend</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-            {clusterIds.map(id => (
-              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                <ClusterBadge id={id} />
-                Cluster {id} ({clusters[id]?.animal_count?.toLocaleString()} obs)
+      {/* Visual Evidence - Gallery */}
+      <div className="mb-4">
+        <div className="text-[8px] font-bold uppercase text-muted mb-2 flex items-center justify-between">
+          <span>Visual Evidence</span>
+          {loadingPhotos && <div className="spinner !w-2 !h-2 border-t-green-500" />}
+        </div>
+        
+        {photos.length > 0 ? (
+          <div className="grid grid-cols-3 gap-1.5">
+            {photos.slice(0, 6).map((p, idx) => (
+              <div key={idx} className="aspect-square bg-white/5 rounded-lg overflow-hidden group relative">
+                <img 
+                  src={`/photo-proxy/?url=${encodeURIComponent(p.url)}`} 
+                  alt={p.species} 
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-1">
+                  <div className="text-[6px] text-white font-bold truncate">{p.common_name || p.species}</div>
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : !loadingPhotos && (
+          <div className="text-[8px] text-muted text-center py-4 bg-white/5 rounded-lg border border-dashed border-white/10 italic">
+            No visual evidence in cluster
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="text-[8px] font-bold uppercase text-muted mb-1">Key Species</div>
+        {details?.species?.slice(0, 8).map(s => (
+          <Link key={s.scientificName} to={`/${category}/species?species=${encodeURIComponent(s.scientificName)}`} className="block p-1.5 bg-white/5 rounded text-[10px] hover:bg-white/10 transition-all italic truncate">
+            {s.scientificName}
+          </Link>
+        ))}
+      </div>
     </div>
   )
 }

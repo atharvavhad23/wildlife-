@@ -28,6 +28,15 @@ const cards = [
     btnText: 'Predict Insect Density →',
     to: '/insects',
   },
+  {
+    key: 'plants',
+    emoji: '🌿',
+    title: 'Plants',
+    subtitle: 'Flora & Vegetation',
+    features: ['Floral density forecasting', 'Botanical hotspot clustering', 'Species-level drilldown maps', 'Taxonomy-aware vegetation signals'],
+    btnText: 'Predict Plant Density →',
+    to: '/plants',
+  },
 ]
 
 export default function Home() {
@@ -42,9 +51,17 @@ export default function Home() {
         <h1>Wildlife Population<br />Density Forecasting</h1>
         <p>
           Use advanced machine learning to predict wildlife population density
-          across the Koyna Wildlife Sanctuary based on environmental,
           taxonomic, and temporal factors.
         </p>
+
+        <div className="flex justify-center gap-4 mb-12">
+          <Link to="/dashboard" className="px-8 py-4 bg-green-500 hover:bg-green-600 rounded-2xl font-bold text-white shadow-lg shadow-green-500/20 transition-all flex items-center gap-2">
+            📊 View Intelligence Dashboard
+          </Link>
+          <Link to="/animals/clustering" className="px-8 py-4 bg-white/5 hover:bg-white/10 rounded-2xl font-bold text-secondary border border-white/10 transition-all">
+            🗺 Explore Spatial Maps
+          </Link>
+        </div>
 
         {/* Stats */}
         <div className="stats-row">

@@ -12,6 +12,7 @@ export default defineConfig({
       '/photos': 'http://127.0.0.1:8000',
       '/photo-proxy': 'http://127.0.0.1:8000',
       '/api': 'http://127.0.0.1:8000',
+      '/auth': 'http://127.0.0.1:8000',
     },
   },
 })

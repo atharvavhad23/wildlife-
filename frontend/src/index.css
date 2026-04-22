@@ -699,3 +699,17 @@ input[type="range"]::-webkit-slider-thumb {
 .trend-chip.up { background: rgba(52,211,153,0.15); color: #34d399; }
 .trend-chip.down { background: rgba(255,107,107,0.15); color: var(--red-400); }
 .trend-chip.stable { background: rgba(251,191,36,0.15); color: #fbbf24; }
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.02);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
+}

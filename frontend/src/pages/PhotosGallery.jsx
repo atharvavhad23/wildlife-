@@ -14,6 +14,10 @@ const CONFIG = {
     emoji: '🦋', label: 'Insects', apiUrl: '/photos/insects/',
     accent: '#f59e0b', back: '/insects',
   },
+  plants: {
+    emoji: '🌿', label: 'Plants', apiUrl: '/photos/plants/',
+    accent: '#10b981', back: '/plants',
+  },
 }
 
 function PhotoCard({ photo }) {

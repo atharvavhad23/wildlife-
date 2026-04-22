@@ -2,12 +2,16 @@ from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+from django.core.cache import cache
+from django.core.mail import send_mail
+from django.conf import settings
 import joblib
 import pandas as pd
 import numpy as np
 import math
 import json
 import re
+import secrets
 from urllib.parse import quote_plus
 from urllib.request import urlopen, Request
 import warnings
@@ -62,12 +66,151 @@ BASE_INSECTS_FEATURES = [
     'species_richness',
 ]
 
+BASE_ANIMALS_OCCURRENCE_FEATURES = [
+    'coordinateUncertaintyInMeters',
+    'month',
+    'year',
+    'day',
+    'decade',
+    'lat_grid',
+    'lon_grid',
+    'phylum_enc',
+    'class_enc',
+    'order_enc',
+    'family_enc',
+    'taxonRank_enc',
+    'basisOfRecord_enc',
+    'season_enc',
+    'species_richness',
+]
+
+BASE_PLANTS_FEATURES = [
+    'coordinateUncertaintyInMeters',
+    'day',
+    'month',
+    'year',
+    'decade',
+    'season_enc',
+    'lat_grid',
+    'lon_grid',
+    'species_richness',
+    'order_enc',
+    'family_enc',
+    'class_enc',
+    'taxonRank_enc',
+    'basisOfRecord_enc',
+]
+
+occurrence_models = {
+    'animals': None,
+    'birds': None,
+    'insects': None,
+    'plants': None,
+}
+occurrence_model_features = {
+    'animals': BASE_ANIMALS_OCCURRENCE_FEATURES.copy(),
+    'birds': BASE_BIRDS_FEATURES.copy(),
+    'insects': BASE_INSECTS_FEATURES.copy(),
+    'plants': BASE_PLANTS_FEATURES.copy(),
+}
+
+OTP_TTL_SECONDS = 10 * 60
+
 
 def _safe_float(value, default=None):
     try:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _otp_key(email: str, purpose: str) -> str:
+    normalized = str(email).strip().lower()
+    safe_purpose = str(purpose).strip().lower() or 'auth'
+    return f"otp:{safe_purpose}:{normalized}"
+
+
+def _otp_verified_key(email: str, purpose: str) -> str:
+    normalized = str(email).strip().lower()
+    safe_purpose = str(purpose).strip().lower() or 'auth'
+    return f"otp_verified:{safe_purpose}:{normalized}"
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def send_email_otp(request):
+    """Send OTP code to email using configured project SMTP account."""
+    try:
+        payload = json.loads(request.body or '{}')
+    except Exception:
+        payload = {}
+
+    email = str(payload.get('email', '')).strip().lower()
+    purpose = str(payload.get('purpose', 'auth')).strip().lower() or 'auth'
+
+    if not email or '@' not in email:
+        return JsonResponse({'error': 'Valid email is required.'}, status=400)
+
+    if not getattr(settings, 'EMAIL_HOST', '') or not getattr(settings, 'EMAIL_HOST_USER', ''):
+        return JsonResponse(
+            {'error': 'Project email SMTP is not configured on server.'},
+            status=400,
+        )
+
+    otp = f"{secrets.randbelow(900000) + 100000}"
+    cache.set(_otp_key(email, purpose), otp, timeout=OTP_TTL_SECONDS)
+    cache.delete(_otp_verified_key(email, purpose))
+
+    subject = f"Koyna Wildlife OTP for {purpose.title()}"
+    message = (
+        f"Your OTP is: {otp}\n\n"
+        f"It will expire in {OTP_TTL_SECONDS // 60} minutes.\n"
+        "If you did not request this, please ignore this email."
+    )
+
+    try:
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [email],
+            fail_silently=False,
+        )
+    except Exception as exc:
+        return JsonResponse({'error': f'Failed to send OTP email: {exc}'}, status=500)
+
+    return JsonResponse({'status': 'success', 'message': 'OTP sent to email.'})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def verify_email_otp(request):
+    """Verify OTP code sent to email."""
+    try:
+        payload = json.loads(request.body or '{}')
+    except Exception:
+        payload = {}
+
+    email = str(payload.get('email', '')).strip().lower()
+    purpose = str(payload.get('purpose', 'auth')).strip().lower() or 'auth'
+    code = str(payload.get('otp', '')).strip()
+
+    if not email or '@' not in email:
+        return JsonResponse({'error': 'Valid email is required.'}, status=400)
+    if not code:
+        return JsonResponse({'error': 'OTP code is required.'}, status=400)
+
+    stored = cache.get(_otp_key(email, purpose))
+    if stored is None:
+        return JsonResponse({'error': 'OTP expired or not found. Request a new code.'}, status=400)
+
+    if str(stored) != code:
+        return JsonResponse({'error': 'Invalid OTP code.'}, status=400)
+
+    cache.set(_otp_verified_key(email, purpose), True, timeout=15 * 60)
+    cache.delete(_otp_key(email, purpose))
+
+    return JsonResponse({'status': 'success', 'verified': True})
 
 
 def _safe_number(value, default=0.0):
@@ -102,6 +245,69 @@ def _sanitize_for_json(value):
     if isinstance(value, float):
         return value if math.isfinite(value) else None
     return value
+
+
+def _load_occurrence_classifier_if_needed(category: str):
+    """Load per-category RF occurrence classifier on demand."""
+    if occurrence_models.get(category) is not None:
+        return
+
+    try:
+        occurrence_models[category] = joblib.load(_project_file(f'{category}_occurrence_classifier.pkl'))
+        try:
+            loaded_features = joblib.load(_project_file(f'{category}_occurrence_features.pkl'))
+            if isinstance(loaded_features, list) and loaded_features:
+                occurrence_model_features[category] = loaded_features
+        except Exception:
+            pass
+    except Exception:
+        occurrence_models[category] = None
+
+
+def _predict_occurrence_trend(category: str, feature_values: dict) -> dict | None:
+    """Predict occurrence trend class using RandomForestClassifier artifacts."""
+    _load_occurrence_classifier_if_needed(category)
+    model = occurrence_models.get(category)
+    if model is None:
+        return None
+
+    features = occurrence_model_features.get(category) or []
+    if not features:
+        return None
+
+    row = []
+    for feat in features:
+        val = _safe_float(feature_values.get(feat), 0.0)
+        row.append(float(val) if val is not None else 0.0)
+
+    df_row = pd.DataFrame([row], columns=features)
+
+    try:
+        cls = str(model.predict(df_row)[0]).lower()
+        confidence = None
+        if hasattr(model, 'predict_proba'):
+            probs = model.predict_proba(df_row)[0]
+            confidence = float(np.max(probs) * 100.0)
+
+        if cls == 'rising':
+            trend_label = 'Increasing'
+            pct = confidence if confidence is not None else 8.0
+        elif cls == 'declining':
+            trend_label = 'Decreasing'
+            pct = -(confidence if confidence is not None else 8.0)
+        else:
+            trend_label = 'Stable'
+            pct = 0.0
+
+        return {
+            'trend': trend_label,
+            'percentage_change': round(float(pct), 2),
+            'classifier_label': cls,
+            'confidence': round(float(confidence), 2) if confidence is not None else None,
+            'source': 'RandomForestClassifier',
+        }
+    except Exception:
+        return None
 
 
 def _normalize_species_text(value: str) -> str:
@@ -192,7 +398,7 @@ def _predict_animals_from_payload(payload: dict) -> dict:
     df_scaled = animals_scaler.transform(df_input)
     prediction = float(animals_model.predict(df_scaled)[0])
     decision = analyze_prediction(prediction, env_data)
-    trend = analyze_trend(prediction)
+    trend = _predict_occurrence_trend('animals', model_input) or analyze_trend(prediction)
 
     return {
         'prediction': prediction,
@@ -233,7 +439,7 @@ def _predict_birds_from_payload(payload: dict) -> dict:
 
     env_data = get_environmental_data(base_input['lat_grid'], base_input['lon_grid'])
     decision = analyze_prediction(pred, env_data)
-    trend = analyze_trend(pred)
+    trend = _predict_occurrence_trend('birds', base_input) or analyze_trend(pred)
 
     return {
         'prediction': pred,
@@ -274,7 +480,7 @@ def _predict_insects_from_payload(payload: dict) -> dict:
 
     env_data = get_environmental_data(base_input['lat_grid'], base_input['lon_grid'])
     decision = analyze_prediction(pred, env_data)
-    trend = analyze_trend(pred)
+    trend = _predict_occurrence_trend('insects', base_input) or analyze_trend(pred)
 
     return {
         'prediction': pred,
@@ -327,6 +533,14 @@ def _extract_feature_importance(model, feature_names, top_n=5):
         }
     except Exception:
         return {'labels': [], 'values': []}
+
+
+def _model_display_name(model, fallback='Model'):
+    """Return a user-friendly model class name."""
+    try:
+        return str(model.__class__.__name__)
+    except Exception:
+        return fallback
 
 
 def _build_dashboard_context(species_label: str, result: dict, input_data: dict, model, feature_names):
@@ -453,6 +667,69 @@ try:
     print("Insects model loaded successfully.")
 except Exception as e:
     print(f"Error loading insects model: {e}")
+
+
+# Load plants artifacts
+plants_model = None
+plants_scaler = None
+plants_features = BASE_PLANTS_FEATURES.copy()
+plants_metadata = {}
+plants_kmeans = None
+plants_kmeans_scaler = None
+
+try:
+    try:
+        plants_features = joblib.load(_project_file('plants_feature_names.pkl'))
+    except Exception:
+        plants_features = BASE_PLANTS_FEATURES.copy()
+
+    plants_scaler = joblib.load(_project_file('plants_scaler.pkl'))
+    plants_model  = joblib.load(_project_file('plants_model.pkl'))
+    try:
+        plants_metadata = joblib.load(_project_file('plants_metadata.pkl'))
+    except Exception:
+        plants_metadata = {}
+    try:
+        plants_kmeans        = joblib.load(_project_file('plants_kmeans.pkl'))
+        plants_kmeans_scaler = joblib.load(_project_file('plants_kmeans_scaler.pkl'))
+    except Exception:
+        plants_kmeans = None
+    print("Plants model loaded successfully.")
+except Exception as e:
+    print(f"Plants model not yet trained ({e}). Run: python prepare_plants_data.py && python train_plants_model.py")
+
+
+def _reload_plants_artifacts_if_needed(force: bool = False):
+    """Load plants model artifacts on demand if they were unavailable at startup."""
+    global plants_model, plants_scaler, plants_features, plants_metadata, plants_kmeans, plants_kmeans_scaler
+
+    if not force and plants_model is not None and plants_scaler is not None:
+        return
+
+    try:
+        try:
+            plants_features = joblib.load(_project_file('plants_feature_names.pkl'))
+        except Exception:
+            plants_features = BASE_PLANTS_FEATURES.copy()
+
+        plants_scaler = joblib.load(_project_file('plants_scaler.pkl'))
+        plants_model = joblib.load(_project_file('plants_model.pkl'))
+
+        try:
+            plants_metadata = joblib.load(_project_file('plants_metadata.pkl'))
+        except Exception:
+            plants_metadata = {}
+
+        try:
+            plants_kmeans = joblib.load(_project_file('plants_kmeans.pkl'))
+            plants_kmeans_scaler = joblib.load(_project_file('plants_kmeans_scaler.pkl'))
+        except Exception:
+            plants_kmeans = None
+            plants_kmeans_scaler = None
+    except Exception:
+        # Keep existing values; caller will handle untrained state.
+        pass
+
 
 
 _birds_thresholds_cache = None
@@ -686,6 +963,10 @@ def _build_birds_gallery_rows() -> list[dict]:
 
 def _build_insects_gallery_rows() -> list[dict]:
     return _build_gallery_rows_from_csv('Koyna_insects_final.csv', 'Koyna Insect Habitat')
+
+
+def _build_plants_gallery_rows() -> list[dict]:
+    return _build_gallery_rows_from_csv('Koyna_plants_final.csv', 'Koyna Flora Hub')
 
 
 def _get_birds_thresholds():
@@ -960,6 +1241,7 @@ def predict_animals(request):
             'environmental_data': result['environmental_data'],
             'decision': result['decision'],
             'trend': result['trend'],
+            'model_name': _model_display_name(animals_model, 'RandomForestRegressor'),
             'status': 'success'
         })
 
@@ -1206,6 +1488,7 @@ def predict_birds(request):
             'environmental_data': result['environmental_data'],
             'decision': result['decision'],
             'trend': result['trend'],
+            'model_name': _model_display_name(birds_model, 'Regression Model'),
             'status': 'success'
         })
     
@@ -1229,6 +1512,7 @@ def predict_insects(request):
             'environmental_data': result['environmental_data'],
             'decision': result['decision'],
             'trend': result['trend'],
+            'model_name': _model_display_name(insects_model, 'Regression Model'),
             'status': 'success'
         })
 
@@ -1237,6 +1521,257 @@ def predict_insects(request):
             'error': str(e),
             'status': 'error'
         }, status=400)
+
+
+
+# =============================================================================
+# PLANTS — PREDICTION HELPERS + API ENDPOINTS
+# =============================================================================
+
+def _plants_base_feature_names():
+    """The raw features expected from the Plants prediction form."""
+    return BASE_PLANTS_FEATURES
+
+
+def _build_plants_engineered_features(df_base: pd.DataFrame) -> pd.DataFrame:
+    """Apply the same feature engineering used in train_plants_model.py."""
+    X = df_base.copy()
+
+    X['order_family']      = X['order_enc']  * X['family_enc']
+    X['richness_family']   = X['species_richness'] * X['family_enc']
+    X['richness_order']    = X['species_richness'] * X['order_enc']
+    X['class_family']      = X['class_enc']  * X['family_enc']
+
+    X['spatial']           = X['lat_grid'] * X['lon_grid']
+    X['spatial_uncertainty'] = (X['lat_grid'] + X['lon_grid']) * X['coordinateUncertaintyInMeters']
+
+    X['season_month']      = X['season_enc'] * X['month']
+    X['year_month']        = X['year'] * X['month']
+    X['day_month']         = X['day']  * X['month']
+
+    for feat in ['species_richness', 'month', 'day', 'year']:
+        X[f'{feat}_sq']   = X[feat] ** 2
+        X[f'{feat}_sqrt'] = np.sqrt(np.abs(X[feat]) + 1)
+        X[f'{feat}_cbrt'] = np.cbrt(X[feat])
+
+    X['richness_log']     = np.log1p(X['species_richness'])
+    X['uncertainty_log']  = np.log1p(X['coordinateUncertaintyInMeters'])
+    X['month_log']        = np.log1p(X['month'])
+
+    X['rich_uncertainty_ratio'] = X['species_richness'] / (X['coordinateUncertaintyInMeters'] + 1)
+    X['family_order_ratio']     = (X['family_enc'] + 1) / (X['order_enc'] + 1)
+
+    X['spatial_mean']    = (X['lat_grid'] + X['lon_grid']) / 2
+    X['temporal_mean']   = (X['day'] + X['month'] + X['decade']) / 3
+    X['category_mean']   = (X['order_enc'] + X['family_enc'] + X['class_enc']) / 3
+
+    X['richness_high']    = (X['species_richness'] > X['species_richness'].median()).astype(int)
+    X['uncertainty_high'] = (X['coordinateUncertaintyInMeters'] > X['coordinateUncertaintyInMeters'].median()).astype(int)
+    X['month_season']     = (X['month'] % 4).astype(int)
+
+    return X
+
+
+def _predict_plants_from_payload(payload: dict) -> dict:
+    """Run the plants regression model given a form/JSON payload."""
+    _reload_plants_artifacts_if_needed()
+
+    if plants_model is None or plants_scaler is None:
+        raise ValueError(
+            'Plants model not yet trained. '
+            'Run: python prepare_plants_data.py && python train_plants_model.py'
+        )
+
+    base_input = {}
+    for feature in _plants_base_feature_names():
+        value = _safe_float(payload.get(feature))
+        if value is None:
+            raise ValueError(f'Missing feature: {feature}')
+        base_input[feature] = value
+
+    df_base       = pd.DataFrame([base_input])
+    df_engineered = _build_plants_engineered_features(df_base)
+
+    # Use only the features the model was trained on
+    feature_cols = plants_features if isinstance(plants_features, list) else _plants_base_feature_names()
+    available    = [f for f in feature_cols if f in df_engineered.columns]
+    df_input     = df_engineered[available]
+
+    df_scaled    = plants_scaler.transform(df_input)
+    pred         = float(plants_model.predict(df_scaled)[0])
+
+    if isinstance(plants_metadata, dict) and plants_metadata.get('target_transform') == 'log1p':
+        pred = float(np.expm1(pred))
+
+    env_data = get_environmental_data(base_input['lat_grid'], base_input['lon_grid'])
+    decision = analyze_prediction(pred, env_data)
+    trend = _predict_occurrence_trend('plants', base_input) or analyze_trend(pred)
+
+    return {
+        'prediction': pred,
+        'environmental_data': env_data,
+        'decision': decision,
+        'trend': trend,
+        'model_input': base_input,
+    }
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def predict_plants(request):
+    """API: Make a plants density prediction."""
+    try:
+        data   = json.loads(request.body)
+        result = _predict_plants_from_payload(data)
+        meta   = plants_metadata if isinstance(plants_metadata, dict) else {}
+        return JsonResponse({
+            'prediction': result['prediction'],
+            'environmental_data': result['environmental_data'],
+            'decision': result['decision'],
+            'trend': result['trend'],
+            'model_name': _model_display_name(plants_model, 'Regression Model'),
+            'model_info': {
+                'winner': meta.get('winner', 'Unknown'),
+                'r2': meta.get('r2', 0),
+                'cv_r2': meta.get('cv_r2', 0),
+                'mae': meta.get('mae', 0),
+                'within_25pct': meta.get('within_25pct', 0),
+                'comparison': meta.get('comparison', {}),
+            },
+            'status': 'success'
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e), 'status': 'error'}, status=400)
+
+
+@require_http_methods(["GET"])
+def get_plants_features(request):
+    """API: Return plants feature ranges for the prediction form."""
+    try:
+        # Prefer engineered regression dataset when available.
+        regression_path = Path(_project_file('koyna_plants_regression_density.csv'))
+        if regression_path.exists():
+            df = pd.read_csv(str(regression_path))
+            drop_cols = ['decimalLatitude', 'decimalLongitude', 'plant_sighting_density']
+            X = df.drop(columns=[c for c in drop_cols if c in df.columns])
+        else:
+            # Fallback for environments that only have the raw observations CSV.
+            raw_df = pd.read_csv(_project_file('Koyna_plants_final.csv'))
+
+            for col in ['day', 'month', 'year', 'coordinateUncertaintyInMeters']:
+                if col in raw_df.columns:
+                    raw_df[col] = pd.to_numeric(raw_df[col], errors='coerce').fillna(0)
+                else:
+                    raw_df[col] = 0
+
+            raw_df['decade'] = (raw_df['year'] // 10) * 10
+            raw_df['lat_grid'] = pd.to_numeric(raw_df.get('decimalLatitude', 0), errors='coerce').fillna(0).round(1)
+            raw_df['lon_grid'] = pd.to_numeric(raw_df.get('decimalLongitude', 0), errors='coerce').fillna(0).round(1)
+
+            def _season_from_month(m):
+                m = int(max(1, min(12, m or 1)))
+                if m in (12, 1, 2):
+                    return 0
+                if m in (3, 4, 5):
+                    return 1
+                if m in (6, 7, 8, 9):
+                    return 2
+                return 3
+
+            raw_df['season_enc'] = raw_df['month'].map(_season_from_month)
+
+            # Encode categorical taxonomic fields to numeric ids for the form ranges.
+            for src_col, enc_col in [
+                ('order', 'order_enc'),
+                ('family', 'family_enc'),
+                ('class', 'class_enc'),
+                ('taxonRank', 'taxonRank_enc'),
+                ('basisOfRecord', 'basisOfRecord_enc'),
+            ]:
+                if src_col in raw_df.columns:
+                    raw_df[enc_col] = pd.factorize(raw_df[src_col].fillna('Unknown'))[0]
+                else:
+                    raw_df[enc_col] = 0
+
+            if 'species' in raw_df.columns:
+                richness = (
+                    raw_df.groupby(['lat_grid', 'lon_grid'])['species']
+                    .transform(lambda s: s.nunique())
+                )
+                raw_df['species_richness'] = pd.to_numeric(richness, errors='coerce').fillna(1)
+            else:
+                raw_df['species_richness'] = 1
+
+            X = raw_df
+
+        feature_info = {}
+        for feat in _plants_base_feature_names():
+            if feat in X.columns:
+                col = X[feat].dropna()
+                feature_info[feat] = {
+                    'min':  float(col.min()),
+                    'max':  float(col.max()),
+                    'mean': float(col.mean()),
+                    'std':  float(col.std()),
+                }
+        # Attach model comparison info
+        meta = plants_metadata if isinstance(plants_metadata, dict) else {}
+        feature_info['__model_info__'] = {
+            'winner':       meta.get('winner', 'Not trained'),
+            'r2':           meta.get('r2', 0),
+            'cv_r2':        meta.get('cv_r2', 0),
+            'mae':          meta.get('mae', 0),
+            'within_25pct': meta.get('within_25pct', 0),
+            'comparison':   meta.get('comparison', {}),
+        }
+        return JsonResponse(feature_info)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@require_http_methods(["GET"])
+def get_plants_clustering_api(request):
+    """API: Return K-Means cluster assignments for the plants dataset."""
+    try:
+        n = max(3, min(20, int(request.GET.get('clusters', 8))))
+        df = _get_labeled_df(n, 'plants')
+        if df is None:
+            return JsonResponse({'error': 'No plants data'}, status=400)
+        pts = [
+            [round(float(r.decimalLatitude), 5), round(float(r.decimalLongitude), 5), int(r.cluster)]
+            for r in df[['decimalLatitude', 'decimalLongitude', 'cluster']].itertuples()
+        ]
+        return JsonResponse({'points': pts, 'total': len(pts), 'n_clusters': n})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@require_http_methods(["GET"])
+def get_plants_model_info(request):
+    """API: Return model comparison metrics for the plants section."""
+    _reload_plants_artifacts_if_needed()
+
+    meta = plants_metadata if isinstance(plants_metadata, dict) else {}
+    km_meta = {}
+    try:
+        km_meta = joblib.load(_project_file('plants_kmeans_meta.pkl'))
+    except Exception:
+        pass
+    return JsonResponse({
+        'regression': {
+            'winner':       meta.get('winner', 'Not trained'),
+            'r2':           meta.get('r2', 0),
+            'cv_r2':        meta.get('cv_r2', 0),
+            'mae':          meta.get('mae', 0),
+            'within_25pct': meta.get('within_25pct', 0),
+            'comparison':   meta.get('comparison', {}),
+        },
+        'clustering': {
+            'n_clusters': km_meta.get('n_clusters', 0),
+            'inertia':    km_meta.get('inertia', 0),
+        },
+        'trained': plants_model is not None,
+    })
 
 
 @require_http_methods(["GET"])
@@ -1282,6 +1817,14 @@ def get_insects_photos(request):
     """Return wildlife observation photos for the insects page gallery."""
     offset, limit = _parse_gallery_pagination(request)
     payload = _build_gallery_page_payload(_build_insects_gallery_rows(), offset, limit)
+    return JsonResponse(payload)
+
+
+@require_http_methods(["GET"])
+def get_plants_photos(request):
+    """Return wildlife observation photos for the plants page gallery."""
+    offset, limit = _parse_gallery_pagination(request)
+    payload = _build_gallery_page_payload(_build_plants_gallery_rows(), offset, limit)
     return JsonResponse(payload)
 
 
@@ -1356,8 +1899,8 @@ def get_insects_features(request):
 # CLUSTERING & SPECIES DETAIL SYSTEM
 # =============================================================================
 
-_clustering_cache = { 'animals': {}, 'birds': {}, 'insects': {} }
-_species_cache = { 'animals': None, 'birds': None, 'insects': None }
+_clustering_cache = { 'animals': {}, 'birds': {}, 'insects': {}, 'plants': {} }
+_species_cache = { 'animals': None, 'birds': None, 'insects': None, 'plants': None }
 _clustering_lock = threading.Lock()
 
 
@@ -1370,14 +1913,16 @@ def _load_category_data(category='animals'):
     files = {
         'animals': 'Koyna_animals_final.csv',
         'birds': 'Koyna_birds_final.csv',
-        'insects': 'Koyna_insects_final.csv'
+        'insects': 'Koyna_insects_final.csv',
+        'plants': 'Koyna_plants_final.csv'
     }
     
     try:
         df = pd.read_csv(_project_file(files[category]))
         _species_cache[category] = df
         return df
-    except Exception:
+    except Exception as e:
+        print(f"Error loading {category} data: {e}")
         return pd.DataFrame()
 
 
@@ -1589,6 +2134,11 @@ def get_birds_species_photos(request):
 def get_insects_species_photos(request):
     """API: Get paginated photos for a specific insect species."""
     return _get_species_photos_generic(request, 'insects')
+
+@require_http_methods(["GET"])
+def get_plants_species_photos(request):
+    """API: Get paginated photos for a specific plant species."""
+    return _get_species_photos_generic(request, 'plants')
         
 @require_http_methods(["GET"])
 def get_birds_clustering(request):
@@ -1629,6 +2179,17 @@ def get_insects_species_detail(request):
         if not species_name:
             return JsonResponse({'error': 'Species name required'}, status=400)
         detail = _sanitize_for_json(_get_species_detail(species_name, 'insects'))
+        return JsonResponse(detail, json_dumps_params={'allow_nan': False})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@require_http_methods(["GET"])
+def get_plants_species_detail(request):
+    try:
+        species_name = str(request.GET.get('species', '')).strip()
+        if not species_name:
+            return JsonResponse({'error': 'Species name required'}, status=400)
+        detail = _sanitize_for_json(_get_species_detail(species_name, 'plants'))
         return JsonResponse(detail, json_dumps_params={'allow_nan': False})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
@@ -1708,3 +2269,426 @@ def _get_species_photos_generic(request, category):
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+
+
+# =============================================================================
+# LABELED DATAFRAME CACHE — shared by heatmap, cluster-details, timeline, etc.
+# =============================================================================
+_labeled_df_cache = {}
+_labeled_df_lock = threading.Lock()
+
+def _get_labeled_df(n_clusters=8, category='animals'):
+    cache_key = f'{category}_{n_clusters}'
+    with _labeled_df_lock:
+        if cache_key in _labeled_df_cache:
+            return _labeled_df_cache[cache_key]
+    df = _load_category_data(category)
+    if df.empty:
+        return None
+    df_clean = df.dropna(subset=['decimalLatitude', 'decimalLongitude']).copy()
+    if len(df_clean) == 0:
+        return None
+    cm = {c: i for i, c in enumerate(df_clean['class'].unique())} if 'class' in df_clean.columns else {}
+    om = {o: i for i, o in enumerate(df_clean['order'].unique())} if 'order' in df_clean.columns else {}
+    df_clean['class_enc'] = df_clean['class'].map(cm).fillna(0) if 'class' in df_clean.columns else 0
+    df_clean['order_enc'] = df_clean['order'].map(om).fillna(0) if 'order' in df_clean.columns else 0
+    feats = df_clean[['decimalLatitude', 'decimalLongitude', 'class_enc', 'order_enc', 'year']].fillna(0)
+    fs = StandardScaler().fit_transform(feats)
+    df_clean['cluster'] = KMeans(n_clusters=n_clusters, random_state=42, n_init=10).fit_predict(fs)
+    with _labeled_df_lock:
+        _labeled_df_cache[cache_key] = df_clean
+    return df_clean
+
+
+# =============================================================================
+# GENERIC CLUSTER HEATMAP  — supports animals / birds / insects
+# =============================================================================
+@require_http_methods(["GET"])
+def get_cluster_heatmap(request):
+    try:
+        ds = request.GET.get('dataset', 'animals').strip().lower()
+        if ds not in ('animals', 'birds', 'insects', 'plants'):
+            ds = 'animals'
+        n = max(3, min(20, int(request.GET.get('clusters', 8))))
+        df = _get_labeled_df(n, ds)
+        if df is None:
+            return JsonResponse({'error': 'No data'}, status=400)
+        pts = [[round(float(r.decimalLatitude), 5), round(float(r.decimalLongitude), 5), int(r.cluster)]
+               for r in df[['decimalLatitude', 'decimalLongitude', 'cluster']].itertuples()]
+        return JsonResponse({'points': pts, 'total': len(pts), 'n_clusters': n})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# =============================================================================
+# GENERIC CLUSTER DETAILS — species list with trend badges, obsIds, taxonomy
+# =============================================================================
+@require_http_methods(["GET"])
+def get_cluster_details(request):
+    try:
+        ds = request.GET.get('dataset', 'animals').strip().lower()
+        if ds not in ('animals', 'birds', 'insects', 'plants'):
+            ds = 'animals'
+        n = max(3, min(20, int(request.GET.get('clusters', 8))))
+        cid = int(request.GET.get('cluster_id', 0))
+        df = _get_labeled_df(n, ds)
+        if df is None:
+            return JsonResponse({'error': 'No data'}, status=400)
+        cdf = df[df['cluster'] == cid]
+        species_list = []
+        for sp_name, rows in cdf.groupby('scientificName'):
+            if not sp_name or str(sp_name) in ('nan', 'None', ''):
+                continue
+            obs_ids = []
+            for oid in rows.get('occurrenceID', pd.Series(dtype=str)):
+                m = re.search(r'/observations/(\d+)', str(oid))
+                if m:
+                    obs_ids.append(m.group(1))
+            obs_ids = list(dict.fromkeys(obs_ids))[:5]
+            r0 = rows.iloc[0]
+            ym = int(rows['year'].min()) if 'year' in rows.columns and not rows['year'].isna().all() else None
+            yM = int(rows['year'].max()) if 'year' in rows.columns and not rows['year'].isna().all() else None
+            trend = 'stable'
+            if 'year' in rows.columns:
+                recent = len(rows[rows['year'] >= 2020])
+                prior  = len(rows[(rows['year'] >= 2015) & (rows['year'] < 2020)])
+                if prior > 0:
+                    if recent < prior * 0.5:   trend = 'declining'
+                    elif recent > prior * 1.5: trend = 'rising'
+            top_loc = ''
+            if 'locality' in rows.columns:
+                lc = rows['locality'].dropna().value_counts()
+                top_loc = str(lc.index[0]) if len(lc) else 'Koyna Region'
+            inat_url = None
+            if 'occurrenceID' in rows.columns:
+                for oid in rows['occurrenceID'].dropna():
+                    if 'inaturalist' in str(oid).lower():
+                        inat_url = str(oid); break
+            def sv(v, d=''):
+                return str(v) if pd.notna(v) else d
+            species_list.append({
+                'scientificName': str(sp_name),
+                'class': sv(r0.get('class')), 'order': sv(r0.get('order')),
+                'family': sv(r0.get('family')), 'genus': sv(r0.get('genus')),
+                'kingdom': sv(r0.get('kingdom'), 'Animalia'),
+                'observationCount': len(rows), 'obsIds': obs_ids, 'hasImage': len(obs_ids) > 0,
+                'yearMin': ym, 'yearMax': yM, 'trend': trend,
+                'centerLat': round(float(rows['decimalLatitude'].mean()), 5),
+                'centerLon': round(float(rows['decimalLongitude'].mean()), 5),
+                'topLocality': top_loc, 'inatUrl': inat_url,
+            })
+        species_list.sort(key=lambda x: x['observationCount'], reverse=True)
+        cb = {}
+        if 'class' in cdf.columns:
+            for c, cnt in cdf['class'].value_counts().head(8).items():
+                cb[str(c)] = int(cnt)
+        df_fam = ''
+        if 'family' in cdf.columns:
+            fv = cdf['family'].dropna().value_counts()
+            df_fam = str(fv.index[0]) if len(fv) else ''
+        return JsonResponse({'clusters': {str(cid): {
+            'species': species_list, 'species_count': len(species_list),
+            'total_obs': len(cdf), 'class_breakdown': cb, 'dominant_family': df_fam,
+        }}})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# =============================================================================
+# INAT PHOTO PROXY — server-side batch fetch, cached
+# =============================================================================
+_inat_photo_cache = {}
+_inat_photo_lock  = threading.Lock()
+
+@require_http_methods(["GET"])
+def get_inat_photos(request):
+    try:
+        raw = request.GET.get('obs_ids', '').strip()
+        if not raw:
+            return JsonResponse({'photos': {}})
+        obs_ids = [o.strip() for o in raw.split(',') if o.strip().isdigit()][:40]
+        results, to_fetch = {}, []
+        with _inat_photo_lock:
+            for oid in obs_ids:
+                if oid in _inat_photo_cache: results[oid] = _inat_photo_cache[oid]
+                else: to_fetch.append(oid)
+        def _fetch(obs_id):
+            try:
+                req = Request(f'https://api.inaturalist.org/v1/observations/{obs_id}?fields=photos',
+                               headers={'User-Agent': 'KoynaWildlifeApp/1.0'})
+                with urlopen(req, timeout=12) as resp:
+                    data = json.loads(resp.read().decode())
+                photos = data.get('results', [{}])[0].get('photos', [])
+                if photos:
+                    url = (photos[0].get('url') or '').replace('/square.', '/medium.')
+                    return obs_id, url if url else None
+            except Exception: pass
+            return obs_id, None
+        if to_fetch:
+            with ThreadPoolExecutor(max_workers=12) as ex:
+                for oid, url in [f.result() for f in as_completed({ex.submit(_fetch, o): o for o in to_fetch})]:
+                    results[oid] = url
+                    with _inat_photo_lock: _inat_photo_cache[oid] = url
+        return JsonResponse({'photos': results})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@require_http_methods(["GET"])
+def get_cluster_photos(request):
+    """API: Get a collection of photos for a specific cluster."""
+    try:
+        ds = request.GET.get('dataset', 'animals').strip().lower()
+        if ds not in ('animals', 'birds', 'insects', 'plants'): ds = 'animals'
+        n = max(3, min(20, int(request.GET.get('clusters', 8))))
+        cid = int(request.GET.get('cluster_id', 0))
+        
+        df = _get_labeled_df(n, ds)
+        if df is None:
+            return JsonResponse({'photos': []})
+            
+        cdf = df[df['cluster'] == cid]
+        if cdf.empty:
+            return JsonResponse({'photos': []})
+            
+        # Extract iNat observation IDs
+        obs_ids = []
+        for oid in cdf['occurrenceID'].dropna():
+            m = re.search(r'/observations/(\d+)', str(oid))
+            if m:
+                obs_ids.append(m.group(1))
+        
+        # Deduplicate and limit
+        obs_ids = list(dict.fromkeys(obs_ids))[:40]
+        
+        results = []
+        def _fetch(obs_id):
+            try:
+                req = Request(f'https://api.inaturalist.org/v1/observations/{obs_id}?fields=photos,taxon',
+                               headers={'User-Agent': 'KoynaWildlifeApp/1.0'})
+                with urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode())
+                res = data.get('results', [{}])[0]
+                photos = res.get('photos', [])
+                taxon = res.get('taxon', {})
+                if photos:
+                    url = (photos[0].get('url') or '').replace('/square.', '/medium.')
+                    return {
+                        'url': url,
+                        'obs_id': obs_id,
+                        'species': taxon.get('name', 'Unknown'),
+                        'common_name': taxon.get('preferred_common_name', '')
+                    }
+            except Exception: pass
+            return None
+
+        if obs_ids:
+            with ThreadPoolExecutor(max_workers=10) as ex:
+                futures = {ex.submit(_fetch, o): o for o in obs_ids}
+                for f in as_completed(futures):
+                    res = f.result()
+                    if res: results.append(res)
+        
+        return JsonResponse({'photos': results, 'count': len(results)})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# =============================================================================
+# SPECIES OBSERVATIONS — all GPS points for one species (modal mini-map)
+# =============================================================================
+@require_http_methods(["GET"])
+def get_species_observations(request):
+    try:
+        species = request.GET.get('species', '').strip()
+        ds = request.GET.get('dataset', 'animals').strip().lower()
+        if ds not in ('animals', 'birds', 'insects', 'plants'): ds = 'animals'
+        if not species:
+            return JsonResponse({'error': 'species required'}, status=400)
+        df = _load_category_data(ds)
+        sp = df[df['scientificName'].str.contains(re.escape(species), case=False, na=False)]
+        obs = []
+        cols = ['decimalLatitude', 'decimalLongitude', 'eventDate', 'locality', 'recordedBy', 'occurrenceID', 'year']
+        for row in sp[[c for c in cols if c in sp.columns]].itertuples():
+            try:
+                lat, lon = float(row.decimalLatitude), float(row.decimalLongitude)
+                if pd.isna(lat) or pd.isna(lon): continue
+                oid = str(getattr(row, 'occurrenceID', '') or '')
+                m = re.search(r'/observations/(\d+)', oid)
+                obs.append({
+                    'lat': round(lat, 5), 'lon': round(lon, 5),
+                    'date': str(getattr(row, 'eventDate', '') or '')[:10],
+                    'locality': str(getattr(row, 'locality', '') or 'Koyna'),
+                    'recordedBy': str(getattr(row, 'recordedBy', '') or ''),
+                    'inatUrl': oid if 'inaturalist' in oid.lower() else None,
+                    'obsId': m.group(1) if m else None,
+                    'year': int(row.year) if hasattr(row, 'year') and not pd.isna(row.year) else None,
+                })
+            except Exception: continue
+        return JsonResponse({'observations': obs, 'total': len(obs)})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# =============================================================================
+# CLUSTER TIMELINE — year-by-year obs counts for a cluster
+# =============================================================================
+@require_http_methods(["GET"])
+def get_cluster_timeline(request):
+    try:
+        ds = request.GET.get('dataset', 'animals').strip().lower()
+        if ds not in ('animals', 'birds', 'insects', 'plants'): ds = 'animals'
+        n   = max(3, min(20, int(request.GET.get('clusters', 8))))
+        cid = int(request.GET.get('cluster_id', 0))
+        df  = _get_labeled_df(n, ds)
+        if df is None: return JsonResponse({'timeline': [], 'total': 0})
+        cdf = df[df['cluster'] == cid]
+        tl  = []
+        if 'year' in cdf.columns:
+            yc = cdf.groupby('year').size().reset_index(name='count').sort_values('year')
+            tl = [{'year': int(r.year), 'count': int(r.count)} for r in yc.itertuples()]
+        return JsonResponse({'timeline': tl, 'total': len(cdf)})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# =============================================================================
+# SEASONAL ACTIVITY — obs per month across all years
+# =============================================================================
+@require_http_methods(["GET"])
+def get_seasonal_activity(request):
+    try:
+        ds = request.GET.get('dataset', 'animals').strip().lower()
+        if ds not in ('animals', 'birds', 'insects', 'plants'): ds = 'animals'
+        df = _load_category_data(ds)
+        months = {i: 0 for i in range(1, 13)}
+        MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+        if 'eventDate' in df.columns:
+            dates = pd.to_datetime(df['eventDate'], errors='coerce')
+            mc = dates.dt.month.dropna().value_counts()
+            for m, c in mc.items():
+                if 1 <= m <= 12: months[int(m)] = int(c)
+        elif 'month' in df.columns:
+            mc = df['month'].dropna().value_counts()
+            for m, c in mc.items():
+                if 1 <= m <= 12: months[int(m)] = int(c)
+        result = [{'month': i, 'name': MONTH_NAMES[i-1], 'count': months[i]} for i in range(1, 13)]
+        return JsonResponse({'seasonal': result, 'dataset': ds})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# =============================================================================
+# CONSERVATION ALERTS — detect declining species across dataset
+# =============================================================================
+@require_http_methods(["GET"])
+def get_conservation_alerts(request):
+    try:
+        ds = request.GET.get('dataset', 'animals').strip().lower()
+        if ds not in ('animals', 'birds', 'insects', 'plants'): ds = 'animals'
+        df = _load_category_data(ds)
+        alerts = []
+        if 'year' not in df.columns or 'scientificName' not in df.columns:
+            return JsonResponse({'alerts': []})
+        for sp, rows in df.groupby('scientificName'):
+            if len(rows) < 5: continue
+            recent = len(rows[rows['year'] >= 2020])
+            prior  = len(rows[(rows['year'] >= 2015) & (rows['year'] < 2020)])
+            if prior >= 3 and recent < prior * 0.4:
+                r0 = rows.iloc[0]
+                drop_pct = round((1 - recent/prior) * 100)
+                alerts.append({
+                    'species': str(sp),
+                    'class': str(r0.get('class', '')),
+                    'order': str(r0.get('order', '')),
+                    'totalObs': len(rows),
+                    'recentObs': recent,
+                    'priorObs': prior,
+                    'dropPercent': drop_pct,
+                    'severity': 'critical' if drop_pct >= 70 else 'high' if drop_pct >= 50 else 'medium',
+                })
+        alerts.sort(key=lambda x: x['dropPercent'], reverse=True)
+        return JsonResponse({'alerts': alerts[:30], 'total': len(alerts), 'dataset': ds})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# =============================================================================
+# TOP OBSERVERS — citizen science leaderboard
+# =============================================================================
+@require_http_methods(["GET"])
+def get_top_observers(request):
+    try:
+        ds = request.GET.get('dataset', 'animals').strip().lower()
+        if ds not in ('animals', 'birds', 'insects', 'plants'): ds = 'animals'
+        df = _load_category_data(ds)
+        if 'recordedBy' not in df.columns:
+            return JsonResponse({'observers': []})
+        vc = df['recordedBy'].dropna().str.strip().value_counts().head(20)
+        sp_per_obs = df.groupby('recordedBy')['scientificName'].nunique() if 'scientificName' in df.columns else {}
+        observers = []
+        for name, cnt in vc.items():
+            n = str(name).strip()
+            if not n or n.lower() in ('', 'nan', 'unknown'): continue
+            sp_count = int(sp_per_obs.get(name, 0)) if hasattr(sp_per_obs, 'get') else 0
+            observers.append({'name': n, 'observations': int(cnt), 'species': sp_count})
+        return JsonResponse({'observers': observers, 'dataset': ds})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# =============================================================================
+# DASHBOARD STATS — aggregate stats for all 3 datasets
+# =============================================================================
+@require_http_methods(["GET"])
+def get_dashboard_stats(request):
+    try:
+        out = {}
+        all_observers = set()
+        for ds in ('animals', 'birds', 'insects', 'plants'):
+            df = _load_category_data(ds)
+            if df.empty:
+                out[ds] = {'total': 0, 'species': 0, 'families': 0, 'yearMin': 0, 'yearMax': 0}
+                continue
+            
+            sp = int(df['scientificName'].nunique()) if 'scientificName' in df.columns else 0
+            fam = int(df['family'].nunique()) if 'family' in df.columns else 0
+            ym = int(df['year'].min()) if 'year' in df.columns and not df['year'].isna().all() else 0
+            yM = int(df['year'].max()) if 'year' in df.columns and not df['year'].isna().all() else 0
+            
+            if 'recordedBy' in df.columns:
+                all_observers.update(df['recordedBy'].dropna().unique())
+
+            # top locality
+            top_loc = ''
+            if 'locality' in df.columns:
+                lv = df['locality'].dropna().value_counts()
+                top_loc = str(lv.index[0]) if len(lv) else ''
+            
+            # class breakdown
+            cb = {}
+            if 'class' in df.columns:
+                for c, cnt in df['class'].value_counts().head(6).items():
+                    cb[str(c)] = int(cnt)
+            
+            out[ds] = {
+                'total': len(df), 'species': sp, 'families': fam,
+                'yearMin': ym, 'yearMax': yM, 'topLocality': top_loc,
+                'classBreakdown': cb,
+            }
+            
+        return JsonResponse({
+            'datasets': out, 
+            'totalRecords': sum(v['total'] for v in out.values()),
+            'totalObservers': len(all_observers)
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+# =============================================================================
+# WILDLIFE DASHBOARD PAGE VIEW
+# =============================================================================
+@require_http_methods(["GET"])
+def wildlife_dashboard(request):
+    return render(request, 'wildlife_dashboard.html')

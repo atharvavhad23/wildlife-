@@ -36,15 +36,32 @@ export function usePrediction(featuresUrl, predictUrl) {
     fetch(featuresUrl)
       .then(r => r.json())
       .then(data => {
-        setFeatures(data)
+        if (data?.error) {
+          throw new Error(data.error)
+        }
+
+        const sanitizedEntries = Object.entries(data).filter(([, v]) => (
+          v &&
+          typeof v === 'object' &&
+          Number.isFinite(v.min) &&
+          Number.isFinite(v.max) &&
+          Number.isFinite(v.mean)
+        ))
+
+        if (sanitizedEntries.length === 0) {
+          throw new Error('No feature metadata available for this model.')
+        }
+
+        const cleanFeatures = Object.fromEntries(sanitizedEntries)
+        setFeatures(cleanFeatures)
         // Pre-fill with means
         const defaults = {}
-        Object.entries(data).forEach(([k, v]) => {
+        Object.entries(cleanFeatures).forEach(([k, v]) => {
           defaults[k] = Math.round(v.mean * 10) / 10
         })
         setValues(defaults)
       })
-      .catch(() => setError('Failed to load model features.'))
+      .catch((err) => setError(err?.message || 'Failed to load model features.'))
       .finally(() => setFetchingFeatures(false))
   }, [featuresUrl])
 

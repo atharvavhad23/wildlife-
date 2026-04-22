@@ -14,6 +14,18 @@ function TrendChip({ trend }) {
   return <span className={`trend-chip ${cls}`}>{icon} {dir} ({pct.toFixed(2)}%)</span>
 }
 
+function OccurrenceModelChip({ trend }) {
+  if (!trend?.source) return null
+  const label = String(trend.classifier_label || trend.trend || 'stable').toLowerCase()
+  const conf = Number(trend.confidence)
+  const confText = Number.isFinite(conf) ? `${conf.toFixed(1)}% confidence` : 'confidence n/a'
+  return (
+    <span className="trend-chip stable" title="Occurrence trend classifier output">
+      RF occurrence: {label} ({confText})
+    </span>
+  )
+}
+
 function RiskBadge({ level }) {
   if (!level) return null
   return <span className={`risk-badge ${level}`}>⚠ {level} Risk</span>
@@ -121,6 +133,10 @@ function FeatureBar({ labels = [], values = [] }) {
 
 export default function ResultPanel({ result, unit, speciesLabel }) {
   const { prediction, environmental_data: env, decision, trend } = result
+  const regressionModel = result?.model_info?.winner || result?.model_name || 'Regression Model'
+  const occurrenceModel = trend?.source || 'Occurrence Classifier'
+  const occurrenceLabel = trend?.classifier_label || 'stable'
+  const occurrenceConfidence = Number(trend?.confidence)
 
   const recommendation = decision?.recommendation || ''
   const recs = recommendation
@@ -140,6 +156,7 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
           <RiskBadge level={riskLevel} />
           <TrendChip trend={trend} />
+          <OccurrenceModelChip trend={trend} />
         </div>
         {summary && (
           <p style={{ marginTop: 16, color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: 520, margin: '16px auto 0' }}>
@@ -149,6 +166,19 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
       </div>
 
       {/* Env data cards */}
+      <div className="dashboard-grid" style={{ marginTop: 24 }}>
+        <div className="dash-card">
+          <div className="dash-card-title">Models Used</div>
+          <div className="rec-list" style={{ marginTop: 8 }}>
+            <div>Density model: {regressionModel}</div>
+            <div>
+              Occurrence model: {occurrenceModel} ({occurrenceLabel}
+              {Number.isFinite(occurrenceConfidence) ? `, ${occurrenceConfidence.toFixed(1)}% confidence` : ''})
+            </div>
+          </div>
+        </div>
+      </div>
+
       {env && Object.keys(env).length > 0 && (
         <>
           <div className="section-heading" style={{ marginTop: 28 }}>
