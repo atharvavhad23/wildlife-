@@ -237,9 +237,9 @@ export default function ClusteringMap() {
             <div>
               <div className="text-[9px] font-bold uppercase text-muted mb-1">Defined Limits</div>
               <select value={layerType} onChange={e => setLayerType(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-[10px] text-primary outline-none">
-                <option value="hulls">Convex Hulls (Defined)</option>
-                <option value="markers">Observation Points</option>
-                <option value="both">Both Layers</option>
+                <option value="hulls" style={{ background: '#121212', color: 'white' }}>Convex Hulls (Defined)</option>
+                <option value="markers" style={{ background: '#121212', color: 'white' }}>Observation Points</option>
+                <option value="both" style={{ background: '#121212', color: 'white' }}>Both Layers</option>
               </select>
             </div>
             <div>

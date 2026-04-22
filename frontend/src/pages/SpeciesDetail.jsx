@@ -150,8 +150,8 @@ export default function SpeciesDetail() {
         points.slice(0, 300).forEach(([lat, lon]) => {
           L.circleMarker([lat, lon], {
             radius: 4,
-            color: '#4ecdc4',
-            fillColor: '#4ecdc4',
+            color: '#ef4444',
+            fillColor: '#ef4444',
             fillOpacity: 0.65,
             weight: 1,
           }).addTo(map)
