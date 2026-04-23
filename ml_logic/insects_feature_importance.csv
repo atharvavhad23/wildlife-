@@ -1,0 +1,9 @@
+Feature,Importance
+species_richness,0.34320894
+lon_grid,0.34158015
+lat_grid,0.15638371
+season_enc,0.13847166
+family_enc,0.006312156
+taxonRank_enc,0.0058400775
+order_enc,0.004956637
+basisOfRecord_enc,0.0032466415

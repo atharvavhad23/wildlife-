@@ -148,8 +148,68 @@ function FeatureBar({ labels = [], values = [] }) {
   )
 }
 
+function FutureOutlookSection({ outlook, unit }) {
+  if (!outlook) return null
+  const { endangered_risk: risk, density_change_10yr_pct: change } = outlook
+  
+  const riskColor = risk.risk_level === 'High' ? 'text-red-400 bg-red-400/10 border-red-400/20' : 
+                    risk.risk_level === 'Medium' ? 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' : 
+                    'text-emerald-400 bg-emerald-400/10 border-emerald-400/20'
+
+  return (
+    <div className="mt-8 space-y-4">
+      <div className="section-heading">🔮 Future Outlook & Conservation Risk</div>
+      
+      <div className={`p-4 rounded-xl border backdrop-blur-md ${riskColor}`}>
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">{risk.is_endangered ? '🚨' : '✅'}</span>
+          <div>
+            <div className="font-bold text-sm uppercase tracking-wider mb-1">
+              Endangered Risk: {risk.risk_level}
+            </div>
+            <p className="text-sm opacity-90 leading-relaxed">
+              {risk.warning_message}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="glass p-4 rounded-xl flex flex-col gap-1">
+          <div className="text-[10px] uppercase tracking-widest text-text-muted mb-1">5-Year Projection</div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-text-primary">{outlook.projected_density_5yr}</span>
+            <span className="text-xs text-text-muted">{unit}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 ${outlook.projected_trend_5yr === 'Declining' ? 'text-red-400' : 'text-emerald-400'}`}>
+              {outlook.projected_trend_5yr}
+            </span>
+          </div>
+        </div>
+
+        <div className="glass p-4 rounded-xl flex flex-col gap-1">
+          <div className="text-[10px] uppercase tracking-widest text-text-muted mb-1">10-Year Projection</div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-text-primary">{outlook.projected_density_10yr}</span>
+            <span className="text-xs text-text-muted">{unit}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+             <span className={`text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 ${outlook.projected_trend_10yr === 'Declining' ? 'text-red-400' : 'text-emerald-400'}`}>
+              {outlook.projected_trend_10yr}
+            </span>
+            <span className={`text-[10px] font-bold ${change < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+              ({change > 0 ? '+' : ''}{change}%)
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ResultPanel({ result, unit, speciesLabel }) {
-  const { prediction, environmental_data: env, decision, trend } = result
+  const { prediction, environmental_data: env, decision, trend, future_outlook } = result
   const regressionModel = result?.model_info?.winner || result?.model_name || 'Regression Model'
   const occurrenceModel = trend?.source || 'Occurrence Classifier'
   const occurrenceLabel = trend?.classifier_label || 'stable'
@@ -194,50 +254,9 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
             )}
           </>
         )}
-        
-        {/* Action Buttons (Hidden for now) */}
-        {/*
-        <div className="flex justify-center gap-4 mt-6">
-          <button 
-            onClick={() => {
-              const csvContent = "data:text/csv;charset=utf-8," 
-                + "Model,Mode,Prediction,Unit,Risk,Trend,Accuracy\n"
-                + `${mode === 'density' ? regressionModel : occurrenceModel},${mode},${mode === 'density' ? Number(prediction).toFixed(3) : occurrenceLabel.toUpperCase()},${unit},${riskLevel},${trend},${result?.accuracy || 'N/A'}`;
-              const encodedUri = encodeURI(csvContent);
-              const link = document.createElement("a");
-              link.setAttribute("href", encodedUri);
-              link.setAttribute("download", `koyna_${speciesLabel.toLowerCase()}_prediction.csv`);
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-            }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-wider text-white transition-all shadow-lg backdrop-blur-sm"
-          >
-            <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-            Export CSV
-          </button>
-          
-          <button 
-            onClick={(e) => {
-              const text = `Koyna Sanctuary ${speciesLabel} ML Prediction:\nMode: ${mode.toUpperCase()}\nResult: ${mode === 'density' ? Number(prediction).toFixed(3) + ' ' + unit : occurrenceLabel.toUpperCase()}\nTrend: ${trend}\nAccuracy: ${result?.accuracy || 'N/A'}%`;
-              navigator.clipboard.writeText(text);
-              const btn = e.currentTarget;
-              const originalText = btn.innerHTML;
-              btn.innerHTML = `<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Copied!`;
-              btn.classList.add('border-green-400/50', 'bg-green-400/10');
-              setTimeout(() => {
-                btn.innerHTML = originalText;
-                btn.classList.remove('border-green-400/50', 'bg-green-400/10');
-              }, 2000);
-            }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-wider text-white transition-all shadow-lg backdrop-blur-sm"
-          >
-            <svg className="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-            Share Result
-          </button>
-        </div>
-        */}
       </div>
+
+      <FutureOutlookSection outlook={future_outlook} unit={unit} />
 
       {/* Env data cards */}
       <div className="dashboard-grid" style={{ marginTop: 24 }}>
@@ -251,7 +270,7 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
                 <span style={{ fontSize: '0.85em', color: '#fbbf24' }}>
                   {result?.accuracy ? ` ✓ Accuracy: ${Number(result.accuracy).toFixed(1)}%` : ''} 
                   {result?.accuracy ? ' | ' : ''} 
-                  ⚡ Limited to top PCA-ranked features
+                  ⚡ Universal Feature Integrated
                 </span>
               </div>
             ) : (
