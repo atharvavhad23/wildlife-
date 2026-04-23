@@ -138,27 +138,44 @@ def _otp_verified_key(email: str, purpose: str) -> str:
 
 
 @csrf_exempt
+@csrf_exempt
 @require_http_methods(["POST"])
 def send_email_otp(request):
     """Send OTP code to email using configured project SMTP account."""
+    import json
+    import secrets
+    from django.http import JsonResponse
+    from django.conf import settings
+    from django.core.mail import send_mail
+    from django.core.cache import cache
+
     try:
         payload = json.loads(request.body or '{}')
     except Exception:
-        payload = {}
+        return JsonResponse({'error': 'Invalid JSON data.'}, status=400)
 
     email = str(payload.get('email', '')).strip().lower()
     purpose = str(payload.get('purpose', 'auth')).strip().lower() or 'auth'
 
+    # ✅ Validate email
     if not email or '@' not in email:
         return JsonResponse({'error': 'Valid email is required.'}, status=400)
 
-    if not getattr(settings, 'EMAIL_HOST', '') or not getattr(settings, 'EMAIL_HOST_USER', ''):
+    # ✅ Proper SMTP configuration check (FIXED)
+    if not all([
+        getattr(settings, 'EMAIL_HOST', ''),
+        getattr(settings, 'EMAIL_HOST_USER', ''),
+        getattr(settings, 'EMAIL_HOST_PASSWORD', '')
+    ]):
         return JsonResponse(
-            {'error': 'Project email SMTP is not configured on server.'},
+            {'error': 'SMTP configuration incomplete. Check EMAIL_HOST, USER, PASSWORD.'},
             status=400,
         )
 
+    # ✅ Generate OTP
     otp = f"{secrets.randbelow(900000) + 100000}"
+
+    # ✅ Store OTP in cache
     cache.set(_otp_key(email, purpose), otp, timeout=OTP_TTL_SECONDS)
     cache.delete(_otp_verified_key(email, purpose))
 
@@ -170,15 +187,20 @@ def send_email_otp(request):
     )
 
     try:
+        # ✅ Send email
         send_mail(
             subject,
             message,
-            settings.DEFAULT_FROM_EMAIL,
+            settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER,
             [email],
             fail_silently=False,
         )
     except Exception as exc:
-        return JsonResponse({'error': f'Failed to send OTP email: {exc}'}, status=500)
+        print("EMAIL ERROR:", exc)  # Debug in terminal
+        return JsonResponse(
+            {'error': f'Failed to send OTP email: {str(exc)}'},
+            status=500
+        )
 
     return JsonResponse({'status': 'success', 'message': 'OTP sent to email.'})
 

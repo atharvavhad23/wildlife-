@@ -15,6 +15,14 @@ async function postJson(url, body) {
   return data
 }
 
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
 export default function Auth() {
   const navigate = useNavigate()
   const [mode, setMode] = useState('login')
@@ -44,15 +52,21 @@ export default function Auth() {
 
   const sendOtp = async () => {
     clearStatus()
-    if (!email.trim()) {
+    const normalizedEmail = normalizeEmail(email)
+    if (!normalizedEmail) {
       setError('Please enter your email first.')
+      return
+    }
+    if (!isValidEmail(normalizedEmail)) {
+      setError('Please enter a valid email address.')
       return
     }
     setLoading(true)
     try {
-      await postJson('/auth/send-otp/', { email, purpose })
+      await postJson('/auth/send-otp/', { email: normalizedEmail, purpose })
       setOtpSent(true)
       setOtpVerified(false)
+      setEmail(normalizedEmail)
       setMessage('OTP sent to your email.')
     } catch (e) {
       setError(e.message)
@@ -63,13 +77,18 @@ export default function Auth() {
 
   const verifyOtp = async () => {
     clearStatus()
+    const normalizedEmail = normalizeEmail(email)
+    if (!isValidEmail(normalizedEmail)) {
+      setError('Please enter a valid email address.')
+      return
+    }
     if (!otp.trim()) {
       setError('Please enter the OTP code.')
       return
     }
     setLoading(true)
     try {
-      await postJson('/auth/verify-otp/', { email, otp, purpose })
+      await postJson('/auth/verify-otp/', { email: normalizedEmail, otp: otp.trim(), purpose })
       setOtpVerified(true)
       setMessage('OTP verified successfully.')
     } catch (e) {
@@ -108,6 +127,10 @@ export default function Auth() {
       setError('Email and password are required.')
       return
     }
+    if (!isValidEmail(normalizedEmail)) {
+      setError('Please enter a valid email address.')
+      return
+    }
     if (mode === 'signup' && !otpVerified) {
       setError('Please verify your email with OTP first.')
       return
@@ -116,12 +139,13 @@ export default function Auth() {
     setLoading(true)
     try {
       if (mode === 'signup') {
-        const cred = await createUserWithEmailAndPassword(auth, email, password)
+        const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password)
         await sendEmailVerification(cred.user)
         setMessage('Signup successful. Redirecting...')
       } else {
-        await signInWithEmailAndPassword(auth, email, password)
+        await signInWithEmailAndPassword(auth, normalizedEmail, password)
       }
+      setEmail(normalizedEmail)
       setTimeout(() => navigate('/'), 1000)
     } catch (e) {
       setError(e.message)
