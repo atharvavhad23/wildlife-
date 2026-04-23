@@ -145,36 +145,106 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
   const riskLevel = decision?.risk_level || 'Medium'
   const status = decision?.status || 'Declining'
   const summary = `Risk is ${riskLevel.toLowerCase()} and ecosystem status is ${status.toLowerCase()}. ${recommendation}`
+  
+  const mode = result.mode || 'density'
 
   return (
     <div className="result-panel">
-      {/* Big number */}
+      {/* Dynamic Results Header based on Mode */}
       <div className="result-top">
-        <div className="result-label">Estimated {speciesLabel} Population Density</div>
-        <div className="result-value-big">{Number(prediction).toFixed(3)}</div>
-        <div className="result-unit">{unit}</div>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
-          <RiskBadge level={riskLevel} />
-          <TrendChip trend={trend} />
-          <OccurrenceModelChip trend={trend} />
-        </div>
-        {summary && (
-          <p style={{ marginTop: 16, color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: 520, margin: '16px auto 0' }}>
-            {summary}
-          </p>
+        {mode === 'density' ? (
+          <>
+            <div className="result-label">Estimated {speciesLabel} Population Density</div>
+            <div className="result-value-big">{Number(prediction).toFixed(3)}</div>
+            <div className="result-unit">{unit}</div>
+            <p style={{ marginTop: 16, color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: 520, margin: '16px auto 0' }}>
+              This regression model predicts the precise expected population density based on the inputted parameters.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="result-label">{speciesLabel} Occurrence Trend</div>
+            <div className="result-value-big" style={{ fontSize: '2.5rem', marginBottom: 10 }}>{occurrenceLabel.toUpperCase()}</div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <RiskBadge level={riskLevel} />
+              <TrendChip trend={trend} />
+              <OccurrenceModelChip trend={trend} />
+            </div>
+            {summary && (
+              <p style={{ marginTop: 16, color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: 520, margin: '16px auto 0' }}>
+                {summary}
+              </p>
+            )}
+          </>
         )}
+        
+        {/* Action Buttons */}
+        <div className="flex justify-center gap-4 mt-6">
+          <button 
+            onClick={() => {
+              const csvContent = "data:text/csv;charset=utf-8," 
+                + "Model,Mode,Prediction,Unit,Risk,Trend,Accuracy\n"
+                + `${mode === 'density' ? regressionModel : occurrenceModel},${mode},${mode === 'density' ? Number(prediction).toFixed(3) : occurrenceLabel.toUpperCase()},${unit},${riskLevel},${trend},${result?.accuracy || 'N/A'}`;
+              const encodedUri = encodeURI(csvContent);
+              const link = document.createElement("a");
+              link.setAttribute("href", encodedUri);
+              link.setAttribute("download", `koyna_${speciesLabel.toLowerCase()}_prediction.csv`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-wider text-white transition-all shadow-lg backdrop-blur-sm"
+          >
+            <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Export CSV
+          </button>
+          
+          <button 
+            onClick={(e) => {
+              const text = `Koyna Sanctuary ${speciesLabel} ML Prediction:\nMode: ${mode.toUpperCase()}\nResult: ${mode === 'density' ? Number(prediction).toFixed(3) + ' ' + unit : occurrenceLabel.toUpperCase()}\nTrend: ${trend}\nAccuracy: ${result?.accuracy || 'N/A'}%`;
+              navigator.clipboard.writeText(text);
+              const btn = e.currentTarget;
+              const originalText = btn.innerHTML;
+              btn.innerHTML = `<svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Copied!`;
+              btn.classList.add('border-green-400/50', 'bg-green-400/10');
+              setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.classList.remove('border-green-400/50', 'bg-green-400/10');
+              }, 2000);
+            }}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold uppercase tracking-wider text-white transition-all shadow-lg backdrop-blur-sm"
+          >
+            <svg className="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+            Share Result
+          </button>
+        </div>
       </div>
 
       {/* Env data cards */}
       <div className="dashboard-grid" style={{ marginTop: 24 }}>
         <div className="dash-card">
-          <div className="dash-card-title">Models Used</div>
+          <div className="dash-card-title">Model Diagnostics</div>
           <div className="rec-list" style={{ marginTop: 8 }}>
-            <div>Density model: {regressionModel}</div>
-            <div>
-              Occurrence model: {occurrenceModel} ({occurrenceLabel}
-              {Number.isFinite(occurrenceConfidence) ? `, ${occurrenceConfidence.toFixed(1)}% confidence` : ''})
-            </div>
+            {mode === 'density' ? (
+              <div>
+                <strong>Density Model:</strong> {regressionModel} 
+                <br/>
+                <span style={{ fontSize: '0.85em', color: '#fbbf24' }}>
+                  {result?.accuracy ? ` ✓ Accuracy: ${Number(result.accuracy).toFixed(1)}%` : ''} 
+                  {result?.accuracy ? ' | ' : ''} 
+                  ⚡ Limited to top PCA-ranked features
+                </span>
+              </div>
+            ) : (
+              <div>
+                <strong>Classification Model:</strong> {occurrenceModel}
+                <br/>
+                <span style={{ fontSize: '0.85em', color: '#10b981' }}>
+                  ✓ Output: {occurrenceLabel.toUpperCase()} 
+                  {Number.isFinite(occurrenceConfidence) ? ` | ${occurrenceConfidence.toFixed(1)}% confidence` : ''}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

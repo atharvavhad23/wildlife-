@@ -57,53 +57,26 @@ BASE_FEATURES = X_raw.columns.tolist()
 print(f"   Base features ({len(BASE_FEATURES)}): {BASE_FEATURES}")
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. FEATURE ENGINEERING (mirroring birds pipeline for consistency)
+# 2. SELECT TOP 8 BASE FEATURES VIA PCA
 # ─────────────────────────────────────────────────────────────────────────────
-print("\n🔧 Engineering features ...")
+print("\n🔧 Selecting top 8 original features via PCA importance...")
 
-X = X_raw.copy()
+temp_scaler = RobustScaler()
+X_temp_scaled = temp_scaler.fit_transform(X_raw)
+pca_rank = PCA(random_state=42)
+pca_rank.fit(X_temp_scaled)
 
-# Interaction terms
-X['order_family']      = X['order_enc']  * X['family_enc']
-X['richness_family']   = X['species_richness'] * X['family_enc']
-X['richness_order']    = X['species_richness'] * X['order_enc']
-X['class_family']      = X['class_enc']  * X['family_enc']
+loadings = np.abs(pca_rank.components_)
+weighted_loadings = loadings * pca_rank.explained_variance_ratio_[:, np.newaxis]
+importance = np.sum(weighted_loadings, axis=0)
 
-# Spatial interactions
-X['spatial']           = X['lat_grid'] * X['lon_grid']
-X['spatial_uncertainty'] = (X['lat_grid'] + X['lon_grid']) * X['coordinateUncertaintyInMeters']
+num_features = 8
+top_indices = np.argsort(importance)[-num_features:]
+top_features = [X_raw.columns[i] for i in top_indices]
 
-# Temporal interactions
-X['season_month']      = X['season_enc'] * X['month']
-X['year_month']        = X['year'] * X['month']
-X['day_month']         = X['day']  * X['month']
-
-# Polynomial features
-for feat in ['species_richness', 'month', 'day', 'year']:
-    X[f'{feat}_sq']   = X[feat] ** 2
-    X[f'{feat}_sqrt'] = np.sqrt(np.abs(X[feat]) + 1)
-    X[f'{feat}_cbrt'] = np.cbrt(X[feat])
-
-# Log transforms
-X['richness_log']     = np.log1p(X['species_richness'])
-X['uncertainty_log']  = np.log1p(X['coordinateUncertaintyInMeters'])
-X['month_log']        = np.log1p(X['month'])
-
-# Ratios
-X['rich_uncertainty_ratio'] = X['species_richness'] / (X['coordinateUncertaintyInMeters'] + 1)
-X['family_order_ratio']     = (X['family_enc'] + 1) / (X['order_enc'] + 1)
-
-# Aggregates
-X['spatial_mean']    = (X['lat_grid'] + X['lon_grid']) / 2
-X['temporal_mean']   = (X['day'] + X['month'] + X['decade']) / 3
-X['category_mean']   = (X['order_enc'] + X['family_enc'] + X['class_enc']) / 3
-
-# Binary indicators
-X['richness_high']    = (X['species_richness'] > X['species_richness'].median()).astype(int)
-X['uncertainty_high'] = (X['coordinateUncertaintyInMeters'] > X['coordinateUncertaintyInMeters'].median()).astype(int)
-X['month_season']     = (X['month'] % 4).astype(int)
-
-print(f"✓ Feature matrix: {X.shape[1]} features (+{X.shape[1] - len(BASE_FEATURES)} engineered)")
+# Filter dataset
+X_selected = X_raw[top_features]
+print(f"✓ Top Features used: {top_features}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. TARGET TRANSFORM + SPLIT
@@ -112,7 +85,7 @@ print("\n📈 Applying log1p transform to target ...")
 y = np.log1p(y_orig)
 
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, shuffle=True
+    X_selected, y, test_size=0.2, random_state=42, shuffle=True
 )
 print(f"   Train: {len(X_train):,}   Test: {len(X_test):,}")
 
@@ -120,7 +93,7 @@ scaler = RobustScaler()
 X_train_s = scaler.fit_transform(X_train)
 X_test_s  = scaler.transform(X_test)
 
-FEATURE_NAMES = X.columns.tolist()
+FEATURE_NAMES = top_features
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. HELPER: EVALUATION

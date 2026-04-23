@@ -73,7 +73,7 @@ export function usePrediction(featuresUrl, predictUrl) {
     setValues(prev => ({ ...prev, [key]: val }))
   }, [])
 
-  const predict = useCallback(async () => {
+  const predict = useCallback(async (mode = 'density') => {
     setLoading(true)
     setError(null)
     setResult(null)
@@ -88,7 +88,7 @@ export function usePrediction(featuresUrl, predictUrl) {
       })
       const data = await res.json()
       if (data.status === 'success') {
-        setResult(data)
+        setResult({ ...data, mode })
       } else {
         setError(data.error || 'Prediction failed.')
       }
@@ -115,11 +115,11 @@ export function usePrediction(featuresUrl, predictUrl) {
 // ─── Field Component ─────────────────────────────────────────────────────
 function FormField({ name, ranges, value, onChange, categoryLabel = 'Animals' }) {
   const meta = FIELD_META[name] || { name, desc: '', icon: '📌' }
-  const isDropdown = DROPDOWN_FEATURES.includes(name)
+  const isDropdown = DROPDOWN_FEATURES.includes(name) || !!ranges.options
   const isSlider = SLIDER_FEATURES.includes(name)
   const isInteger = INTEGER_FEATURES.includes(name)
   const span = Math.round(ranges.max - ranges.min)
-  const showDropdown = isDropdown && span > 0 && span <= 25
+  const showDropdown = isDropdown && (ranges.options || (span > 0 && span <= 200))
 
   let desc = meta.desc;
   let icon = meta.icon;
@@ -172,7 +172,9 @@ function FormField({ name, ranges, value, onChange, categoryLabel = 'Animals' })
           onChange={e => onChange(name, e.target.value)}
           style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: '#fff' }}
         >
-          {Array.from({ length: Math.round(ranges.max - ranges.min) + 1 }, (_, i) => {
+          {ranges.options ? ranges.options.map((opt, i) => (
+            <option key={i} value={i} style={{ background: '#1a2e20', color: '#fff' }}>{opt}</option>
+          )) : Array.from({ length: Math.round(ranges.max - ranges.min) + 1 }, (_, i) => {
             const v = Math.round(ranges.min) + i
             return <option key={v} value={v} style={{ background: '#1a2e20', color: '#fff' }}>{v}</option>
           })}
@@ -237,16 +239,24 @@ export function PredictionForm({ features, values, setValue, loading, fetchingFe
           />
         ))}
       </div>
-      <div className="form-actions">
+      <div className="form-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <button
           className="btn-predict"
-          onClick={onPredict}
+          onClick={() => onPredict('density')}
           disabled={loading}
-          style={accentColor ? { background: accentColor } : {}}
+          style={{ ...(accentColor ? { background: accentColor } : {}), flex: 1, minWidth: '200px' }}
         >
-          {loading ? '⏳ Analysing…' : '🔮 Predict Population Density'}
+          {loading ? '⏳ Analysing…' : '🔮 Predict Density'}
         </button>
-        <button className="btn-reset" onClick={onReset}>↺ Reset</button>
+        <button
+          className="btn-predict"
+          onClick={() => onPredict('trend')}
+          disabled={loading}
+          style={{ ...(accentColor ? { background: accentColor } : {}), flex: 1, minWidth: '200px' }}
+        >
+          {loading ? '⏳ Analysing…' : '📈 Classify Trend'}
+        </button>
+        <button className="btn-reset" onClick={onReset} style={{ flexBasis: '100%' }}>↺ Reset</button>
       </div>
     </>
   )

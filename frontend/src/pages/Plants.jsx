@@ -7,7 +7,7 @@ const config = {
   category: 'Phylum · Family · Locality · Season',
   featuresUrl: '/features/plants/',
   predictUrl: '/predict/plants/',
-  unit: 'plant observations per grid cell',
+  unit: 'plants per km²',
   accentColor: 'linear-gradient(135deg, #10b981, #059669)',
   quickLinks: [
     { to: '/plants/photos', label: 'Photo Gallery', icon: '📸' },
