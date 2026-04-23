@@ -99,6 +99,22 @@ export default function App() {
     return () => unsubscribe()
   }, [])
 
+  // ── Sync Document Title ──
+  useEffect(() => {
+    const path = location.pathname;
+    let title = "Koyna Wildlife Intelligence";
+    if (path === '/') title = "Dashboard | Koyna Intelligence";
+    else if (path === '/home') title = "Species Selection | Koyna Intelligence";
+    else if (path.includes('animals')) title = "Animals Prediction | Koyna";
+    else if (path.includes('birds')) title = "Birds Prediction | Koyna";
+    else if (path.includes('insects')) title = "Insects Prediction | Koyna";
+    else if (path.includes('plants')) title = "Plants Prediction | Koyna";
+    else if (path === '/auth') title = "Platform Access | Koyna";
+    else if (path === '/profile') title = "Your Profile | Koyna";
+    
+    document.title = title;
+  }, [location])
+
   const showNavbar = location.pathname !== '/auth'
 
   return (

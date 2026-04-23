@@ -401,13 +401,35 @@ input, select { font-family: 'Inter', sans-serif; }
 .back-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-  margin-bottom: 24px;
-  transition: var(--transition);
+  gap: 10px;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 32px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
-.back-link:hover { color: var(--green-300); }
+
+.back-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--green-400);
+  color: var(--green-400);
+  transform: translateX(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.back-link svg {
+  transition: transform 0.3s ease;
+}
+
+.back-link:hover svg {
+  transform: translateX(-3px);
+}
 
 /* Quick links row */
 .quick-links { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; }

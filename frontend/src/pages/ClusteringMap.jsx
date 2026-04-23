@@ -215,6 +215,15 @@ export default function ClusteringMap() {
     <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-black">
       {/* Sidebar */}
       <div className="w-[420px] flex flex-col glass-panel border-r border-white/5 z-20 overflow-hidden">
+        <div className="px-6 pt-6 pb-2">
+          <Link to="/" className="back-link !mb-4">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Back to Dashboard
+          </Link>
+        </div>
         <div className="p-6 border-b border-white/5 bg-black/20">
           <div className="flex items-center gap-3 mb-5">
             <span className="text-3xl"><DatasetIcon ds={category} /></span>

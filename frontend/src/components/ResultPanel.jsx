@@ -109,8 +109,25 @@ function EnvSimpleBars({ env }) {
 }
 
 // ─── Feature importance bar ───────────────────────────────────────────────
+const FEATURE_NAME_MAP = {
+  coordinateUncertaintyInMeters: 'Location Accuracy',
+  lat_grid: 'Geographic Latitude',
+  lon_grid: 'Geographic Longitude',
+  species_richness: 'Biodiversity Density',
+  phylum_enc: 'Phylum Taxonomy',
+  class_enc: 'Taxonomic Class',
+  order_enc: 'Taxonomic Order',
+  family_enc: 'Taxonomic Family',
+  taxonRank_enc: 'Classification Rank',
+  basisOfRecord_enc: 'Observational Basis',
+  season_enc: 'Seasonal Cycle',
+}
+
 function FeatureBar({ labels = [], values = [] }) {
-  const data = labels.map((l, i) => ({ name: l.replace(/_/g, ' '), value: values[i] || 0 }))
+  const data = labels.map((l, i) => ({ 
+    name: FEATURE_NAME_MAP[l] || l.replace(/_/g, ' '), 
+    value: values[i] || 0 
+  }))
   const COLORS = ['#43a047', '#4ecdc4', '#26c6da', '#fbbf24', '#f97316']
   return (
     <ResponsiveContainer width="100%" height={220}>
@@ -178,7 +195,8 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
           </>
         )}
         
-        {/* Action Buttons */}
+        {/* Action Buttons (Hidden for now) */}
+        {/*
         <div className="flex justify-center gap-4 mt-6">
           <button 
             onClick={() => {
@@ -218,6 +236,7 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
             Share Result
           </button>
         </div>
+        */}
       </div>
 
       {/* Env data cards */}

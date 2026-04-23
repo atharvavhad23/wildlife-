@@ -131,7 +131,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] w-full flex bg-[#050d06] overflow-hidden -mt-8">
+    <div className="h-screen w-full flex bg-[#050d06] overflow-hidden relative">
       {/* Left Decorative Panel (Hidden on Mobile) */}
       <div className="hidden lg:flex flex-1 relative items-center justify-center border-r border-white/5 overflow-hidden">
         {/* Animated Neon Blobs */}

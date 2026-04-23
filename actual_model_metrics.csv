@@ -1,0 +1,9 @@
+Model,Accuracy,F1_Score,R2_Score
+Density (Animals),63.45%,N/A,N/A
+Density (Birds),9055.11%,N/A,0.0580
+Density (Insects),8949.71%,N/A,0.7899
+Density (Plants),N/A,N/A,0.9276
+Occurrence (Animals),63.45%,N/A,N/A
+Occurrence (Birds),33.60%,N/A,N/A
+Occurrence (Insects),85.85%,N/A,N/A
+Occurrence (Plants),100.00%,N/A,N/A
