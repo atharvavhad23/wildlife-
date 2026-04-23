@@ -1,8 +1,52 @@
 import {
   ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
+  LineChart, Line, CartesianGrid
 } from 'recharts'
 import { motion } from 'framer-motion'
+
+function TrendGraph({ currentDensity, outlook, unit }) {
+  if (!outlook || typeof currentDensity === 'undefined') return null;
+
+  const data = [
+    { year: 'Current', density: Number(Number(currentDensity).toFixed(2)) },
+    { year: '+5 Years', density: Number(Number(outlook.projected_density_5yr).toFixed(2)) },
+    { year: '+10 Years', density: Number(Number(outlook.projected_density_10yr).toFixed(2)) },
+  ];
+
+  const trendColor = outlook.density_change_10yr_pct >= 0 ? '#10b981' : '#f87171';
+
+  return (
+    <div className="dash-card" style={{ marginTop: 24, maxWidth: 600, margin: '24px auto 0' }}>
+      <div className="dash-card-title">Population Projection Trend</div>
+      <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: 20 }}>
+        Visualized prediction of population density ({unit}) over the next decade.
+      </p>
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={data} margin={{ top: 10, right: 20, bottom: 5, left: -20 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+          <XAxis dataKey="year" tick={{ fill: '#a7d7a9', fontSize: 12 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: '#a7d7a9', fontSize: 12 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
+          <Tooltip 
+            cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }}
+            contentStyle={{ background: '#0d2818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
+            labelStyle={{ color: '#a7d7a9', marginBottom: 4 }}
+            itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+            formatter={(value) => [`${value}`, 'Density']}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="density" 
+            stroke={trendColor} 
+            strokeWidth={3}
+            dot={{ r: 5, fill: '#0d2818', stroke: trendColor, strokeWidth: 2 }}
+            activeDot={{ r: 7 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
 
 function TrendChip({ trend }) {
   if (!trend) return null
@@ -247,16 +291,15 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
               <TrendChip trend={trend} />
               <OccurrenceModelChip trend={trend} />
             </div>
-            {summary && (
-              <p style={{ marginTop: 16, color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: 520, margin: '16px auto 0' }}>
-                {summary}
-              </p>
-            )}
           </>
         )}
       </div>
 
-      <FutureOutlookSection outlook={future_outlook} unit={unit} />
+      {mode !== 'density' && (
+        <TrendGraph currentDensity={prediction} outlook={future_outlook} unit={unit} />
+      )}
+
+      {mode === 'density' && <FutureOutlookSection outlook={future_outlook} unit={unit} />}
 
       {/* Env data cards */}
       <div className="dashboard-grid" style={{ marginTop: 24 }}>
@@ -287,7 +330,7 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
         </div>
       </div>
 
-      {env && Object.keys(env).length > 0 && (
+      {mode === 'density' && env && Object.keys(env).length > 0 && (
         <>
           <div className="section-heading" style={{ marginTop: 28 }}>
             🌍 Environmental Context
@@ -311,7 +354,7 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
       )}
 
       {/* Charts row */}
-      {env && (
+      {mode === 'density' && env && (
         <div className="dashboard-grid" style={{ marginTop: 28 }}>
           <div className="dash-card">
             <div className="dash-card-title">Environmental Snapshot (Easy View)</div>
@@ -335,7 +378,7 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
         </div>
       )}
 
-      {result?.feature_importance?.labels?.length > 0 && (
+      {mode === 'density' && result?.feature_importance?.labels?.length > 0 && (
         <div className="dashboard-grid" style={{ marginTop: 18 }}>
           <div className="dash-card">
             <div className="dash-card-title">Top Drivers (Feature Importance)</div>

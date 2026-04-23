@@ -431,6 +431,12 @@ def _predict_animals_from_payload(payload: dict) -> dict:
     lat, lon = _extract_animals_lat_lon(payload)
     env_data = get_environmental_data(lat, lon)
 
+    # Override env_data with user manual inputs so UI and Decision Engine reflect them
+    for key in ['temperature', 'humidity', 'rainfall', 'vegetation_index', 'water_availability', 'human_disturbance']:
+        user_val = _safe_float(payload.get(key))
+        if user_val is not None:
+            env_data[key] = user_val
+
     model_input = {}
     if hasattr(animals_scaler, 'feature_names_in_'):
         orig_features = list(animals_scaler.feature_names_in_)
@@ -470,7 +476,6 @@ def _predict_animals_from_payload(payload: dict) -> dict:
         return max(0.0, max(baseline, pred))
 
     current_density = _get_density(model_input)
-    decision = analyze_prediction(current_density, env_data)
     current_trend = _predict_occurrence_trend('animals', model_input) or analyze_trend(current_density)
 
     # Future Outlook Predictions (+5 Years and +10 Years)
@@ -491,23 +496,23 @@ def _predict_animals_from_payload(payload: dict) -> dict:
     
     is_endangered = False
     risk_level = "Low"
-    warning_message = None
+    warning_message = "STABLE: Population projected to remain stable or grow."
 
-    if density_change_10yr <= -30.0 or (trend_10yr and trend_10yr.get('trend') == 'Decreasing'):
+    if density_change_10yr <= -30.0:
         is_endangered = True
         risk_level = "High"
-        warning_message = f"CRITICAL: Model projects a severe {-density_change_10yr:.1f}% population drop over the next decade. Immediate conservation required."
+        warning_message = f"CRITICAL: Density model projects a severe {-density_change_10yr:.1f}% population drop over the next decade. Immediate conservation required."
     elif density_change_10yr <= -10.0:
         risk_level = "Medium"
-        warning_message = "WARNING: Model projects a declining population trend. Habitat monitoring recommended."
-    else:
-        warning_message = "STABLE: Population projected to remain stable or grow."
+        warning_message = f"WARNING: Model projects a {-density_change_10yr:.1f}% declining population trend. Habitat monitoring recommended."
 
+    decision = analyze_prediction(current_density, env_data, is_endangered=is_endangered)
+    
     future_outlook = {
         'projected_density_5yr': round(density_5yr, 2),
         'projected_density_10yr': round(density_10yr, 2),
-        'projected_trend_5yr': trend_5yr.get('trend', 'Stable') if trend_5yr else 'Stable',
-        'projected_trend_10yr': trend_10yr.get('trend', 'Stable') if trend_10yr else 'Stable',
+        'projected_trend_5yr': 'Decreasing' if density_5yr < current_density * 0.99 else 'Increasing' if density_5yr > current_density * 1.01 else 'Stable',
+        'projected_trend_10yr': 'Decreasing' if density_10yr < current_density * 0.99 else 'Increasing' if density_10yr > current_density * 1.01 else 'Stable',
         'density_change_10yr_pct': round(density_change_10yr, 2),
         'endangered_risk': {
             'is_endangered': is_endangered,
@@ -589,26 +594,43 @@ def _predict_birds_from_payload(payload: dict) -> dict:
     t10 = _predict_occurrence_trend('birds', p10)
 
     d_change = ((d10 - current_density) / max(current_density, 0.001)) * 100
-    is_e = d_change <= -30.0 or (t10 and t10.get('trend') == 'Decreasing')
-    rl = "High" if is_e else "Medium" if d_change <= -10.0 else "Low"
+    
+    is_e = False
+    rl = "Low"
+    msg = "Population projected to remain stable or grow."
+    
+    if d_change <= -30.0:
+        is_e = True
+        rl = "High"
+        msg = f"CRITICAL: Density model projects a severe {-d_change:.1f}% population drop over 10 years."
+    elif d_change <= -10.0:
+        rl = "Medium"
+        msg = f"WARNING: Model projects a {-d_change:.1f}% declining population trend."
 
     future_outlook = {
         'projected_density_5yr': round(d5, 2),
         'projected_density_10yr': round(d10, 2),
-        'projected_trend_5yr': t5.get('trend', 'Stable') if t5 else 'Stable',
-        'projected_trend_10yr': t10.get('trend', 'Stable') if t10 else 'Stable',
+        'projected_trend_5yr': 'Decreasing' if d5 < current_density * 0.99 else 'Increasing' if d5 > current_density * 1.01 else 'Stable',
+        'projected_trend_10yr': 'Decreasing' if d10 < current_density * 0.99 else 'Increasing' if d10 > current_density * 1.01 else 'Stable',
         'density_change_10yr_pct': round(d_change, 2),
         'endangered_risk': {
             'is_endangered': is_e,
             'risk_level': rl,
-            'warning_message': f"Model projects a {abs(d_change):.1f}% change over 10 years."
+            'warning_message': msg
         }
     }
 
     lat = _safe_float(payload.get('lat_grid', 17.5))
     lon = _safe_float(payload.get('lon_grid', 73.5))
     env_data = get_environmental_data(lat, lon)
-    decision = analyze_prediction(current_density, env_data)
+    
+    # Override env_data with user manual inputs so UI and Decision Engine reflect them
+    for key in ['temperature', 'humidity', 'rainfall', 'vegetation_index', 'water_availability', 'human_disturbance']:
+        user_val = _safe_float(payload.get(key))
+        if user_val is not None:
+            env_data[key] = user_val
+            
+    decision = analyze_prediction(current_density, env_data, is_endangered=is_e)
     trend = _predict_occurrence_trend('birds', payload) or analyze_trend(current_density)
 
     return {
@@ -675,24 +697,41 @@ def _predict_insects_from_payload(payload: dict) -> dict:
     t5, t10 = _predict_occurrence_trend('insects', p5), _predict_occurrence_trend('insects', p10)
 
     d_change = ((d10 - current_density) / max(current_density, 0.001)) * 100
-    is_e = d_change <= -30.0 or (t10 and t10.get('trend') == 'Decreasing')
-    rl = "High" if is_e else "Medium" if d_change <= -10.0 else "Low"
+    
+    is_e = False
+    rl = "Low"
+    msg = "Population projected to remain stable or grow."
+    
+    if d_change <= -30.0:
+        is_e = True
+        rl = "High"
+        msg = f"CRITICAL: Density model projects a severe {-d_change:.1f}% population drop over 10 years."
+    elif d_change <= -10.0:
+        rl = "Medium"
+        msg = f"WARNING: Model projects a {-d_change:.1f}% declining population trend."
 
     future_outlook = {
         'projected_density_5yr': round(d5, 2), 'projected_density_10yr': round(d10, 2),
-        'projected_trend_5yr': t5.get('trend', 'Stable') if t5 else 'Stable',
-        'projected_trend_10yr': t10.get('trend', 'Stable') if t10 else 'Stable',
+        'projected_trend_5yr': 'Decreasing' if d5 < current_density * 0.99 else 'Increasing' if d5 > current_density * 1.01 else 'Stable',
+        'projected_trend_10yr': 'Decreasing' if d10 < current_density * 0.99 else 'Increasing' if d10 > current_density * 1.01 else 'Stable',
         'density_change_10yr_pct': round(d_change, 2),
         'endangered_risk': {
             'is_endangered': is_e, 'risk_level': rl,
-            'warning_message': f"Model projects a {abs(d_change):.1f}% change in insect population."
+            'warning_message': msg
         }
     }
 
     lat = _safe_float(payload.get('lat_grid', 17.5))
     lon = _safe_float(payload.get('lon_grid', 73.5))
     env_data = get_environmental_data(lat, lon)
-    decision = analyze_prediction(current_density, env_data)
+    
+    # Override env_data with user manual inputs so UI and Decision Engine reflect them
+    for key in ['temperature', 'humidity', 'rainfall', 'vegetation_index', 'water_availability', 'human_disturbance']:
+        user_val = _safe_float(payload.get(key))
+        if user_val is not None:
+            env_data[key] = user_val
+            
+    decision = analyze_prediction(current_density, env_data, is_endangered=is_e)
     trend = _predict_occurrence_trend('insects', payload) or analyze_trend(current_density)
 
     return {
@@ -1868,17 +1907,27 @@ def _predict_plants_from_payload(payload: dict) -> dict:
     t5, t10 = _predict_occurrence_trend('plants', p5), _predict_occurrence_trend('plants', p10)
 
     d_change = ((d10 - current_density) / max(current_density, 0.001)) * 100
-    is_e = d_change <= -30.0 or (t10 and t10.get('trend') == 'Decreasing')
-    rl = "High" if is_e else "Medium" if d_change <= -10.0 else "Low"
+    
+    is_e = False
+    rl = "Low"
+    msg = "Population projected to remain stable or grow."
+    
+    if d_change <= -30.0:
+        is_e = True
+        rl = "High"
+        msg = f"CRITICAL: Density model projects a severe {-d_change:.1f}% population drop over 10 years."
+    elif d_change <= -10.0:
+        rl = "Medium"
+        msg = f"WARNING: Model projects a {-d_change:.1f}% declining population trend."
 
     future_outlook = {
         'projected_density_5yr': round(d5, 2), 'projected_density_10yr': round(d10, 2),
-        'projected_trend_5yr': t5.get('trend', 'Stable') if t5 else 'Stable',
-        'projected_trend_10yr': t10.get('trend', 'Stable') if t10 else 'Stable',
+        'projected_trend_5yr': 'Decreasing' if d5 < current_density * 0.99 else 'Increasing' if d5 > current_density * 1.01 else 'Stable',
+        'projected_trend_10yr': 'Decreasing' if d10 < current_density * 0.99 else 'Increasing' if d10 > current_density * 1.01 else 'Stable',
         'density_change_10yr_pct': round(d_change, 2),
         'endangered_risk': {
             'is_endangered': is_e, 'risk_level': rl,
-            'warning_message': f"Model projects a {abs(d_change):.1f}% change in botanical density."
+            'warning_message': msg
         }
     }
 

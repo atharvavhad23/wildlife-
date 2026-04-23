@@ -1,9 +1,9 @@
 Feature,Importance
-year,0.15571775
-species_richness,0.1530931
-season_enc,0.147182
-lat_grid,0.14142902
-month,0.14126673
-decade,0.11833898
-lon_grid,0.11770728
-basisOfRecord_enc,0.025265176
+year,0.16282701
+species_richness,0.1537967
+season_enc,0.15151983
+month,0.14471301
+lat_grid,0.14013475
+lon_grid,0.114965074
+decade,0.10420125
+basisOfRecord_enc,0.027842361

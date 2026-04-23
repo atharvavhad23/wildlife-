@@ -127,6 +127,9 @@ export default function Auth() {
       setError('Email and password are required.')
       return
     }
+
+    const normalizedEmail = email.trim().toLowerCase()
+
     if (!isValidEmail(normalizedEmail)) {
       setError('Please enter a valid email address.')
       return
