@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   AreaChart, Area, ResponsiveContainer
 } from 'recharts'
@@ -144,6 +144,7 @@ function ClusterDetailView({ id, details, category, timeline, loading, photos, l
 
 export default function ClusteringMap() {
   const location = useLocation()
+  const navigate = useNavigate()
   const initialCategory = location.pathname.split('/')[1] || 'animals'
 
   const [category, setCategory] = useState(initialCategory)
@@ -270,12 +271,12 @@ export default function ClusteringMap() {
       <div className="w-[380px] xl:w-[420px] flex flex-col glass-panel border-r border-white/5 z-20 overflow-hidden flex-shrink-0">
         {/* Sidebar header */}
         <div className="p-5 border-b border-white/5 bg-black/20">
-          <Link to="/" className="back-link !mb-5">
+          <button onClick={() => navigate(-1)} className="back-link !mb-5 border-none bg-transparent cursor-pointer">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
             </svg>
-            Dashboard
-          </Link>
+            Back
+          </button>
 
           <div className="flex items-center gap-3 mb-5">
             <span className="text-3xl"><DatasetIcon ds={category} /></span>

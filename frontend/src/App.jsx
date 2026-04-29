@@ -14,6 +14,9 @@ import Dashboard from './pages/Dashboard'
 import Plants from './pages/Plants'
 import Auth from './pages/Auth'
 import Profile from './pages/Profile'
+import PredictHub from './pages/PredictHub'
+import AboutUs from './pages/AboutUs'
+import FAQ from './pages/FAQ'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import ToastContainer from './components/Toast'
@@ -33,12 +36,12 @@ function NotFound() {
       <div>
         <h2 className="text-2xl font-bold text-white/60 mb-3">Page not found</h2>
         <p className="text-white/30 text-sm mb-6">The page you're looking for doesn't exist.</p>
-        <a
-          href="/"
+        <Link
+          to="/"
           className="inline-flex items-center gap-2 px-6 py-3 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-xl border border-green-500/30 font-semibold text-sm transition-all"
         >
-          ← Back to Dashboard
-        </a>
+          ← Back to Home
+        </Link>
       </div>
     </div>
   )
@@ -64,9 +67,11 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/auth" element={user ? <Navigate to="/" replace /> : withTransition(Auth)} />
-        <Route path="/" element={withAuth(Dashboard)} />
-        <Route path="/home" element={withAuth(Home)} />
+        <Route path="/" element={withTransition(Home)} />
+        <Route path="/about" element={withTransition(AboutUs)} />
+        <Route path="/faq" element={withTransition(FAQ)} />
         <Route path="/dashboard" element={withAuth(Dashboard)} />
+        <Route path="/models" element={withAuth(PredictHub)} />
         <Route path="/animals" element={withAuth(Animals)} />
         <Route path="/birds" element={withAuth(Birds)} />
         <Route path="/insects" element={withAuth(Insects)} />
@@ -81,7 +86,7 @@ function AnimatedRoutes() {
         <Route path="/plants/clustering" element={withAuth(ClusteringMap)} />
         <Route path="/plants/species" element={withAuth(SpeciesDetail)} />
         <Route path="/profile" element={withAuth(Profile)} />
-        <Route path="*" element={withAuth(NotFound)} />
+        <Route path="*" element={withTransition(NotFound)} />
       </Routes>
     </AnimatePresence>
   )

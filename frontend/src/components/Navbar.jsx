@@ -1,16 +1,28 @@
 import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { 
+  Home, 
+  Target, 
+  BarChart3, 
+  Info, 
+  HelpCircle, 
+  User, 
+  LogOut, 
+  Leaf, 
+  ChevronRight,
+  Menu,
+  X
+} from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
 const NAV_ITEMS = [
-  { to: '/home',    label: 'Home',      icon: '🏠' },
-  { to: '/',        label: 'Dashboard', icon: '📊', end: true },
-  { to: '/animals', label: 'Animals',   icon: '🦁' },
-  { to: '/birds',   label: 'Birds',     icon: '🦅' },
-  { to: '/insects', label: 'Insects',   icon: '🦋' },
-  { to: '/plants',  label: 'Plants',    icon: '🌿' },
+  { to: '/',        label: 'Home',      icon: Home, end: true },
+  { to: '/models',   label: 'Predict',   icon: Target },
+  { to: '/dashboard', label: 'Analytics', icon: BarChart3 },
+  { to: '/about',    label: 'About',     icon: Info },
+  { to: '/faq',      label: 'FAQ',       icon: HelpCircle },
 ]
 
 function UserDropdown({ user, onLogout, onClose }) {
@@ -61,7 +73,7 @@ function UserDropdown({ user, onLogout, onClose }) {
           onClick={onClose}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/5 transition-all"
         >
-          <span className="text-base">👤</span> View Profile
+          <User size={16} /> View Profile
         </NavLink>
       </div>
 
@@ -71,9 +83,7 @@ function UserDropdown({ user, onLogout, onClose }) {
           onClick={onLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all text-left"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
+          <LogOut size={16} />
           Sign out
         </button>
       </div>
@@ -118,27 +128,29 @@ export default function Navbar() {
         style={{ height: 'var(--navbar-h)' }}
       >
         {/* Brand */}
-        <NavLink to="/" className="navbar-brand gap-2">
-          <span className="brand-emoji">🌿</span>
-          <span className="hidden sm:inline">Wildlife Intelligence</span>
+        <NavLink to="/" className="navbar-brand gap-2 flex items-center">
+          <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400 border border-green-500/20">
+            <Leaf size={18} strokeWidth={2.5} />
+          </div>
+          <span className="hidden sm:inline font-bold tracking-tight">Wildlife Intelligence</span>
           <span className="inline sm:hidden font-bold">Koyna</span>
-          <span className="text-[10px] font-normal text-white/30 hidden md:inline">Koyna WLS</span>
+          <span className="text-[10px] font-normal text-white/30 hidden md:inline ml-1">Koyna WLS</span>
         </NavLink>
 
         {/* Desktop nav links */}
         <div className="navbar-links hidden md:flex">
-          {NAV_ITEMS.map(({ to, label, icon, end }) => (
+          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
               end={end}
               className={({ isActive }) =>
-                `nav-link relative group${isActive ? ' active' : ''}`
+                `nav-link relative group flex items-center gap-2${isActive ? ' active' : ''}`
               }
             >
               {({ isActive }) => (
                 <>
-                  <span className="nav-icon">{icon}</span>
+                  <Icon size={16} className={`transition-colors ${isActive ? 'text-green-400' : 'text-white/40 group-hover:text-white'}`} />
                   {label}
                   {isActive && (
                     <motion.span
@@ -180,26 +192,12 @@ export default function Navbar() {
 
           {/* Hamburger (mobile) */}
           <button
-            className="md:hidden flex flex-col justify-center items-center w-10 h-10 gap-1.5 rounded-xl hover:bg-white/5 transition-colors"
+            className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl hover:bg-white/5 transition-colors text-white/70"
             onClick={() => setMobileOpen(v => !v)}
             aria-label="Toggle navigation"
             aria-expanded={mobileOpen}
           >
-            <motion.span
-              animate={mobileOpen ? { rotate: 45, y: 7 } : { rotate: 0, y: 0 }}
-              className="block w-5 h-0.5 bg-white/70 rounded-full origin-center"
-              transition={{ duration: 0.2 }}
-            />
-            <motion.span
-              animate={mobileOpen ? { opacity: 0, scaleX: 0 } : { opacity: 1, scaleX: 1 }}
-              className="block w-5 h-0.5 bg-white/70 rounded-full"
-              transition={{ duration: 0.2 }}
-            />
-            <motion.span
-              animate={mobileOpen ? { rotate: -45, y: -7 } : { rotate: 0, y: 0 }}
-              className="block w-5 h-0.5 bg-white/70 rounded-full origin-center"
-              transition={{ duration: 0.2 }}
-            />
+            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </nav>
@@ -216,7 +214,7 @@ export default function Navbar() {
             className="md:hidden fixed top-[64px] left-0 right-0 z-[90] bg-[#0a1a0e]/97 backdrop-blur-xl border-b border-white/10 shadow-2xl"
           >
             <div className="flex flex-col p-4 gap-1">
-              {NAV_ITEMS.map(({ to, label, icon, end }) => (
+              {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -230,7 +228,7 @@ export default function Navbar() {
                     }`
                   }
                 >
-                  <span className="text-lg">{icon}</span>
+                  <Icon size={18} />
                   {label}
                 </NavLink>
               ))}

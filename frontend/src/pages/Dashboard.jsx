@@ -5,16 +5,17 @@ import {
   PieChart, Pie, Cell
 } from 'recharts'
 import { motion } from 'framer-motion'
+import { AlertTriangle, PawPrint, Bird, Bug, Leaf, TrendingUp } from 'lucide-react'
 import { SkeletonCard, SkeletonStat, SkeletonRow } from '../components/Skeleton'
 import { useToast } from '../context/ToastContext'
 
 const COLORS = ['#34d399', '#4cc9f0', '#f72585', '#fbbf24', '#f97316', '#a78bfa']
 
 const DS_META = {
-  animals: { icon: '🐾', color: '#34d399' },
-  birds:   { icon: '🦅', color: '#4cc9f0' },
-  insects: { icon: '🦋', color: '#f72585' },
-  plants:  { icon: '🌿', color: '#fbbf24' },
+  animals: { icon: PawPrint, color: '#34d399' },
+  birds:   { icon: Bird, color: '#4cc9f0' },
+  insects: { icon: Bug, color: '#f72585' },
+  plants:  { icon: Leaf, color: '#fbbf24' },
 }
 
 const stagger = {
@@ -26,13 +27,13 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100, damping: 18 } },
 }
 
-function DatasetCard({ dsKey, stats, color, icon }) {
+function DatasetCard({ dsKey, stats, color, Icon }) {
   if (!stats) return <SkeletonCard />
   return (
     <motion.div variants={fadeUp}>
       <Link to={`/${dsKey}/clustering`} className="glass-card p-6 hover:-translate-y-1 transition-all block group">
         <div className="flex items-center justify-between mb-4">
-          <span className="text-4xl group-hover:scale-110 transition-transform duration-300">{icon}</span>
+          <span className="text-4xl group-hover:scale-110 transition-transform duration-300"><Icon size={40} style={{ color }} /></span>
           <div className="text-right">
             <h3 className="text-xl font-bold uppercase tracking-tight" style={{ color }}>{dsKey}</h3>
             <p className="text-xs text-muted">Koyna WLS Dataset</p>
@@ -67,60 +68,84 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState([])
   const [observers, setObservers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [switching, setSwitching] = useState(false)
   const [activeDs, setActiveDs] = useState('animals')
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
+  const fetchGlobalStats = useCallback(async () => {
     try {
-      const [statsRes, seasonalRes, alertsRes, observersRes] = await Promise.all([
-        fetch('/api/dashboard-stats/'),
+      const res = await fetch('/api/dashboard-stats/')
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setStatsData(data)
+    } catch (e) {
+      console.error('Global stats error:', e)
+      toast.error('Failed to load sanctuary stats')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const fetchCategoryData = useCallback(async () => {
+    setSwitching(true)
+    try {
+      const [seasonalRes, alertsRes, observersRes] = await Promise.all([
         fetch(`/api/seasonal-activity/?dataset=${activeDs}`),
         fetch(`/api/conservation-alerts/?dataset=${activeDs}`),
         fetch(`/api/top-observers/?dataset=${activeDs}`),
       ])
-
-      if (!statsRes.ok || !seasonalRes.ok || !alertsRes.ok || !observersRes.ok)
-        throw new Error('One or more dashboard API calls failed')
-
-      const stats = await statsRes.json()
       const seasonalData = await seasonalRes.json()
       const alertsData = await alertsRes.json()
       const observersData = await observersRes.json()
-
-      if (stats.error) throw new Error(stats.error)
-
-      setStatsData(stats)
+      
       setSeasonal(seasonalData.seasonal || [])
       setAlerts(alertsData.alerts || [])
       setObservers(observersData.observers || [])
     } catch (e) {
-      console.error('Dashboard error:', e)
-      toast.error('Failed to load dashboard data')
+      console.error('Category data error:', e)
     } finally {
-      setLoading(false)
+      setSwitching(false)
     }
   }, [activeDs])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { fetchGlobalStats() }, [fetchGlobalStats])
+  useEffect(() => { fetchCategoryData() }, [fetchCategoryData])
+
+  const fetchData = () => {
+    setLoading(true)
+    Promise.all([fetchGlobalStats(), fetchCategoryData()]).finally(() => setLoading(false))
+  }
 
   const data = statsData?.datasets || {}
   const totalRecords = statsData?.totalRecords || 0
   const totalSpecies = Object.values(data).reduce((acc, curr) => acc + (curr.species || 0), 0)
   const totalObservers = statsData?.totalObservers || 0
+  const totalAlerts = statsData?.totalAlerts || 0
 
-  // Compute real biodiversity health index
-  const healthIndex = alerts.length > 0
-    ? Math.max(0, Math.min(100, Math.round(100 - (alerts.length / Math.max(totalSpecies, 1)) * 500)))
-    : 85
+  const healthIndex = totalAlerts > 0
+    ? Math.max(0, Math.min(100, Math.round(100 - (totalAlerts / Math.max(totalSpecies, 1)) * 500)))
+    : 92
   const healthDash = 283 - (283 * healthIndex / 100)
   const healthColor = healthIndex >= 70 ? '#34d399' : healthIndex >= 40 ? '#fbbf24' : '#f87171'
   const healthLabel = healthIndex >= 70 ? 'Stable Ecosystem' : healthIndex >= 40 ? 'Moderate Risk' : 'Critical Risk'
 
   const dsColor = activeDs === 'animals' ? '#34d399' : activeDs === 'birds' ? '#4cc9f0' : activeDs === 'insects' ? '#f72585' : '#fbbf24'
 
+  const handleExport = () => {
+    if (!statsData) return
+    const dataStr = JSON.stringify(statsData, null, 2)
+    const blob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `koyna-wildlife-intelligence-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast.success('Intelligence report exported successfully')
+  }
+
   return (
     <div className="page-wrapper pt-8">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
         <div>
           <h1 className="text-4xl mb-2 font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-teal-400">
@@ -142,23 +167,29 @@ export default function Dashboard() {
             </svg>
             Refresh
           </button>
-          <a
-            href="/api/dashboard-stats/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-400 hover:to-teal-400 rounded-lg text-xs font-extrabold uppercase tracking-wider text-white shadow-lg shadow-green-500/20 transition-all active:scale-95"
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold uppercase tracking-wider text-white border border-white/10 transition-all active:scale-95 hide-on-print"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print Report
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={loading || !statsData}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-400 hover:to-teal-400 rounded-lg text-xs font-extrabold uppercase tracking-wider text-white shadow-lg shadow-green-500/20 transition-all active:scale-95 disabled:opacity-50"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            Export JSON
-          </a>
+            Export Data
+          </button>
         </div>
       </div>
 
-      {/* KPI row */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-10">
-        {/* Health Index */}
         <div className="glass-card p-6 md:col-span-2 flex flex-col items-center justify-center relative overflow-hidden group">
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <h3 className="text-xs font-bold text-muted uppercase tracking-widest mb-4 z-10">Biodiversity Health Index</h3>
@@ -191,7 +222,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="md:col-span-4 grid grid-cols-2 gap-4">
           {loading ? (
             Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)
@@ -199,7 +229,7 @@ export default function Dashboard() {
             [
               { label: 'Total Observations', value: totalRecords.toLocaleString(), color: '#34d399', icon: '🌍' },
               { label: 'Identified Species', value: totalSpecies.toLocaleString(), color: '#4cc9f0', icon: '🧬' },
-              { label: 'Declining Species', value: alerts.length, color: '#ff6b6b', icon: '🚨' },
+              { label: 'Declining Species', value: totalAlerts, color: '#ff6b6b', icon: '🚨' },
               { label: 'Unique Observers', value: totalObservers.toLocaleString(), color: '#fbbf24', icon: '👥' },
             ].map(s => (
               <div key={s.label} className="glass-card p-6 flex flex-col justify-center relative overflow-hidden group">
@@ -212,7 +242,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Dataset Grid */}
       <motion.div
         className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12"
         variants={stagger}
@@ -220,17 +249,15 @@ export default function Dashboard() {
         animate="visible"
       >
         {Object.entries(DS_META).map(([key, { icon, color }]) => (
-          <DatasetCard key={key} dsKey={key} stats={data[key]} color={color} icon={icon} />
+          <DatasetCard key={key} dsKey={key} stats={data[key]} color={color} Icon={icon} />
         ))}
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Charts column */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Seasonal area chart */}
           <div className="glass-card p-8">
             <div className="flex items-center justify-between mb-8">
-              <h3 className="section-heading !border-0 !mb-0 !p-0">🌡️ Seasonal Observation Trends</h3>
+              <h3 className="section-heading !border-0 !mb-0 !p-0 flex items-center gap-2"><TrendingUp size={20} /> Seasonal Observation Trends</h3>
               <div className="flex gap-2">
                 {['animals', 'birds', 'insects', 'plants'].map(ds => (
                   <button
@@ -244,7 +271,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="h-[300px] w-full">
-              {loading ? (
+              {loading || switching ? (
                 <div className="h-full skeleton-pulse rounded-xl" />
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -274,7 +301,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="glass-card p-6">
               <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-6">🏆 Top Contributors</h3>
-              {loading
+              {loading || switching
                 ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
                 : (
                   <div className="space-y-4">
@@ -294,7 +321,7 @@ export default function Dashboard() {
 
             <div className="glass-card p-6">
               <h3 className="text-sm font-bold text-muted uppercase tracking-wider mb-6">🧬 Taxonomic Groups</h3>
-              {loading ? (
+              {loading || switching ? (
                 <div className="h-[200px] skeleton-pulse rounded-xl" />
               ) : (
                 <div className="h-[200px]">
@@ -321,17 +348,23 @@ export default function Dashboard() {
         <div className="space-y-8">
           <div className="glass-card p-6 border-l-4 border-l-red-500/50">
             <div className="flex items-center gap-3 mb-6">
-              <span className="text-2xl">🚨</span>
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500">
+                <AlertTriangle size={20} />
+              </div>
               <h3 className="text-sm font-bold text-muted uppercase tracking-wider">Conservation Alerts</h3>
             </div>
-            {loading ? (
+            {loading || switching ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)}
               </div>
             ) : (
               <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                {alerts.length > 0 ? alerts.slice(0, 10).map(a => (
-                  <div key={a.species} className="p-4 bg-white/5 rounded-xl border border-white/5 hover:border-red-500/30 transition-all group">
+                {alerts.length > 0 ? alerts.map(a => (
+                  <Link
+                    key={a.species}
+                    to={`/${activeDs}/species?species=${encodeURIComponent(a.species)}`}
+                    className="block p-4 bg-white/5 rounded-xl border border-white/5 hover:border-red-500/30 transition-all group"
+                  >
                     <div className="flex justify-between items-start mb-2">
                       <div className="text-sm font-bold italic text-primary group-hover:text-red-400 transition-colors">{a.species}</div>
                       <div className="text-xs font-bold text-red-500">-{a.dropPercent}%</div>
@@ -343,7 +376,7 @@ export default function Dashboard() {
                       </div>
                       <span className="text-[10px] text-muted">{a.recentObs} obs</span>
                     </div>
-                  </div>
+                  </Link>
                 )) : (
                   <div className="text-center py-12 text-muted text-sm italic">No active conservation alerts for this group.</div>
                 )}

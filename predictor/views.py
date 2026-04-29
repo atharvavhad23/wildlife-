@@ -1441,8 +1441,8 @@ def _build_insects_engineered_features(df_base: pd.DataFrame) -> pd.DataFrame:
 
 
 def index(request):
-    """Render the home page with both options"""
-    return render(request, 'home.html')
+    """Render the main React SPA entry point"""
+    return render(request, 'index.html')
 
 
 def animals_prediction(request):
@@ -3030,7 +3030,7 @@ def get_conservation_alerts(request):
                     'severity': 'critical' if drop_pct >= 70 else 'high' if drop_pct >= 50 else 'medium',
                 })
         alerts.sort(key=lambda x: x['dropPercent'], reverse=True)
-        return JsonResponse({'alerts': alerts[:30], 'total': len(alerts), 'dataset': ds})
+        return JsonResponse({'alerts': alerts, 'total': len(alerts), 'dataset': ds})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
 
@@ -3067,12 +3067,24 @@ def get_dashboard_stats(request):
     try:
         out = {}
         all_observers = set()
+        total_alerts = 0
         for ds in ('animals', 'birds', 'insects', 'plants'):
             df = _load_category_data(ds)
             if df.empty:
-                out[ds] = {'total': 0, 'species': 0, 'families': 0, 'yearMin': 0, 'yearMax': 0}
+                out[ds] = {'total': 0, 'species': 0, 'families': 0, 'yearMin': 0, 'yearMax': 0, 'alertsCount': 0}
                 continue
             
+            # Count alerts for this dataset
+            ds_alerts_count = 0
+            if 'year' in df.columns and 'scientificName' in df.columns:
+                for _, rows in df.groupby('scientificName'):
+                    if len(rows) < 5: continue
+                    recent = len(rows[rows['year'] >= 2020])
+                    prior  = len(rows[(rows['year'] >= 2015) & (rows['year'] < 2020)])
+                    if prior >= 3 and recent < prior * 0.4:
+                        ds_alerts_count += 1
+            total_alerts += ds_alerts_count
+
             sp = int(df['scientificName'].nunique()) if 'scientificName' in df.columns else 0
             fam = int(df['family'].nunique()) if 'family' in df.columns else 0
             ym = int(df['year'].min()) if 'year' in df.columns and not df['year'].isna().all() else 0
@@ -3097,12 +3109,14 @@ def get_dashboard_stats(request):
                 'total': len(df), 'species': sp, 'families': fam,
                 'yearMin': ym, 'yearMax': yM, 'topLocality': top_loc,
                 'classBreakdown': cb,
+                'alertsCount': ds_alerts_count,
             }
             
         return JsonResponse({
             'datasets': out, 
             'totalRecords': sum(v['total'] for v in out.values()),
-            'totalObservers': len(all_observers)
+            'totalObservers': len(all_observers),
+            'totalAlerts': total_alerts,
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)

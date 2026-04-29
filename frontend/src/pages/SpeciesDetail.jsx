@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { SkeletonPhoto } from '../components/Skeleton'
 
@@ -68,6 +68,7 @@ function PhotoCard({ photo }) {
 
 export default function SpeciesDetail() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const species = (searchParams.get('species') || '').trim()
 
   const [detail, setDetail] = useState(null)
@@ -150,12 +151,12 @@ export default function SpeciesDetail() {
   return (
     <div className="page-wrapper pb-20">
       {/* Back */}
-      <Link to={`/${category}/clustering`} className="back-link mt-6 inline-flex">
+      <button onClick={() => navigate(-1)} className="back-link mt-6 inline-flex border-none bg-transparent cursor-pointer">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
         </svg>
-        Back to Clustering Map
-      </Link>
+        Back
+      </button>
 
       {/* Species header */}
       <div className="pt-6 pb-8">

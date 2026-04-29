@@ -817,3 +817,54 @@ input[type="range"]::-webkit-slider-thumb {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255,255,255,0.2);
 }
+/* ── Print Styles ────────────────────────────────────────── */
+@media print {
+  .navbar, .hide-on-print, .footer, .btn-dashboard, .load-more-btn, button, .back-link {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+    color: #111 !important;
+    padding: 0 !important;
+  }
+
+  .page-wrapper {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .glass-card {
+    background: white !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    color: #111 !important;
+    backdrop-filter: none !important;
+    page-break-inside: avoid;
+    margin-bottom: 20px !important;
+  }
+
+  .text-primary, .text-secondary, .text-muted, h1, h2, h3, h4, .text-transparent {
+    color: #111 !important;
+    background: none !important;
+    -webkit-text-fill-color: #111 !important;
+  }
+
+  .section-heading {
+    border-bottom: 2px solid #eee !important;
+    color: #111 !important;
+  }
+
+  /* Ensure charts are visible but simple */
+  .recharts-cartesian-grid-horizontal line,
+  .recharts-cartesian-grid-vertical line {
+    stroke: #eee !important;
+  }
+
+  /* Force background colors for bars/progress if needed */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

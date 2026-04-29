@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path
 from predictor import views
 # Trigger reload
 
@@ -65,4 +65,7 @@ urlpatterns = [
     path('api/dashboard-stats/',      views.get_dashboard_stats,      name='dashboard_stats_api'),
     # Wildlife Intelligence Dashboard
     path('wildlife/dashboard/',       views.wildlife_dashboard,       name='wildlife_dashboard'),
+
+    # Catch-all for SPA routes (MUST be last)
+    re_path(r'^.*$', views.index, name='index'),
 ]
