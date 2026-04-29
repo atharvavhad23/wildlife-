@@ -11,8 +11,9 @@ const cards = [
     btnText: 'Predict Animal Density →',
     to: '/animals',
     color: 'from-red-500 to-rose-400',
+    topBar: 'from-red-400 to-rose-400',
     shadow: 'shadow-[0_0_20px_rgba(239,68,68,0.3)]',
-    hoverShadow: 'hover:shadow-[0_0_35px_rgba(239,68,68,0.5)]'
+    hoverShadow: 'hover:shadow-[0_0_35px_rgba(239,68,68,0.5)]',
   },
   {
     key: 'birds',
@@ -23,8 +24,9 @@ const cards = [
     btnText: 'Predict Bird Density →',
     to: '/birds',
     color: 'from-teal-400 to-cyan-400',
+    topBar: 'from-teal-400 to-cyan-400',
     shadow: 'shadow-[0_0_20px_rgba(45,212,191,0.3)]',
-    hoverShadow: 'hover:shadow-[0_0_35px_rgba(45,212,191,0.5)]'
+    hoverShadow: 'hover:shadow-[0_0_35px_rgba(45,212,191,0.5)]',
   },
   {
     key: 'insects',
@@ -35,8 +37,9 @@ const cards = [
     btnText: 'Predict Insect Density →',
     to: '/insects',
     color: 'from-amber-400 to-orange-400',
+    topBar: 'from-amber-400 to-orange-400',
     shadow: 'shadow-[0_0_20px_rgba(251,191,36,0.3)]',
-    hoverShadow: 'hover:shadow-[0_0_35px_rgba(251,191,36,0.5)]'
+    hoverShadow: 'hover:shadow-[0_0_35px_rgba(251,191,36,0.5)]',
   },
   {
     key: 'plants',
@@ -47,55 +50,45 @@ const cards = [
     btnText: 'Predict Plant Density →',
     to: '/plants',
     color: 'from-emerald-400 to-green-400',
+    topBar: 'from-emerald-400 to-green-400',
     shadow: 'shadow-[0_0_20px_rgba(52,211,153,0.3)]',
-    hoverShadow: 'hover:shadow-[0_0_35px_rgba(52,211,153,0.5)]'
+    hoverShadow: 'hover:shadow-[0_0_35px_rgba(52,211,153,0.5)]',
   },
 ]
 
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.15,
-      delayChildren: 0.2
-    }
-  }
+  visible: { opacity: 1, transition: { staggerChildren: 0.12, delayChildren: 0.15 } },
 }
-
 const itemVariants = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 80, damping: 15 } }
+  hidden: { opacity: 0, y: 28 },
+  visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 80, damping: 16 } },
 }
 
 export default function Home() {
   return (
     <div className="page-wrapper overflow-hidden pb-20">
-      <Link to="/" className="back-link">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-        Back to Dashboard
-      </Link>
       {/* Hero */}
-      <motion.div 
-        className="hero pt-20 pb-16 relative"
+      <motion.div
+        className="hero pt-16 pb-12 relative"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
+        transition={{ duration: 0.7, ease: 'easeOut' }}
       >
-        <motion.div 
+        <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.2, type: "spring" }}
+          transition={{ delay: 0.2, type: 'spring' }}
           className="inline-flex items-center gap-3 bg-green-500/10 border border-green-500/30 rounded-full px-5 py-2 text-sm font-bold text-green-400 tracking-wider uppercase mb-8 shadow-[0_0_20px_rgba(34,197,94,0.15)]"
         >
-          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400" />
+          </span>
           ML-Powered Conservation Intelligence
         </motion.div>
-        
-        <motion.h1 
+
+        <motion.h1
           className="text-6xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-green-100 to-green-400 tracking-tighter leading-[1.1] mb-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -103,33 +96,41 @@ export default function Home() {
         >
           Wildlife Population<br />Density Forecasting
         </motion.h1>
-        
-        <motion.p 
+
+        <motion.p
           className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed mb-10"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
         >
-          Harness advanced machine learning algorithms to predict and cluster wildlife population densities using taxonomy, climate signals, and spatial geometry.
+          Harness advanced machine learning algorithms to predict and cluster wildlife population densities
+          using taxonomy, climate signals, and spatial geometry across Koyna Wildlife Sanctuary.
         </motion.p>
 
-        <motion.div 
+        <motion.div
           className="flex flex-col sm:flex-row justify-center gap-4 mb-16"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
         >
-          <Link to="/dashboard" className="group px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl font-extrabold text-white uppercase tracking-widest shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_35px_rgba(16,185,129,0.5)] transition-all flex items-center justify-center gap-2">
-            📊 Intelligence Dashboard <span className="group-hover:translate-x-1 transition-transform">→</span>
+          <Link
+            to="/dashboard"
+            className="group px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl font-extrabold text-white uppercase tracking-widest shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_35px_rgba(16,185,129,0.5)] transition-all flex items-center justify-center gap-2"
+          >
+            📊 Intelligence Dashboard
+            <span className="group-hover:translate-x-1 transition-transform">→</span>
           </Link>
-          <Link to="/animals/clustering" className="px-8 py-4 bg-white/5 hover:bg-white/10 backdrop-blur-md rounded-xl font-extrabold text-white uppercase tracking-widest border border-white/10 transition-all flex items-center justify-center gap-2">
+          <Link
+            to="/animals/clustering"
+            className="px-8 py-4 bg-white/5 hover:bg-white/10 backdrop-blur-md rounded-xl font-extrabold text-white uppercase tracking-widest border border-white/10 hover:border-white/20 transition-all flex items-center justify-center gap-2"
+          >
             🗺 Explore Maps
           </Link>
         </motion.div>
 
         {/* Stats */}
-        <motion.div 
-          className="flex flex-wrap justify-center gap-6"
+        <motion.div
+          className="flex flex-wrap justify-center gap-4"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
@@ -140,43 +141,69 @@ export default function Home() {
             { num: '92%+', lbl: 'Peak R² Accuracy' },
             { num: '250K+', lbl: 'Sighting Records' },
           ].map((s, i) => (
-            <motion.div variants={itemVariants} className="bg-black/30 backdrop-blur-md border border-white/10 rounded-2xl px-6 py-4 flex items-center gap-4 shadow-xl" key={i}>
-              <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-teal-400 drop-shadow-md">{s.num}</span>
-              <span className="text-xs font-bold uppercase tracking-wider text-white/50 w-min leading-tight text-left">{s.lbl}</span>
+            <motion.div
+              variants={itemVariants}
+              key={i}
+              className="bg-black/30 backdrop-blur-md border border-white/10 rounded-2xl px-6 py-4 flex items-center gap-4 shadow-xl hover:border-white/20 transition-colors"
+            >
+              <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-teal-400">{s.num}</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-white/40 max-w-[64px] leading-tight text-left">{s.lbl}</span>
             </motion.div>
           ))}
+        </motion.div>
+
+        {/* Scroll hint */}
+        <motion.div
+          className="mt-12 flex flex-col items-center gap-2 opacity-40"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.4 }}
+          transition={{ delay: 1.2 }}
+        >
+          <span className="text-xs font-bold uppercase tracking-widest text-white/60">Explore Categories</span>
+          <motion.div
+            animate={{ y: [0, 6, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+            className="text-white/40 text-xl"
+          >
+            ↓
+          </motion.div>
         </motion.div>
       </motion.div>
 
       {/* Category cards */}
-      <motion.div 
+      <motion.div
         className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 px-4"
         variants={containerVariants}
         initial="hidden"
         whileInView="visible"
-        viewport={{ once: true, margin: "-100px" }}
+        viewport={{ once: true, margin: '-80px' }}
       >
         {cards.map(card => (
           <motion.div variants={itemVariants} key={card.key}>
-            <Link to={card.to} className="block group">
+            <Link to={card.to} className="block group h-full">
               <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:border-white/20 shadow-2xl relative h-full flex flex-col">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r opacity-50 group-hover:opacity-100 transition-opacity" />
-                <div className={`p-8 pb-6 border-b border-white/5 relative overflow-hidden`}>
-                  <div className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-[0.03] group-hover:opacity-[0.08] transition-opacity`} />
+                {/* Accent top bar */}
+                <div className={`absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r ${card.topBar} opacity-60 group-hover:opacity-100 transition-opacity`} />
+
+                {/* Card header */}
+                <div className="p-8 pb-6 border-b border-white/5 relative overflow-hidden">
+                  <div className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-[0.04] group-hover:opacity-[0.09] transition-opacity`} />
                   <span className="text-6xl mb-4 block filter drop-shadow-xl group-hover:scale-110 transition-transform duration-300 origin-left">{card.emoji}</span>
                   <h2 className="text-3xl font-black text-white tracking-tight mb-1">{card.title}</h2>
                   <p className="text-sm font-bold uppercase tracking-wider text-white/40">{card.subtitle}</p>
                 </div>
+
+                {/* Card body */}
                 <div className="p-8 pt-6 flex-1 flex flex-col">
                   <ul className="flex flex-col gap-3 mb-8 flex-1">
                     {card.features.map(f => (
                       <li key={f} className="flex items-start gap-3 text-sm font-medium text-white/60">
-                        <span className={`flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-r ${card.color} flex items-center justify-center text-[10px] text-white/90 mt-0.5`}>✓</span>
+                        <span className={`flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-r ${card.color} flex items-center justify-center text-[10px] text-white/90 mt-0.5 shadow-sm`}>✓</span>
                         {f}
                       </li>
                     ))}
                   </ul>
-                  <button className={`w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs text-white bg-gradient-to-r ${card.color} ${card.shadow} ${card.hoverShadow} transition-all`}>
+                  <button className={`w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs text-white bg-gradient-to-r ${card.color} ${card.shadow} ${card.hoverShadow} transition-all group-hover:scale-[1.02]`}>
                     {card.btnText}
                   </button>
                 </div>
@@ -187,7 +214,7 @@ export default function Home() {
       </motion.div>
 
       {/* Footer */}
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}

@@ -1,3 +1,21 @@
-backend/node_modules/
+# Environment
 .env
 frontend/.env
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pkl
+thumbnail_cache.pkl
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store

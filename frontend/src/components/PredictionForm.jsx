@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { SkeletonField } from './Skeleton'
 
 // Descriptions for every feature that may appear
 const FIELD_META = {
@@ -233,9 +234,8 @@ function FormField({ name, ranges, value, onChange, categoryLabel = 'Animals' })
 export function PredictionForm({ features, values, setValue, loading, loadingMode, fetchingFeatures, onPredict, onReset, accentColor, categoryLabel = 'Animals' }) {
   if (fetchingFeatures) {
     return (
-      <div className="spinner-wrap">
-        <div className="spinner" />
-        <span>Loading model features…</span>
+      <div className="form-grid">
+        {Array.from({ length: 6 }).map((_, i) => <SkeletonField key={i} />)}
       </div>
     )
   }
@@ -254,24 +254,31 @@ export function PredictionForm({ features, values, setValue, loading, loadingMod
           />
         ))}
       </div>
-      <div className="form-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      <div className="form-actions">
         <button
-          className="btn-predict"
           onClick={() => onPredict('density')}
           disabled={loading}
-          style={{ ...(accentColor ? { background: accentColor } : {}), flex: 1, minWidth: '200px' }}
+          className="flex-1 min-w-[180px] flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-extrabold uppercase tracking-widest text-sm text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 shadow-lg shadow-green-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
         >
-          {loadingMode === 'density' ? '⏳ Analysing…' : '🔮 Predict Density'}
+          {loadingMode === 'density' ? (
+            <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Analysing…</>
+          ) : '🔮 Predict Density'}
         </button>
         <button
-          className="btn-predict"
           onClick={() => onPredict('trend')}
           disabled={loading}
-          style={{ ...(accentColor ? { background: accentColor } : {}), flex: 1, minWidth: '200px' }}
+          className="flex-1 min-w-[180px] flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-extrabold uppercase tracking-widest text-sm text-white bg-gradient-to-r from-teal-600 to-cyan-500 hover:from-teal-500 hover:to-cyan-400 shadow-lg shadow-teal-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
         >
-          {loadingMode === 'trend' ? '⏳ Analysing…' : '📈 Classify Trend'}
+          {loadingMode === 'trend' ? (
+            <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Analysing…</>
+          ) : '📈 Classify Trend'}
         </button>
-        <button className="btn-reset" onClick={onReset} style={{ flexBasis: '100%' }}>↺ Reset</button>
+        <button
+          onClick={onReset}
+          className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold uppercase tracking-widest text-xs text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all"
+        >
+          ↺ Reset to Defaults
+        </button>
       </div>
     </>
   )

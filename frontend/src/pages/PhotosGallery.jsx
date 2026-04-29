@@ -1,22 +1,24 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { SkeletonPhoto } from '../components/Skeleton'
 
 const CONFIG = {
   animals: {
     emoji: '🦁', label: 'Animals', apiUrl: '/photos/animals/',
-    accent: '#ff6b6b', back: '/animals',
+    accent: 'bg-red-500', back: '/animals',
   },
   birds: {
     emoji: '🦅', label: 'Birds', apiUrl: '/photos/birds/',
-    accent: '#4ecdc4', back: '/birds',
+    accent: 'bg-cyan-500', back: '/birds',
   },
   insects: {
     emoji: '🦋', label: 'Insects', apiUrl: '/photos/insects/',
-    accent: '#f59e0b', back: '/insects',
+    accent: 'bg-amber-500', back: '/insects',
   },
   plants: {
     emoji: '🌿', label: 'Plants', apiUrl: '/photos/plants/',
-    accent: '#10b981', back: '/plants',
+    accent: 'bg-emerald-500', back: '/plants',
   },
 }
 
@@ -26,36 +28,56 @@ function PhotoCard({ photo }) {
     : null
 
   return (
-    <div className="photo-card">
-      <div className="photo-img-wrap">
-        {src
-          ? <img src={src} alt={photo.title} loading="lazy" />
-          : <span className="photo-placeholder">🌿</span>
-        }
-      </div>
-      <div className="photo-info">
-        <div className="photo-title" title={photo.title}>{photo.title}</div>
-        <div className="photo-sub">{photo.subtitle}</div>
-        {photo.eventDate && (
-          <div className="photo-sub" style={{ marginTop: 3 }}>📅 {photo.eventDate}</div>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="group relative bg-white/5 rounded-2xl overflow-hidden border border-white/5 hover:border-white/20 transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50"
+    >
+      <div className="aspect-[4/3] bg-white/3 overflow-hidden relative">
+        {src ? (
+          <img 
+            src={src} 
+            alt={photo.title} 
+            loading="lazy" 
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-4xl grayscale opacity-20">🌿</div>
         )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      </div>
+
+      <div className="p-4">
+        <h3 className="text-sm font-bold text-white truncate mb-1" title={photo.title}>
+          {photo.title}
+        </h3>
+        <p className="text-[10px] font-bold text-white/30 uppercase tracking-wider mb-2">
+          {photo.subtitle}
+        </p>
+        
+        {photo.eventDate && (
+          <div className="flex items-center gap-1.5 text-[10px] text-white/40 mb-3 font-medium">
+            <span>🗓️</span> {photo.eventDate}
+          </div>
+        )}
+
         {photo.occurrenceUrl && (
           <a
             href={photo.occurrenceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="photo-link"
+            className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-green-400 hover:text-green-300 transition-colors"
           >
-            View observation ↗
+            Observation ↗
           </a>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }
 
 export default function PhotosGallery() {
-  const { species } = useParams()   // 'animals' | 'birds' | 'insects'
+  const { species } = useParams()
   const cfg = CONFIG[species] || CONFIG.animals
 
   const [photos, setPhotos] = useState([])
@@ -89,72 +111,93 @@ export default function PhotosGallery() {
     setOffset(0)
     setHasMore(true)
     loadPhotos(0, true)
-  }, [species])   // eslint-disable-line
+  }, [species])
 
   return (
-    <div className="page-wrapper">
-      {/* Header */}
-      <div className="gallery-header">
-      <Link to={cfg.back} className="back-link">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-        Back to {cfg.label} Prediction
-      </Link>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 8 }}>
-          <span style={{ fontSize: '3rem' }}>{cfg.emoji}</span>
-          <div>
-            <h1 style={{ fontSize: '2rem', marginBottom: 4 }}>{cfg.label} Photo Gallery</h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-              {total > 0 ? `${total.toLocaleString()} verified iNaturalist observations` : 'Loading…'}
+    <div className="page-wrapper min-h-screen pb-20">
+      {/* Header Section */}
+      <div className="mb-12">
+        <Link to={cfg.back} className="back-link !mb-8">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          Back to Predictor
+        </Link>
+        
+        <div className="flex flex-col md:flex-row md:items-end gap-6">
+          <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center text-5xl shadow-inner border border-white/5">
+            {cfg.emoji}
+          </div>
+          <div className="flex-1">
+            <h1 className="text-4xl font-black text-white mb-2">{cfg.label} Evidence</h1>
+            <p className="text-white/30 text-sm font-medium tracking-wide">
+              {total > 0 ? (
+                <><span className="text-green-400">{total.toLocaleString()}</span> verified observations from the Koyna biosphere</>
+              ) : 'Accessing iNaturalist visual repository…'}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="error-box" style={{ marginBottom: 24 }}>
-          <span>⚠️</span><span>{error}</span>
+      {/* Error State */}
+      <AnimatePresence>
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-400 text-sm font-bold"
+          >
+            <span>⚠️</span> {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Photo Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {photos.map((p, i) => <PhotoCard key={`${p.occurrenceUrl}-${i}`} photo={p} />)}
+
+        {/* Skeleton loading state */}
+        {loading && Array.from({ length: 8 }).map((_, i) => (
+          <SkeletonPhoto key={i} />
+        ))}
+      </div>
+
+      {/* Load More Action */}
+      {hasMore && photos.length > 0 && (
+        <div className="mt-16 flex flex-col items-center gap-4">
+          <button
+            onClick={() => loadPhotos(offset)}
+            disabled={loading}
+            className="group relative px-8 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs font-black uppercase tracking-[0.2em] text-white/60 hover:text-white transition-all disabled:opacity-50"
+          >
+            {loading ? '⏳ Accessing Next Page…' : 'Load More Observations'}
+            {/* Progress indicator */}
+            <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-[9px] text-white/20 whitespace-nowrap">
+              Showing {photos.length} of {total.toLocaleString()} records
+            </div>
+          </button>
         </div>
       )}
 
-      {/* Grid */}
-      <div className="gallery-grid">
-        {photos.map((p, i) => <PhotoCard key={`${p.occurrenceUrl}-${i}`} photo={p} />)}
-
-        {/* Skeleton placeholders while loading first batch */}
-        {loading && photos.length === 0 &&
-          Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="photo-card" style={{ opacity: 0.4 }}>
-              <div className="photo-img-wrap" style={{ background: 'rgba(255,255,255,0.04)' }}>
-                <span className="photo-placeholder">🌿</span>
-              </div>
-              <div className="photo-info">
-                <div style={{ height: 14, background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 8 }} />
-                <div style={{ height: 10, background: 'rgba(255,255,255,0.04)', borderRadius: 4, width: '60%' }} />
-              </div>
-            </div>
-          ))
-        }
-      </div>
-
-      {/* Load more */}
-      {hasMore && photos.length > 0 && (
-        <button
-          className="load-more-btn"
-          onClick={() => loadPhotos(offset)}
-          disabled={loading}
-        >
-          {loading ? '⏳ Loading…' : `Load more photos (${photos.length} / ${total})`}
-        </button>
+      {/* End of results */}
+      {!hasMore && photos.length > 0 && (
+        <div className="mt-20 text-center">
+          <div className="w-10 h-1 border-t border-white/10 mx-auto mb-6" />
+          <p className="text-[11px] font-black uppercase tracking-widest text-white/20">
+            End of visual evidence for {cfg.label} ✓
+          </p>
+        </div>
       )}
 
-      {!hasMore && photos.length > 0 && (
-        <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: 32, fontSize: '0.875rem' }}>
-          All {total.toLocaleString()} observations loaded ✓
-        </p>
+      {/* Empty State */}
+      {!loading && photos.length === 0 && !error && (
+        <div className="py-32 text-center">
+          <div className="text-5xl mb-6 opacity-20">🍃</div>
+          <h2 className="text-xl font-bold text-white mb-2">No observations found</h2>
+          <p className="text-white/30 text-sm">Try another species category or check back later.</p>
+        </div>
       )}
     </div>
   )

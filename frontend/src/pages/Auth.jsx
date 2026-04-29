@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { createUserWithEmailAndPassword, sendEmailVerification, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
 import { auth, firebaseConfigured } from '../lib/firebase'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useToast } from '../context/ToastContext'
 
 async function postJson(url, body) {
   const res = await fetch(url, {
@@ -25,6 +26,7 @@ function isValidEmail(value) {
 
 export default function Auth() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -68,8 +70,10 @@ export default function Auth() {
       setOtpVerified(false)
       setEmail(normalizedEmail)
       setMessage('OTP sent to your email.')
+      toast.success('OTP sent — check your inbox')
     } catch (e) {
       setError(e.message)
+      toast.error(e.message)
     } finally {
       setLoading(false)
     }
@@ -91,8 +95,10 @@ export default function Auth() {
       await postJson('/auth/verify-otp/', { email: normalizedEmail, otp: otp.trim(), purpose })
       setOtpVerified(true)
       setMessage('OTP verified successfully.')
+      toast.success('Email verified ✓')
     } catch (e) {
       setError(e.message)
+      toast.error(e.message)
     } finally {
       setLoading(false)
     }
@@ -115,8 +121,10 @@ export default function Auth() {
       try {
         await sendPasswordResetEmail(auth, email)
         setMessage('Password reset email sent! Check your inbox.')
+        toast.success('Reset email sent — check your inbox')
       } catch (e) {
         setError(e.message)
+        toast.error(e.message)
       } finally {
         setLoading(false)
       }
@@ -145,13 +153,16 @@ export default function Auth() {
         const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password)
         await sendEmailVerification(cred.user)
         setMessage('Signup successful. Redirecting...')
+        toast.success('Account created! Welcome to Koyna Intelligence 🌿')
       } else {
         await signInWithEmailAndPassword(auth, normalizedEmail, password)
+        toast.success('Welcome back! Signed in successfully')
       }
       setEmail(normalizedEmail)
       setTimeout(() => navigate('/'), 1000)
     } catch (e) {
       setError(e.message)
+      toast.error(e.message)
     } finally {
       setLoading(false)
     }
