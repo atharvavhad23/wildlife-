@@ -89,8 +89,3 @@ EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in {'1', 'true', 'ye
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@koynawildlife.local')
-
-# ✅ DEBUG PRINTS (remove later)
-print("EMAIL_HOST:", EMAIL_HOST)
-print("EMAIL_USER:", EMAIL_HOST_USER)
-print("EMAIL_PASS:", EMAIL_HOST_PASSWORD)
