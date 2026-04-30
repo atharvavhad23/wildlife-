@@ -1,0 +1,9 @@
+Feature,Importance
+lat_grid,0.7789997
+coordinateUncertaintyInMeters,0.077829674
+basisOfRecord_enc,0.05473463
+order_enc,0.034508336
+class_enc,0.021072403
+month,0.011542759
+year,0.011322654
+season_enc,0.009989903

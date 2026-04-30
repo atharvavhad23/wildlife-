@@ -1,22 +1,31 @@
 import { useState, useEffect, useCallback } from 'react'
+import { SkeletonField } from './Skeleton'
 
 // Descriptions for every feature that may appear
 const FIELD_META = {
-  coordinateUncertaintyInMeters: { name: 'GPS Accuracy', desc: 'Location accuracy in metres (lower = better)', icon: '📍' },
-  day:              { name: 'Day of Month',        desc: 'Observation day (1–31)',              icon: '🗓️' },
+  coordinateUncertaintyInMeters: { name: 'Location Accuracy', desc: 'Precision of geographic coordinates (lower is better)', icon: '📍' },
+  day:              { name: 'Day',               desc: 'Observation day (1–31)',              icon: '🗓️' },
   month:            { name: 'Month',               desc: 'Observation month (1–12)',            icon: '📅' },
-  year:             { name: 'Year',                desc: 'Year when observation was recorded',  icon: '📆' },
-  decade:           { name: 'Decade',              desc: 'Decade group derived from year',      icon: '⏰' },
-  season_enc:       { name: 'Season Code',         desc: 'Encoded season of observation',       icon: '🌦️' },
-  lat_grid:         { name: 'Latitude Grid',       desc: 'North–South grid location',           icon: '🧭' },
-  lon_grid:         { name: 'Longitude Grid',      desc: 'East–West grid location',             icon: '🧭' },
-  species_richness: { name: 'Species Richness',    desc: 'Number of different species in area', icon: '🌈' },
-  phylum_enc:       { name: 'Phylum Code',         desc: 'Broad animal phylum (encoded)',       icon: '🧬' },
-  class_enc:        { name: 'Class Code',          desc: 'Animal class (encoded)',              icon: '🏷️' },
-  order_enc:        { name: 'Order Code',          desc: 'Animal order (encoded)',              icon: '🦁' },
-  family_enc:       { name: 'Family Code',         desc: 'Animal family (encoded)',             icon: '🐾' },
-  taxonRank_enc:    { name: 'Taxonomic Rank',      desc: 'How specific the classification is',  icon: '📊' },
-  basisOfRecord_enc:{ name: 'Record Type',         desc: 'Type of observation record',          icon: '📋' },
+  year:             { name: 'Year',                desc: 'Observation year',                    icon: '📆' },
+  decade:           { name: 'Decade',              desc: 'Temporal decade classification',      icon: '⏰' },
+  season_enc:       { name: 'Seasonal Cycle',      desc: 'Observed season (Pre-monsoon, etc.)', icon: '🌦️' },
+  lat_grid:         { name: 'Geographic Latitude', desc: 'North–South spatial grid',           icon: '🧭' },
+  lon_grid:         { name: 'Geographic Longitude',desc: 'East–West spatial grid',              icon: '🧭' },
+  species_richness: { name: 'Biodiversity Density',desc: 'Unique species per spatial node',      icon: '🌈' },
+  phylum_enc:       { name: 'Phylum Taxonomy',     desc: 'Broad taxonomic phylum classification',icon: '🧬' },
+  class_enc:        { name: 'Taxonomic Class',     desc: 'Class-level biological category',      icon: '🏷️' },
+  order_enc:        { name: 'Taxonomic Order',     desc: 'Order-level biological category',      icon: '🦁' },
+  family_enc:       { name: 'Taxonomic Family',    desc: 'Family-level biological category',     icon: '🐾' },
+  taxonRank_enc:    { name: 'Classification Rank', desc: 'Specificness of taxonomic ID',         icon: '📊' },
+  basisOfRecord_enc:{ name: 'Observational Basis', desc: 'Method used for data collection',     icon: '📋' },
+}
+
+const FEATURE_VALUE_MAPS = {
+  phylum_enc: { 0: 'Chordata', 1: 'Arthropoda', 2: 'Tracheophyta', 3: 'Mollusca' },
+  class_enc: { 0: 'Mammalia', 1: 'Aves', 2: 'Insecta', 3: 'Magnoliopsida', 4: 'Reptilia', 5: 'Amphibia' },
+  season_enc: { 0: 'Summer', 1: 'Monsoon', 2: 'Winter', 3: 'Spring' },
+  basisOfRecord_enc: { 0: 'Human Observation', 1: 'Machine Observation', 2: 'Preserved Specimen' },
+  taxonRank_enc: { 0: 'Species', 1: 'Genus', 2: 'Family', 3: 'Order' }
 }
 
 const DROPDOWN_FEATURES = ['phylum_enc','class_enc','order_enc','family_enc','taxonRank_enc','basisOfRecord_enc','season_enc']
@@ -30,6 +39,7 @@ export function usePrediction(featuresUrl, predictUrl) {
   const [features, setFeatures] = useState({})
   const [values, setValues] = useState({})
   const [loading, setLoading] = useState(false)
+  const [loadingMode, setLoadingMode] = useState(null)
   const [fetchingFeatures, setFetchingFeatures] = useState(true)
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
@@ -75,6 +85,7 @@ export function usePrediction(featuresUrl, predictUrl) {
 
   const predict = useCallback(async (mode = 'density') => {
     setLoading(true)
+    setLoadingMode(mode)
     setError(null)
     setResult(null)
     try {
@@ -96,6 +107,7 @@ export function usePrediction(featuresUrl, predictUrl) {
       setError('Network error: ' + e.message)
     } finally {
       setLoading(false)
+      setLoadingMode(null)
     }
   }, [features, values, predictUrl])
 
@@ -109,7 +121,7 @@ export function usePrediction(featuresUrl, predictUrl) {
     setValues(defaults)
   }, [features])
 
-  return { features, values, setValue, loading, fetchingFeatures, result, error, predict, reset }
+  return { features, values, setValue, loading, loadingMode, fetchingFeatures, result, error, predict, reset }
 }
 
 // ─── Field Component ─────────────────────────────────────────────────────
@@ -175,8 +187,10 @@ function FormField({ name, ranges, value, onChange, categoryLabel = 'Animals' })
           {ranges.options ? ranges.options.map((opt, i) => (
             <option key={i} value={i} style={{ background: '#1a2e20', color: '#fff' }}>{opt}</option>
           )) : Array.from({ length: Math.round(ranges.max - ranges.min) + 1 }, (_, i) => {
-            const v = Math.round(ranges.min) + i
-            return <option key={v} value={v} style={{ background: '#1a2e20', color: '#fff' }}>{v}</option>
+            const v = Math.round(ranges.min) + i;
+            const map = FEATURE_VALUE_MAPS[name];
+            const label = map && map[v] ? map[v] : v;
+            return <option key={v} value={v} style={{ background: '#1a2e20', color: '#fff' }}>{label}</option>
           })}
         </select>
       ) : (
@@ -203,24 +217,25 @@ function FormField({ name, ranges, value, onChange, categoryLabel = 'Animals' })
         </div>
       )}
 
-      <div className="range-hint">
-        <span>Range:</span>
-        <span>
-          {isInteger ? Math.round(ranges.min) : ranges.min.toFixed(2)} –{' '}
-          {isInteger ? Math.round(ranges.max) : ranges.max.toFixed(2)}
-        </span>
-      </div>
+      {!name.includes('_enc') && (
+        <div className="range-hint">
+          <span>Range:</span>
+          <span>
+            {isInteger ? Math.round(ranges.min) : ranges.min.toFixed(2)} –{' '}
+            {isInteger ? Math.round(ranges.max) : ranges.max.toFixed(2)}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── Full Form ───────────────────────────────────────────────────────────
-export function PredictionForm({ features, values, setValue, loading, fetchingFeatures, onPredict, onReset, accentColor, categoryLabel = 'Animals' }) {
+export function PredictionForm({ features, values, setValue, loading, loadingMode, fetchingFeatures, onPredict, onReset, accentColor, categoryLabel = 'Animals' }) {
   if (fetchingFeatures) {
     return (
-      <div className="spinner-wrap">
-        <div className="spinner" />
-        <span>Loading model features…</span>
+      <div className="form-grid">
+        {Array.from({ length: 6 }).map((_, i) => <SkeletonField key={i} />)}
       </div>
     )
   }
@@ -239,24 +254,31 @@ export function PredictionForm({ features, values, setValue, loading, fetchingFe
           />
         ))}
       </div>
-      <div className="form-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      <div className="form-actions">
         <button
-          className="btn-predict"
           onClick={() => onPredict('density')}
           disabled={loading}
-          style={{ ...(accentColor ? { background: accentColor } : {}), flex: 1, minWidth: '200px' }}
+          className="flex-1 min-w-[180px] flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-extrabold uppercase tracking-widest text-sm text-white bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 shadow-lg shadow-green-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
         >
-          {loading ? '⏳ Analysing…' : '🔮 Predict Density'}
+          {loadingMode === 'density' ? (
+            <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Analysing…</>
+          ) : '🔮 Predict Density'}
         </button>
         <button
-          className="btn-predict"
           onClick={() => onPredict('trend')}
           disabled={loading}
-          style={{ ...(accentColor ? { background: accentColor } : {}), flex: 1, minWidth: '200px' }}
+          className="flex-1 min-w-[180px] flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-extrabold uppercase tracking-widest text-sm text-white bg-gradient-to-r from-teal-600 to-cyan-500 hover:from-teal-500 hover:to-cyan-400 shadow-lg shadow-teal-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
         >
-          {loading ? '⏳ Analysing…' : '📈 Classify Trend'}
+          {loadingMode === 'trend' ? (
+            <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Analysing…</>
+          ) : '📈 Classify Trend'}
         </button>
-        <button className="btn-reset" onClick={onReset} style={{ flexBasis: '100%' }}>↺ Reset</button>
+        <button
+          onClick={onReset}
+          className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-bold uppercase tracking-widest text-xs text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all"
+        >
+          ↺ Reset to Defaults
+        </button>
       </div>
     </>
   )

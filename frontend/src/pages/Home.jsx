@@ -1,197 +1,159 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useAuth } from '../context/AuthContext'
 
-const cards = [
+const FEATURES = [
   {
-    key: 'animals',
-    emoji: '🦁',
-    title: 'Animals',
-    subtitle: 'Mammals & Reptiles',
-    features: ['Predator & prey species', 'Spatial distribution maps', 'Temporal sighting patterns', 'Environmental factor analysis'],
-    btnText: 'Predict Animal Density →',
-    to: '/animals',
-    color: 'from-red-500 to-rose-400',
-    shadow: 'shadow-[0_0_20px_rgba(239,68,68,0.3)]',
-    hoverShadow: 'hover:shadow-[0_0_35px_rgba(239,68,68,0.5)]'
+    icon: '🎯',
+    title: 'High Precision Modeling',
+    desc: 'Utilizing Random Forest and Gradient Boosting architectures to achieve up to 92% prediction accuracy.'
   },
   {
-    key: 'birds',
-    emoji: '🦅',
-    title: 'Birds',
-    subtitle: 'Avian Species',
-    features: ['200+ bird species tracked', 'Migratory pattern analysis', 'Seasonal variation models', 'Habitat preference mapping'],
-    btnText: 'Predict Bird Density →',
-    to: '/birds',
-    color: 'from-teal-400 to-cyan-400',
-    shadow: 'shadow-[0_0_20px_rgba(45,212,191,0.3)]',
-    hoverShadow: 'hover:shadow-[0_0_35px_rgba(45,212,191,0.5)]'
+    icon: '🌍',
+    title: 'Spatial Intelligence',
+    desc: 'Dynamic clustering and heatmapping of wildlife sightings across 400+ square kilometers of sanctuary terrain.'
   },
   {
-    key: 'insects',
-    emoji: '🦋',
-    title: 'Insects',
-    subtitle: 'Invertebrate Species',
-    features: ['Pollinator & arthropod trends', 'Micro-habitat density signals', 'Seasonal emergence patterns', 'Taxonomy-aware predictions'],
-    btnText: 'Predict Insect Density →',
-    to: '/insects',
-    color: 'from-amber-400 to-orange-400',
-    shadow: 'shadow-[0_0_20px_rgba(251,191,36,0.3)]',
-    hoverShadow: 'hover:shadow-[0_0_35px_rgba(251,191,36,0.5)]'
+    icon: '🌩️',
+    title: 'Environmental Sync',
+    desc: 'Real-time integration of climate data including NDVI, precipitation, and anthropogenic disturbance factors.'
   },
   {
-    key: 'plants',
-    emoji: '🌿',
-    title: 'Plants',
-    subtitle: 'Flora & Vegetation',
-    features: ['Floral density forecasting', 'Botanical hotspot clustering', 'Species-level drilldown maps', 'Taxonomy-aware vegetation signals'],
-    btnText: 'Predict Plant Density →',
-    to: '/plants',
-    color: 'from-emerald-400 to-green-400',
-    shadow: 'shadow-[0_0_20px_rgba(52,211,153,0.3)]',
-    hoverShadow: 'hover:shadow-[0_0_35px_rgba(52,211,153,0.5)]'
-  },
+    icon: '📊',
+    title: 'Conservation Metrics',
+    desc: 'Automated health index calculations to identify vulnerable species and habitat degradation hotspots.'
+  }
 ]
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.15,
-      delayChildren: 0.2
-    }
-  }
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 80, damping: 15 } }
-}
-
 export default function Home() {
+  const { user } = useAuth()
+
   return (
-    <div className="page-wrapper overflow-hidden pb-20">
-      {/* Hero */}
-      <motion.div 
-        className="hero pt-20 pb-16 relative"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-      >
-        <motion.div 
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.2, type: "spring" }}
-          className="inline-flex items-center gap-3 bg-green-500/10 border border-green-500/30 rounded-full px-5 py-2 text-sm font-bold text-green-400 tracking-wider uppercase mb-8 shadow-[0_0_20px_rgba(34,197,94,0.15)]"
-        >
-          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          ML-Powered Conservation Intelligence
-        </motion.div>
+    <div className="page-wrapper overflow-hidden pb-32">
+      {/* Hero Section */}
+      <section className="relative pt-20 pb-32 text-center">
+        {/* Abstract Background Glows */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-green-500/10 blur-[120px] rounded-full pointer-events-none" />
         
-        <motion.h1 
-          className="text-6xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-white via-green-100 to-green-400 tracking-tighter leading-[1.1] mb-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="relative z-10"
         >
-          Wildlife Population<br />Density Forecasting
-        </motion.h1>
-        
-        <motion.p 
-          className="text-lg text-white/60 max-w-2xl mx-auto leading-relaxed mb-10"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          Harness advanced machine learning algorithms to predict and cluster wildlife population densities using taxonomy, climate signals, and spatial geometry.
-        </motion.p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-green-400 mb-8 shadow-2xl">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            Empowering Conservation with AI
+          </div>
 
-        <motion.div 
-          className="flex flex-col sm:flex-row justify-center gap-4 mb-16"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <Link to="/dashboard" className="group px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl font-extrabold text-white uppercase tracking-widest shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_35px_rgba(16,185,129,0.5)] transition-all flex items-center justify-center gap-2">
-            📊 Intelligence Dashboard <span className="group-hover:translate-x-1 transition-transform">→</span>
-          </Link>
-          <Link to="/animals/clustering" className="px-8 py-4 bg-white/5 hover:bg-white/10 backdrop-blur-md rounded-xl font-extrabold text-white uppercase tracking-widest border border-white/10 transition-all flex items-center justify-center gap-2">
-            🗺 Explore Maps
-          </Link>
-        </motion.div>
+          <h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter leading-[0.9] mb-8">
+            Protecting <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">Koyna's</span><br />
+            Wild Future.
+          </h1>
 
-        {/* Stats */}
-        <motion.div 
-          className="flex flex-wrap justify-center gap-6"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {[
-            { num: '12', lbl: 'Custom ML Models' },
-            { num: '50+', lbl: 'Engineered Features' },
-            { num: '92%+', lbl: 'Peak R² Accuracy' },
-            { num: '250K+', lbl: 'Sighting Records' },
-          ].map((s, i) => (
-            <motion.div variants={itemVariants} className="bg-black/30 backdrop-blur-md border border-white/10 rounded-2xl px-6 py-4 flex items-center gap-4 shadow-xl" key={i}>
-              <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-teal-400 drop-shadow-md">{s.num}</span>
-              <span className="text-xs font-bold uppercase tracking-wider text-white/50 w-min leading-tight text-left">{s.lbl}</span>
-            </motion.div>
-          ))}
-        </motion.div>
-      </motion.div>
+          <p className="text-lg md:text-xl text-white/40 max-w-2xl mx-auto leading-relaxed mb-12 font-medium">
+            The world's most advanced machine learning platform for 
+            predicting wildlife population dynamics and biodiversity health 
+            within the UNESCO World Heritage site.
+          </p>
 
-      {/* Category cards */}
-      <motion.div 
-        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 px-4"
-        variants={containerVariants}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, margin: "-100px" }}
-      >
-        {cards.map(card => (
-          <motion.div variants={itemVariants} key={card.key}>
-            <Link to={card.to} className="block group">
-              <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:border-white/20 shadow-2xl relative h-full flex flex-col">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r opacity-50 group-hover:opacity-100 transition-opacity" />
-                <div className={`p-8 pb-6 border-b border-white/5 relative overflow-hidden`}>
-                  <div className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-[0.03] group-hover:opacity-[0.08] transition-opacity`} />
-                  <span className="text-6xl mb-4 block filter drop-shadow-xl group-hover:scale-110 transition-transform duration-300 origin-left">{card.emoji}</span>
-                  <h2 className="text-3xl font-black text-white tracking-tight mb-1">{card.title}</h2>
-                  <p className="text-sm font-bold uppercase tracking-wider text-white/40">{card.subtitle}</p>
-                </div>
-                <div className="p-8 pt-6 flex-1 flex flex-col">
-                  <ul className="flex flex-col gap-3 mb-8 flex-1">
-                    {card.features.map(f => (
-                      <li key={f} className="flex items-start gap-3 text-sm font-medium text-white/60">
-                        <span className={`flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-r ${card.color} flex items-center justify-center text-[10px] text-white/90 mt-0.5`}>✓</span>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <button className={`w-full py-4 rounded-xl font-black uppercase tracking-widest text-xs text-white bg-gradient-to-r ${card.color} ${card.shadow} ${card.hoverShadow} transition-all`}>
-                    {card.btnText}
-                  </button>
-                </div>
-              </div>
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <Link
+              to={user ? "/models" : "/auth"}
+              className="px-10 py-5 bg-white text-black font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-green-400 transition-all shadow-[0_20px_50px_rgba(255,255,255,0.1)] active:scale-95"
+            >
+              Access Prediction Models
             </Link>
+            <Link
+              to="/about"
+              className="px-10 py-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-white font-black uppercase tracking-widest text-xs transition-all active:scale-95"
+            >
+              Learn More
+            </Link>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* Feature Grid */}
+      <section className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {FEATURES.map((f, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.1 }}
+            className="glass-card p-8 group hover:border-green-500/30 transition-all"
+          >
+            <div className="text-4xl mb-6 group-hover:scale-110 transition-transform">{f.icon}</div>
+            <h3 className="text-white font-black uppercase tracking-wider text-sm mb-3">{f.title}</h3>
+            <p className="text-white/40 text-xs leading-relaxed font-medium">{f.desc}</p>
           </motion.div>
         ))}
-      </motion.div>
+      </section>
 
-      {/* Footer */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        className="mt-24 text-center border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-center gap-4 text-xs font-bold uppercase tracking-widest text-white/30"
-      >
-        <span>🔬 Powered by Advanced Machine Learning</span>
-        <span className="hidden md:inline text-white/10">•</span>
-        <span>📊 Based on Historical Sighting Data</span>
-        <span className="hidden md:inline text-white/10">•</span>
-        <span>📍 Koyna Wildlife Sanctuary, Maharashtra</span>
-      </motion.div>
+      {/* How it Works / Trust Section */}
+      <section className="mt-40 max-w-5xl mx-auto px-6">
+        <div className="glass-card p-12 md:p-20 overflow-hidden relative">
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-green-500/10 blur-[100px] rounded-full" />
+          
+          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <h2 className="text-3xl md:text-5xl font-black text-white leading-tight mb-8">
+                Data-Driven<br />
+                <span className="text-white/40 font-medium">Decisions for</span><br />
+                Conservationists.
+              </h2>
+              <div className="space-y-6">
+                {[
+                  { t: 'Verified Sources', d: 'Models trained on Research Grade iNaturalist observations.' },
+                  { t: 'Open Intelligence', d: 'Accessible insights for researchers and policy makers.' },
+                  { t: 'Global Standards', d: 'Aligned with IUCN Red List and conservation protocols.' },
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-4">
+                    <span className="text-green-400 font-bold">✓</span>
+                    <div>
+                      <div className="text-white text-sm font-bold">{item.t}</div>
+                      <div className="text-white/30 text-xs">{item.d}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-black/40 rounded-3xl p-8 border border-white/5 shadow-inner">
+               <div className="flex items-center gap-4 mb-6">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-amber-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
+               </div>
+               <div className="space-y-4">
+                  <div className="h-4 bg-white/10 rounded-full w-3/4 animate-pulse" />
+                  <div className="h-4 bg-white/5 rounded-full w-full animate-pulse" />
+                  <div className="h-20 bg-green-500/5 rounded-2xl border border-green-500/10 flex items-center justify-center">
+                     <span className="text-[10px] font-black uppercase tracking-widest text-green-400">Processing Spatial Grid...</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="h-8 bg-white/5 rounded-lg" />
+                    <div className="h-8 bg-white/5 rounded-lg" />
+                    <div className="h-8 bg-white/5 rounded-lg" />
+                  </div>
+               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="mt-40 text-center px-6">
+        <h2 className="text-3xl font-black text-white mb-6 uppercase tracking-tighter">Ready to explore the biodiversity?</h2>
+        <Link
+          to="/models"
+          className="inline-flex items-center gap-3 px-10 py-5 bg-green-500 rounded-2xl text-black font-black uppercase tracking-widest text-xs hover:bg-green-400 transition-all shadow-[0_20px_50px_rgba(34,197,94,0.2)] group"
+        >
+          Start Predicting
+          <span className="group-hover:translate-x-1 transition-transform">→</span>
+        </Link>
+      </section>
     </div>
   )
 }

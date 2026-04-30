@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -67,13 +67,18 @@
   --color-border-strong: hsla(0, 0%, 100%, 0.20);
 }
 
+/* ── Skeleton shimmer ───────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
 /* Glass utility classes */
 @layer components {
   .glass {
     @apply backdrop-blur-md bg-white/5 border border-white/10;
   }
 
-  /* .glass-card already heavily utilized, let's keep custom but adopt some aspects */
   .glass-panel {
     @apply backdrop-blur-lg bg-black/40 border border-white/5;
   }
@@ -83,7 +88,29 @@
   }
 
   .glass-input {
-    @apply backdrop-blur-sm bg-white/5 border border-white/10 focus:border-brand focus:bg-white/10;
+    @apply backdrop-blur-sm bg-white/5 border border-white/10 focus:border-green-500/50 focus:bg-white/10;
+  }
+
+  /* Skeleton shimmer pulse */
+  .skeleton-pulse {
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0.04) 0%,
+      rgba(255,255,255,0.10) 50%,
+      rgba(255,255,255,0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Text utility aliases (usable as Tailwind classes) */
+  .text-primary   { color: var(--text-primary); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-muted     { color: var(--text-muted); }
+
+  /* Toast container lives at z-[9999] — ensure body stacking */
+  .toast-viewport {
+    @apply fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 items-end pointer-events-none;
   }
 }
 
@@ -91,6 +118,9 @@
 @layer utilities {
   .animate-in {
     animation: fadeIn 0.3s ease-out, slideUp 0.3s ease-out;
+  }
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent;
   }
 }
 
@@ -161,10 +191,13 @@ button { font-family: 'Inter', sans-serif; cursor: pointer; }
 input, select { font-family: 'Inter', sans-serif; }
 
 /* ── Layout ─────────────────────────────────────────────── */
+:root {
+  --navbar-h: 64px;
+}
 .page-wrapper {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 0 24px 80px;
+  padding: var(--navbar-h) 24px 80px;
 }
 
 /* ── Glass Card ─────────────────────────────────────────── */
@@ -401,13 +434,35 @@ input, select { font-family: 'Inter', sans-serif; }
 .back-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-  margin-bottom: 24px;
-  transition: var(--transition);
+  gap: 10px;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 32px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
-.back-link:hover { color: var(--green-300); }
+
+.back-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--green-400);
+  color: var(--green-400);
+  transform: translateX(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.back-link svg {
+  transition: transform 0.3s ease;
+}
+
+.back-link:hover svg {
+  transform: translateX(-3px);
+}
 
 /* Quick links row */
 .quick-links { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; }
@@ -727,7 +782,7 @@ input[type="range"]::-webkit-slider-thumb {
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 640px) {
   .navbar { padding: 0 16px; }
-  .page-wrapper { padding: 0 16px 60px; }
+  .page-wrapper { padding: calc(var(--navbar-h) + 8px) 16px 60px; }
   .hero { padding: 48px 16px 40px; }
   .form-actions { flex-direction: column; }
   .quick-links { flex-direction: column; }
@@ -761,4 +816,55 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255,255,255,0.2);
+}
+/* ── Print Styles ────────────────────────────────────────── */
+@media print {
+  .navbar, .hide-on-print, .footer, .btn-dashboard, .load-more-btn, button, .back-link {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+    color: #111 !important;
+    padding: 0 !important;
+  }
+
+  .page-wrapper {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .glass-card {
+    background: white !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    color: #111 !important;
+    backdrop-filter: none !important;
+    page-break-inside: avoid;
+    margin-bottom: 20px !important;
+  }
+
+  .text-primary, .text-secondary, .text-muted, h1, h2, h3, h4, .text-transparent {
+    color: #111 !important;
+    background: none !important;
+    -webkit-text-fill-color: #111 !important;
+  }
+
+  .section-heading {
+    border-bottom: 2px solid #eee !important;
+    color: #111 !important;
+  }
+
+  /* Ensure charts are visible but simple */
+  .recharts-cartesian-grid-horizontal line,
+  .recharts-cartesian-grid-vertical line {
+    stroke: #eee !important;
+  }
+
+  /* Force background colors for bars/progress if needed */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }
