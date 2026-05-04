@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ species_label }} Photo Gallery</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f4f8fb 0%, #eaf4f6 100%);
+            min-height: 100vh;
+            color: #1f2937;
+        }
+
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .title h1 {
+            font-size: 2rem;
+        }
+
+        .title p {
+            color: #5b677a;
+            margin-top: 4px;
+        }
+
+        .back-btn {
+            text-decoration: none;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: #0f766e;
+            color: #fff;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .meta {
+            margin-bottom: 16px;
+            color: #334155;
+            font-size: 0.95rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 14px;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #dce7ef;
+            border-radius: 10px;
+            overflow: hidden;
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 22px rgba(15, 118, 110, 0.18);
+        }
+
+        .frame {
+            width: 100%;
+            height: 160px;
+            background: #eef3f7;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .frame img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .fallback {
+            color: #6b7280;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .content {
+            padding: 10px;
+        }
+
+        .name {
+            font-size: 0.86rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+            line-height: 1.3;
+            color: #1f2937;
+        }
+
+        .sub {
+            font-size: 0.78rem;
+            color: #4b5563;
+            margin-bottom: 2px;
+        }
+
+        .date {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0 30px;
+        }
+
+        .load-btn {
+            border: 0;
+            border-radius: 8px;
+            background: #0f766e;
+            color: #fff;
+            font-weight: 700;
+            padding: 12px 18px;
+            cursor: pointer;
+        }
+
+        .load-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .empty,
+        .error {
+            border-radius: 10px;
+            padding: 16px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            color: #374151;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="topbar">
+            <div class="title">
+                <h1>{{ species_label }} Photo Gallery</h1>
+                <p>Separate gallery page with fast, paginated loading.</p>
+            </div>
+            <a class="back-btn" href="{{ back_path }}">Back</a>
+        </div>
+
+        <p class="meta" id="metaText">Loading photos...</p>
+
+        <div id="errorBox" class="error" style="display:none;">Could not load photos right now.</div>
+        <div id="emptyBox" class="empty" style="display:none;">No photo links found in this dataset.</div>
+        <div id="galleryGrid" class="grid"></div>
+
+        <div class="controls">
+            <button id="loadMoreBtn" class="load-btn" style="display:none;">Load More</button>
+        </div>
+    </div>
+
+    <script>
+        const apiBase = '{{ photos_api }}';
+        let offset = 0;
+        const limit = 24;
+        let total = 0;
+        let loading = false;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const btn = document.getElementById('loadMoreBtn');
+            btn.addEventListener('click', async () => {
+                await loadChunk();
+            });
+            await loadChunk();
+        });
+
+        async function loadChunk() {
+            if (loading) return;
+            loading = true;
+            toggleButton(true);
+
+            try {
+                const response = await fetch(`${apiBase}?offset=${offset}&limit=${limit}`);
+                const data = await response.json();
+                const photos = Array.isArray(data.photos) ? data.photos : [];
+                total = Number(data.total || 0);
+
+                if (!offset && !photos.length) {
+                    document.getElementById('emptyBox').style.display = 'block';
+                    updateMeta(0, total);
+                    toggleButton(false, false);
+                    loading = false;
+                    return;
+                }
+
+                renderCards(photos);
+                offset = Number(data.nextOffset || (offset + photos.length));
+                updateMeta(offset, total);
+                toggleButton(false, !!data.hasMore);
+            } catch (e) {
+                document.getElementById('errorBox').style.display = 'block';
+                toggleButton(false, false);
+            } finally {
+                loading = false;
+            }
+        }
+
+        function renderCards(photos) {
+            const grid = document.getElementById('galleryGrid');
+            const html = photos.map((photo) => {
+                const title = escapeHtml(photo.title || 'Wildlife Observation');
+                const subtitle = escapeHtml(photo.subtitle || 'Koyna Region');
+                const date = escapeHtml(photo.eventDate || 'Date not available');
+                const link = escapeHtml(photo.occurrenceUrl || '#');
+                const hasImage = !!photo.hasImage;
+                const thumb = escapeHtml(photo.thumbnailUrl || '');
+                const proxy = `/photo-proxy/?url=${encodeURIComponent(photo.thumbnailUrl || '')}`;
+
+                return `
+                    <a class="card" href="${link}" target="_blank" rel="noopener noreferrer">
+                        <div class="frame">
+                            ${hasImage
+                                ? `<img src="${thumb}" data-proxy="${proxy}" alt="${title}" loading="lazy" referrerpolicy="no-referrer" onerror="handleImgError(this)">`
+                                : '<div class="fallback">Observation Link</div>'}
+                        </div>
+                        <div class="content">
+                            <div class="name">${title}</div>
+                            <div class="sub">${subtitle}</div>
+                            <div class="date">${date}</div>
+                        </div>
+                    </a>
+                `;
+            }).join('');
+
+            grid.insertAdjacentHTML('beforeend', html);
+        }
+
+        function handleImgError(img) {
+            if (!img.dataset.proxied && img.dataset.proxy) {
+                img.dataset.proxied = '1';
+                img.src = img.dataset.proxy;
+                return;
+            }
+            const frame = img.closest('.frame');
+            if (frame) {
+                frame.innerHTML = '<div class="fallback">Observation Link</div>';
+            }
+        }
+
+        function updateMeta(shown, totalCount) {
+            const text = shown ? `Showing ${shown} of ${totalCount} photos` : 'No photos found';
+            document.getElementById('metaText').textContent = text;
+        }
+
+        function toggleButton(disabled, visible = true) {
+            const btn = document.getElementById('loadMoreBtn');
+            btn.disabled = disabled;
+            btn.style.display = visible ? 'inline-block' : 'none';
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>

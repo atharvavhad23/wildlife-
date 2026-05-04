@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Koyna WLS · Wildlife Intelligence Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{--bg:#07120d;--panel:#0b1a11;--card:#111e16;--border:rgba(82,183,136,.2);--green:#52b788;--glow:#74c69d;--gold:#f4a261;--amber:#e76f51;--sky:#4cc9f0;--pink:#f72585;--text:#d8f3dc;--muted:#8aaa96;--dim:#4f7263;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+.nav{position:sticky;top:0;z-index:100;height:52px;background:linear-gradient(90deg,#050e08,#0c1b12);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;}
+.nav-logo{font-size:1.05rem;font-weight:800;color:var(--glow);}span.gold{color:var(--gold);}
+.nav-sep{width:1px;height:22px;background:var(--border);}
+.nav-sub{font-size:.72rem;color:var(--muted);}
+.nav-links{margin-left:auto;display:flex;gap:6px;}
+.nav-btn{text-decoration:none;font-size:.7rem;color:var(--muted);padding:4px 11px;border:1px solid var(--border);border-radius:6px;transition:.14s;}
+.nav-btn:hover,.nav-btn.active{background:rgba(82,183,136,.12);color:var(--green);border-color:var(--green);}
+.page{max-width:1400px;margin:0 auto;padding:20px 18px;}
+h1{font-size:1.6rem;font-weight:800;margin-bottom:4px;background:linear-gradient(135deg,var(--glow),var(--sky));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.subtitle{font-size:.78rem;color:var(--muted);margin-bottom:22px;}
+/* Hero stats */
+.hero{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px;}
+.hstat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;position:relative;overflow:hidden;}
+.hstat::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(82,183,136,.06),transparent);pointer-events:none;}
+.hstat-v{font-size:2rem;font-weight:800;color:var(--green);line-height:1;}
+.hstat-l{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:4px;}
+.hstat-sub{font-size:.58rem;color:var(--dim);margin-top:2px;}
+/* Section */
+.section{margin-bottom:24px;}
+.sec-title{font-size:.78rem;font-weight:700;color:var(--glow);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border);}
+/* Dataset cards */
+.ds-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.ds-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:.15s;text-decoration:none;display:block;color:inherit;}
+.ds-card:hover{border-color:var(--green);transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,.5);}
+.ds-icon{font-size:2.2rem;margin-bottom:8px;}
+.ds-name{font-size:1.05rem;font-weight:800;margin-bottom:6px;}
+.ds-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.65rem;}
+.ds-stat-r{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(82,183,136,.08);}
+.ds-stat-r span:first-child{color:var(--muted);}
+.ds-stat-r span:last-child{color:var(--glow);font-weight:600;}
+.ds-bar{height:3px;border-radius:3px;margin-top:10px;background:rgba(82,183,136,.15);overflow:hidden;}
+.ds-bar-fill{height:100%;border-radius:3px;transition:width 1s ease;}
+/* 2-col layout */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;}
+/* Seasonal chart */
+.seasonal-bars{display:flex;align-items:flex-end;gap:4px;height:90px;padding-bottom:4px;}
+.s-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.s-bar{width:100%;border-radius:3px 3px 0 0;transition:height 1s ease;min-height:2px;}
+.s-label{font-size:.55rem;color:var(--dim);}
+/* Conservation alerts */
+.alert-list{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;}
+.alert-list::-webkit-scrollbar{width:3px;}
+.alert-list::-webkit-scrollbar-thumb{background:var(--border);}
+.alert-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;border:1px solid transparent;}
+.alert-item.critical{background:rgba(231,111,81,.08);border-color:rgba(231,111,81,.25);}
+.alert-item.high{background:rgba(247,37,133,.06);border-color:rgba(247,37,133,.2);}
+.alert-item.medium{background:rgba(244,162,97,.06);border-color:rgba(244,162,97,.2);}
+.alert-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.alert-name{font-size:.73rem;font-style:italic;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.alert-cls{font-size:.58rem;color:var(--muted);}
+.alert-pct{font-size:.7rem;font-weight:700;white-space:nowrap;}
+.no-alerts{padding:20px;text-align:center;color:var(--muted);font-size:.75rem;}
+/* Observers */
+.obs-list{display:flex;flex-direction:column;gap:5px;max-height:300px;overflow-y:auto;}
+.obs-item{display:flex;align-items:center;gap:9px;padding:7px 8px;background:rgba(255,255,255,.03);border-radius:7px;}
+.obs-rank{width:20px;font-size:.65rem;font-weight:800;color:var(--dim);text-align:center;flex-shrink:0;}
+.obs-rank.top{color:var(--gold);}
+.obs-name{flex:1;font-size:.7rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.obs-cnt{font-size:.65rem;font-weight:700;color:var(--green);white-space:nowrap;}
+.obs-sp{font-size:.58rem;color:var(--muted);white-space:nowrap;}
+/* Dataset selector */
+.ds-tabs{display:flex;gap:5px;margin-bottom:12px;}
+.ds-tab{padding:5px 14px;border:1px solid var(--border);border-radius:8px;font-size:.7rem;font-weight:600;cursor:pointer;background:transparent;color:var(--muted);transition:.13s;}
+.ds-tab.on{background:rgba(82,183,136,.12);color:var(--green);border-color:var(--green);}
+/* Links */
+.explore-btn{display:inline-block;margin-top:12px;padding:7px 16px;background:linear-gradient(135deg,#2d6a4f,#52b788);color:#fff;border-radius:8px;font-size:.72rem;font-weight:700;text-decoration:none;transition:.14s;}
+.explore-btn:hover{filter:brightness(1.15);}
+/* Loading */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+.loading{display:flex;align-items:center;gap:8px;font-size:.72rem;color:var(--muted);padding:12px 0;}
+/* Year history sparkline */
+.spark-svg{width:100%;height:32px;}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-logo">🌿 Koyna <span class="gold">WLS</span></div>
+  <div class="nav-sep"></div>
+  <div class="nav-sub">Wildlife Intelligence Dashboard</div>
+  <div class="nav-links">
+    <a class="nav-btn" href="/">🏠 Home</a>
+    <a class="nav-btn active" href="/wildlife/dashboard/">📊 Dashboard</a>
+    <a class="nav-btn" href="/animals/clustering/">🗺 Heatmap</a>
+    <a class="nav-btn" href="/animals/">🐾 Animals</a>
+    <a class="nav-btn" href="/birds/">🦜 Birds</a>
+    <a class="nav-btn" href="/insects/">🦋 Insects</a>
+  </div>
+</nav>
+
+<div class="page">
+  <h1>🦁 Koyna Wildlife Intelligence Dashboard</h1>
+  <p class="subtitle">Real-time biodiversity analysis · Koyna Wildlife Sanctuary, Maharashtra · Est. 1985</p>
+
+  <!-- Hero stats -->
+  <div class="hero" id="heroStats">
+    <div class="hstat"><div class="hstat-v" id="hTotal">—</div><div class="hstat-l">Total Records</div><div class="hstat-sub">All Datasets</div></div>
+    <div class="hstat"><div class="hstat-v" id="hSpecies" style="color:var(--sky)">—</div><div class="hstat-l">Total Species</div><div class="hstat-sub">Animals+Birds+Insects</div></div>
+    <div class="hstat"><div class="hstat-v" id="hFamilies" style="color:var(--gold)">—</div><div class="hstat-l">Families</div><div class="hstat-sub">Taxonomic</div></div>
+    <div class="hstat"><div class="hstat-v" id="hAlerts" style="color:var(--amber)">—</div><div class="hstat-l">⚠ Alerts</div><div class="hstat-sub">Declining Species</div></div>
+    <div class="hstat"><div class="hstat-v" id="hYears" style="color:var(--pink)">—</div><div class="hstat-l">Year Span</div><div class="hstat-sub">Observation History</div></div>
+  </div>
+
+  <!-- Dataset overview -->
+  <div class="section">
+    <div class="sec-title">📂 Dataset Overview</div>
+    <div class="ds-grid" id="dsGrid"><div class="loading"><div class="spin"></div> Loading datasets…</div></div>
+  </div>
+
+  <div class="two-col">
+    <!-- Conservation Alerts -->
+    <div class="section">
+      <div class="sec-title">🚨 Conservation Alerts</div>
+      <div class="card">
+        <div class="ds-tabs" id="alertTabs">
+          <button class="ds-tab on" onclick="loadAlerts('animals',this)">🐾 Animals</button>
+          <button class="ds-tab" onclick="loadAlerts('birds',this)">🦜 Birds</button>
+          <button class="ds-tab" onclick="loadAlerts('insects',this)">🦋 Insects</button>
+        </div>
+        <div class="alert-list" id="alertList"><div class="loading"><div class="spin"></div> Detecting declining species…</div></div>
+      </div>
+    </div>
+
+    <!-- Seasonal Activity -->
+    <div class="section">
+      <div class="sec-title">🌡️ Seasonal Activity</div>
+      <div class="card">
+        <div class="ds-tabs" id="seasonTabs">
+          <button class="ds-tab on" onclick="loadSeasonal('animals',this)">🐾 Animals</button>
+          <button class="ds-tab" onclick="loadSeasonal('birds',this)">🦜 Birds</button>
+          <button class="ds-tab" onclick="loadSeasonal('insects',this)">🦋 Insects</button>
+        </div>
+        <div class="seasonal-bars" id="seasonBars"><div class="loading"><div class="spin"></div></div></div>
+        <div style="font-size:.6rem;color:var(--dim);margin-top:6px;" id="seasonNote"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <!-- Top Observers -->
+    <div class="section">
+      <div class="sec-title">🏆 Top Observers</div>
+      <div class="card">
+        <div class="ds-tabs" id="obsTabs">
+          <button class="ds-tab on" onclick="loadObservers('animals',this)">🐾 Animals</button>
+          <button class="ds-tab" onclick="loadObservers('birds',this)">🦜 Birds</button>
+          <button class="ds-tab" onclick="loadObservers('insects',this)">🦋 Insects</button>
+        </div>
+        <div class="obs-list" id="obsList"><div class="loading"><div class="spin"></div> Loading leaderboard…</div></div>
+      </div>
+    </div>
+
+    <!-- Quick links -->
+    <div class="section">
+      <div class="sec-title">🔗 Explore & Analyze</div>
+      <div class="card" style="display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <div style="font-size:.8rem;font-weight:700;color:var(--glow);margin-bottom:6px;">🗺 Interactive Heatmaps</div>
+          <div style="font-size:.68rem;color:var(--muted);margin-bottom:8px;">K-Means clustering of 30,000+ observations across 3 datasets with real-time species drill-down and iNaturalist photos.</div>
+          <a class="explore-btn" href="/animals/clustering/">Open Animal Heatmap →</a>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:12px;">
+          <div style="font-size:.8rem;font-weight:700;color:var(--glow);margin-bottom:6px;">📸 Species Photo Gallery</div>
+          <div style="font-size:.68rem;color:var(--muted);margin-bottom:8px;">Browse curated wildlife photographs from iNaturalist observations recorded at Koyna WLS.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a class="explore-btn" href="/animals/photos/">🐾 Animals</a>
+            <a class="explore-btn" style="background:linear-gradient(135deg,#1a4a6b,#4cc9f0);" href="/birds/photos/">🦜 Birds</a>
+            <a class="explore-btn" style="background:linear-gradient(135deg,#4a1a6b,#f72585);" href="/insects/photos/">🦋 Insects</a>
+          </div>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:12px;">
+          <div style="font-size:.8rem;font-weight:700;color:var(--glow);margin-bottom:6px;">🤖 ML Species Prediction</div>
+          <div style="font-size:.68rem;color:var(--muted);margin-bottom:8px;">Enter environmental parameters and let our trained ML models predict likely species encounters.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <a class="explore-btn" href="/animals/">Predict Animals</a>
+            <a class="explore-btn" style="background:linear-gradient(135deg,#1a4a6b,#4cc9f0);" href="/birds/">Predict Birds</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function esc(t){return String(t||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+async function loadDashboard(){
+  try{
+    const r=await fetch('/api/dashboard-stats/');
+    const d=await r.json();
+    const ds=d.datasets;
+    // Hero stats
+    let totalSp=0,totalFam=0,minY=9999,maxY=0;
+    for(const [,v] of Object.entries(ds)){totalSp+=v.species;totalFam+=v.families;if(v.yearMin&&v.yearMin<minY)minY=v.yearMin;if(v.yearMax&&v.yearMax>maxY)maxY=v.yearMax;}
+    document.getElementById('hTotal').textContent=d.totalRecords.toLocaleString();
+    document.getElementById('hSpecies').textContent=totalSp.toLocaleString();
+    document.getElementById('hFamilies').textContent=totalFam.toLocaleString();
+    document.getElementById('hYears').textContent=`${minY}–${maxY}`;
+    // Dataset cards
+    const icons={animals:'🐾',birds:'🦜',insects:'🦋'};
+    const names={animals:'Animals',birds:'Birds',insects:'Insects'};
+    const colors={animals:'#52b788',birds:'#4cc9f0',insects:'#f72585'};
+    const links={animals:'/animals/clustering/',birds:'/animals/',insects:'/insects/'};
+    const maxTotal=Math.max(...Object.values(ds).map(v=>v.total));
+    document.getElementById('dsGrid').innerHTML=Object.entries(ds).map(([k,v])=>`
+      <a class="ds-card" href="${links[k]}" style="border-top:3px solid ${colors[k]}40;">
+        <div class="ds-icon">${icons[k]}</div>
+        <div class="ds-name" style="color:${colors[k]}">${names[k]}</div>
+        <div class="ds-stats">
+          <div class="ds-stat-r"><span>Records</span><span>${v.total.toLocaleString()}</span></div>
+          <div class="ds-stat-r"><span>Species</span><span>${v.species.toLocaleString()}</span></div>
+          <div class="ds-stat-r"><span>Families</span><span>${v.families}</span></div>
+          <div class="ds-stat-r"><span>Years</span><span>${v.yearMin}–${v.yearMax}</span></div>
+          <div class="ds-stat-r"><span>Top Area</span><span style="font-size:.57rem">${esc((v.topLocality||'Koyna').substring(0,18))}</span></div>
+        </div>
+        <div class="ds-bar"><div class="ds-bar-fill" style="width:${Math.round(v.total/maxTotal*100)}%;background:${colors[k]};"></div></div>
+      </a>`).join('');
+  }catch(e){console.error(e);}
+}
+
+async function loadAlerts(ds, btn){
+  document.querySelectorAll('#alertTabs .ds-tab').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  document.getElementById('alertList').innerHTML='<div class="loading"><div class="spin"></div> Analysing trends…</div>';
+  try{
+    const r=await fetch(`/api/conservation-alerts/?dataset=${ds}`);
+    const d=await r.json();
+    const total=d.alerts?.length||0;
+    document.getElementById('hAlerts').textContent=total;
+    if(!total){document.getElementById('alertList').innerHTML='<div class="no-alerts">✅ No significant declines detected in this dataset.</div>';return;}
+    document.getElementById('alertList').innerHTML=d.alerts.map(a=>{
+      const col=a.severity==='critical'?'#e76f51':a.severity==='high'?'#f72585':'#f4a261';
+      return `<div class="alert-item ${a.severity}">
+        <div class="alert-dot" style="background:${col}"></div>
+        <div style="flex:1;min-width:0;">
+          <div class="alert-name">${esc(a.species)}</div>
+          <div class="alert-cls">${esc(a.class)} · ${esc(a.order)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="alert-pct" style="color:${col}">↓${a.dropPercent}%</div>
+          <div style="font-size:.57rem;color:var(--dim);">${a.recentObs} vs ${a.priorObs} obs</div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){document.getElementById('alertList').innerHTML='<div class="no-alerts">⚠ Could not load alerts.</div>';}
+}
+
+async function loadSeasonal(ds, btn){
+  document.querySelectorAll('#seasonTabs .ds-tab').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  document.getElementById('seasonBars').innerHTML='<div class="loading"><div class="spin"></div></div>';
+  try{
+    const r=await fetch(`/api/seasonal-activity/?dataset=${ds}`);
+    const d=await r.json();
+    const data=d.seasonal||[];
+    const mx=Math.max(...data.map(m=>m.count))||1;
+    const colors={animals:'#52b788',birds:'#4cc9f0',insects:'#f72585'};
+    const col=colors[ds]||'#52b788';
+    document.getElementById('seasonBars').innerHTML=data.map(m=>{
+      const pct=Math.max(4,Math.round((m.count/mx)*100));
+      return `<div class="s-bar-wrap">
+        <div class="s-bar" style="height:${pct}%;background:${col};opacity:.8;" title="${m.name}: ${m.count.toLocaleString()}"></div>
+        <div class="s-label">${m.name.substring(0,1)}</div>
+      </div>`;
+    }).join('');
+    const peakM=data.reduce((a,b)=>a.count>b.count?a:b,data[0]);
+    document.getElementById('seasonNote').textContent=`Peak activity: ${peakM?.name||'—'} (${(peakM?.count||0).toLocaleString()} obs)`;
+  }catch(e){document.getElementById('seasonBars').innerHTML='';}
+}
+
+async function loadObservers(ds, btn){
+  document.querySelectorAll('#obsTabs .ds-tab').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  document.getElementById('obsList').innerHTML='<div class="loading"><div class="spin"></div> Loading…</div>';
+  try{
+    const r=await fetch(`/api/top-observers/?dataset=${ds}`);
+    const d=await r.json();
+    const obs=d.observers||[];
+    if(!obs.length){document.getElementById('obsList').innerHTML='<div class="no-alerts">No observer data available.</div>';return;}
+    const mx=obs[0]?.observations||1;
+    document.getElementById('obsList').innerHTML=obs.map((o,i)=>`
+      <div class="obs-item">
+        <div class="obs-rank${i<3?' top':''}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="obs-name">${esc(o.name)}</div>
+          <div style="height:3px;background:rgba(82,183,136,.1);border-radius:2px;margin-top:3px;overflow:hidden;">
+            <div style="width:${Math.round(o.observations/mx*100)}%;height:100%;background:var(--green);border-radius:2px;"></div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div class="obs-cnt">${o.observations.toLocaleString()}</div>
+          <div class="obs-sp">${o.species} sp</div>
+        </div>
+      </div>`).join('');
+  }catch(e){document.getElementById('obsList').innerHTML='';}
+}
+
+// Boot
+loadDashboard();
+loadAlerts('animals', null);
+loadSeasonal('animals', null);
+loadObservers('animals', null);
+</script>
+</body>
+</html>

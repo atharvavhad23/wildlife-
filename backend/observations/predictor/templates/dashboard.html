@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ species_label|default:'Wildlife' }} Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-900">
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-20">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div>
+                <p class="text-xs uppercase tracking-wider text-slate-500">Wildlife Intelligence</p>
+                <h1 class="text-lg font-bold">{{ species_label|default:'Wildlife' }} Prediction Dashboard</h1>
+            </div>
+            <div class="flex gap-2">
+                <a href="/" class="rounded-lg px-3 py-2 text-sm bg-slate-200 hover:bg-slate-300">Home</a>
+                {% if species_label == 'Birds' %}
+                <a href="/birds/" class="rounded-lg px-3 py-2 text-sm bg-teal-700 text-white hover:bg-teal-800">Back to Birds</a>
+                {% elif species_label == 'Insects' %}
+                <a href="/insects/" class="rounded-lg px-3 py-2 text-sm bg-amber-700 text-white hover:bg-amber-800">Back to Insects</a>
+                {% else %}
+                <a href="/animals/" class="rounded-lg px-3 py-2 text-sm bg-emerald-700 text-white hover:bg-emerald-800">Back to Animals</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        {% if error %}
+        <section class="rounded-xl border border-red-200 bg-red-50 text-red-700 p-4">
+            <p class="font-semibold">Unable to build dashboard</p>
+            <p class="mt-1">{{ error }}</p>
+        </section>
+        {% elif prediction is None %}
+        <section class="rounded-xl border border-amber-200 bg-amber-50 text-amber-700 p-4">
+            <p class="font-semibold">No prediction yet</p>
+            <p class="mt-1">Submit a prediction form to view the detailed analysis dashboard.</p>
+        </section>
+        {% else %}
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <section class="xl:col-span-1 space-y-6">
+                <div class="bg-white rounded-2xl shadow p-5">
+                    <h2 class="text-lg font-semibold text-slate-800">Input Summary</h2>
+                    <div class="mt-3 max-h-72 overflow-auto">
+                        <ul class="divide-y divide-slate-200 text-sm">
+                            {% for item in input_summary %}
+                            <li class="py-2 flex items-center justify-between">
+                                <span class="text-slate-600">{{ item.label }}</span>
+                                <span class="font-semibold text-slate-900">{{ item.value }}</span>
+                            </li>
+                            {% empty %}
+                            <li class="py-2 text-slate-500">No inputs available.</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                {% if species_label == 'Insects' and engineered_summary %}
+                <div class="bg-white rounded-2xl shadow p-5">
+                    <h2 class="text-lg font-semibold text-slate-800">Engineered Features Used</h2>
+                    <p class="mt-1 text-sm text-slate-500">Auto-derived features used by the insects model</p>
+                    <div class="mt-3 max-h-72 overflow-auto">
+                        <ul class="divide-y divide-slate-200 text-sm">
+                            {% for item in engineered_summary %}
+                            <li class="py-2 flex items-center justify-between">
+                                <span class="text-slate-600">{{ item.label }}</span>
+                                <span class="font-semibold text-slate-900">{{ item.value }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="bg-white rounded-2xl shadow p-5">
+                    <h2 class="text-lg font-semibold text-slate-800">Prediction</h2>
+                    <p class="mt-1 text-sm text-slate-500">Estimated population density</p>
+                    <p class="mt-2 text-4xl font-bold text-slate-900">{{ prediction }}</p>
+                    <p class="text-sm text-slate-500">{% if species_label == 'Birds' %}birds / observation area{% else %}animals / sq. km{% endif %}</p>
+
+                    <div class="mt-4">
+                        <div class="flex justify-between text-xs text-slate-500 mb-1">
+                            <span>Low</span><span>High</span>
+                        </div>
+                        <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                            <div id="predictionBar" class="h-3 bg-indigo-600 rounded-full" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 rounded-lg p-3 border {% if decision.risk_level == 'High' %}bg-red-50 border-red-200{% elif decision.risk_level == 'Medium' %}bg-amber-50 border-amber-200{% else %}bg-green-50 border-green-200{% endif %}">
+                        <p class="text-sm text-slate-700">Risk Level</p>
+                        <p class="text-xl font-bold {% if decision.risk_level == 'High' %}text-red-700{% elif decision.risk_level == 'Medium' %}text-amber-700{% else %}text-green-700{% endif %}">
+                            {{ decision.risk_level }}
+                        </p>
+                        <p class="text-sm mt-1"><span class="font-semibold">Status:</span> {{ decision.status }}</p>
+                    </div>
+
+                    <div class="mt-4 p-3 rounded-lg border {% if trend.trend == 'Decreasing' %}bg-red-50 border-red-200{% elif trend.trend == 'Increasing' %}bg-green-50 border-green-200{% else %}bg-slate-50 border-slate-200{% endif %}">
+                        <p class="text-sm font-semibold">Trend Analysis</p>
+                        <p class="mt-1 text-lg font-bold">
+                            {% if trend.trend == 'Increasing' %}↑{% elif trend.trend == 'Decreasing' %}↓{% else %}→{% endif %}
+                            {{ trend.trend }} ({{ trend.percentage_change }}%)
+                        </p>
+                        {% if trend.trend == 'Decreasing' %}
+                        <p class="mt-1 text-sm text-red-700">Early Warning: population trend is declining. Consider immediate conservation action.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="xl:col-span-2 space-y-6">
+                <div class="bg-white rounded-2xl shadow p-5">
+                    <h2 class="text-lg font-semibold text-slate-800">Environmental Conditions</h2>
+                    <canvas id="envChart" class="mt-4"></canvas>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow p-5">
+                    <h2 class="text-lg font-semibold text-slate-800">Location Intelligence Map</h2>
+                    <p class="text-sm text-slate-500 mt-1">Marker shows predicted density and risk at provided coordinates.</p>
+                    <div id="predictionMap" class="mt-4 h-72 rounded-xl border border-slate-200"></div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow p-5">
+                    <h2 class="text-lg font-semibold text-slate-800">Conservation Recommendation</h2>
+                    <p class="mt-2 text-slate-700">{{ decision.recommendation }}</p>
+                </div>
+
+                {% if feature_importance.labels %}
+                <div class="bg-white rounded-2xl shadow p-5">
+                    <h2 class="text-lg font-semibold text-slate-800">Top Feature Importance</h2>
+                    <canvas id="importanceChart" class="mt-4"></canvas>
+                </div>
+                {% endif %}
+            </section>
+        </div>
+
+        {{ chart_data|json_script:"chart-data" }}
+        {{ map_data|json_script:"map-data" }}
+        {{ feature_importance|json_script:"importance-data" }}
+
+        <script>
+            const chartData = JSON.parse(document.getElementById('chart-data').textContent);
+            const mapData = JSON.parse(document.getElementById('map-data').textContent);
+            const importanceData = JSON.parse(document.getElementById('importance-data').textContent);
+
+            const envCtx = document.getElementById('envChart');
+            new Chart(envCtx, {
+                type: 'bar',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: 'Environmental Metrics',
+                        data: chartData.values,
+                        backgroundColor: ['#0ea5e9', '#3b82f6', '#6366f1', '#14b8a6', '#22c55e', '#f97316'],
+                        borderRadius: 8,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            const predNormalized = Math.max(0, Math.min(100, mapData.prediction_normalized));
+            document.getElementById('predictionBar').style.width = predNormalized + '%';
+
+            const map = L.map('predictionMap').setView([mapData.lat, mapData.lon], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            const riskColors = {
+                Low: '#16a34a',
+                Medium: '#d97706',
+                High: '#dc2626'
+            };
+            const markerColor = riskColors[mapData.risk_level] || '#2563eb';
+
+            const marker = L.circleMarker([mapData.lat, mapData.lon], {
+                radius: 10,
+                color: markerColor,
+                fillColor: markerColor,
+                fillOpacity: 0.9,
+            }).addTo(map);
+
+            marker.bindPopup(
+                `<b>Predicted Density:</b> ${mapData.prediction}<br/><b>Risk:</b> ${mapData.risk_level}`
+            );
+
+            if (importanceData.labels && importanceData.labels.length > 0) {
+                const impCtx = document.getElementById('importanceChart');
+                if (impCtx) {
+                    new Chart(impCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: importanceData.labels,
+                            datasets: [{
+                                label: 'Importance',
+                                data: importanceData.values,
+                                backgroundColor: '#0f766e',
+                                borderRadius: 8,
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            plugins: { legend: { display: false } },
+                            scales: { x: { beginAtZero: true } }
+                        }
+                    });
+                }
+            }
+        </script>
+        {% endif %}
+    </main>
+</body>
+</html>

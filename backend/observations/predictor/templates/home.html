@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wildlife Prediction System - Koyna Region</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .navbar {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 30px;
+            text-align: center;
+            margin-bottom: 40px;
+            border-radius: 10px;
+            color: white;
+        }
+
+        .navbar h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .navbar p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .intro-section {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        .intro-section h2 {
+            color: #1B5E20;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .intro-section p {
+            font-size: 1.1em;
+            color: #333;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .flow-note {
+            margin-top: 15px;
+            display: inline-block;
+            background: #E8F5E9;
+            color: #1B5E20;
+            border: 1px solid #C8E6C9;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-weight: 700;
+            font-size: 0.95em;
+        }
+
+        .cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            padding: 30px;
+            text-align: center;
+        }
+
+        .card-animals {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+        }
+
+        .card-birds {
+            background: linear-gradient(135deg, #4ECDC4 0%, #44B5AA 100%);
+        }
+
+        .card-insects {
+            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+        }
+
+        .card-header h3 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: white;
+        }
+
+        .card-header p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1em;
+            margin-bottom: 20px;
+        }
+
+        .icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .card-body {
+            padding: 30px;
+            background: white;
+        }
+
+        .card-body h4 {
+            color: #1B5E20;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .card-body ul {
+            list-style: none;
+            margin-bottom: 20px;
+        }
+
+        .card-body li {
+            padding: 8px 0;
+            color: #333;
+            border-bottom: 1px solid #eee;
+        }
+
+        .card-body li:before {
+            content: "✓ ";
+            color: #2E7D32;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 40px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.1em;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            border: none;
+            width: 100%;
+        }
+
+        .btn-animals {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E8E 100%);
+            color: white;
+        }
+
+        .btn-animals:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 25px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-birds {
+            background: linear-gradient(135deg, #4ECDC4 0%, #44B5AA 100%);
+            color: white;
+        }
+
+        .btn-birds:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 25px rgba(78, 205, 196, 0.4);
+        }
+
+        .btn-insects {
+            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+            color: white;
+        }
+
+        .btn-insects:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #eee;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2E7D32;
+        }
+
+        .stat-label {
+            font-size: 0.95em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            margin-top: 40px;
+            font-size: 0.95em;
+        }
+
+
+        @media (max-width: 768px) {
+            .navbar h1 {
+                font-size: 1.8em;
+            }
+
+            .intro-section h2 {
+                font-size: 1.5em;
+            }
+
+            .cards-container {
+                grid-template-columns: 1fr;
+            }
+
+            .card-header h3 {
+                font-size: 2em;
+            }
+
+            .icon {
+                font-size: 3em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🌿 Wildlife Prediction System</h1>
+        <p>Koyna Wildlife Sanctuary - Population Density Forecasting</p>
+    </div>
+
+    <div class="container">
+        <div class="intro-section">
+            <h2>Welcome to Wildlife Prediction</h2>
+            <p>Use machine learning to predict wildlife population density in different areas of the Koyna region.</p>
+            <p>Select whether you want to predict animal, bird, or insect population density based on environmental and temporal factors.</p>
+            <div class="flow-note">Flow: Home → Prediction Form → Detailed Dashboard</div>
+
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">Prediction Models</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">13+</div>
+                    <div class="stat-label">Features Used</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">89%+</div>
+                    <div class="stat-label">Accuracy</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cards-container">
+            <!-- Animals Card -->
+            <a href="/animals/" class="card">
+                <div class="card-header card-animals">
+                    <div class="icon">🦁</div>
+                    <h3>Animals</h3>
+                    <p>General Wildlife</p>
+                </div>
+                <div class="card-body">
+                    <h4>Predict Animal Population</h4>
+                    <ul>
+                        <li>Mammals & Reptiles</li>
+                        <li>Spatial Analysis</li>
+                        <li>Temporal Patterns</li>
+                        <li>Environmental Factors</li>
+                    </ul>
+                    <button class="btn btn-animals">Predict Animals Density →</button>
+                </div>
+            </a>
+
+            <!-- Birds Card -->
+            <a href="/birds/" class="card">
+                <div class="card-header card-birds">
+                    <div class="icon">🦅</div>
+                    <h3>Birds</h3>
+                    <p>Avian Species</p>
+                </div>
+                <div class="card-body">
+                    <h4>Predict Bird Population</h4>
+                    <ul>
+                        <li>Various Bird Species</li>
+                        <li>Migratory Patterns</li>
+                        <li>Seasonal Variations</li>
+                        <li>Habitat Preferences</li>
+                    </ul>
+                    <button class="btn btn-birds">Predict Birds Density →</button>
+                </div>
+            </a>
+
+            <!-- Insects Card -->
+            <a href="/insects/" class="card">
+                <div class="card-header card-insects">
+                    <div class="icon">🦋</div>
+                    <h3>Insects</h3>
+                    <p>Invertebrate Species</p>
+                </div>
+                <div class="card-body">
+                    <h4>Predict Insect Population</h4>
+                    <ul>
+                        <li>Pollinator & Arthropod Trends</li>
+                        <li>Micro-Habitat Density Signals</li>
+                        <li>Seasonal Emergence Patterns</li>
+                        <li>Taxonomy-Aware Predictions</li>
+                    </ul>
+                    <button class="btn btn-insects">Predict Insects Density →</button>
+                </div>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>🔬 Powered by Advanced Machine Learning | 📊 Based on Historical Sighting Data | 📍 Koyna Wildlife Sanctuary</p>
+        </div>
+    </div>
+</body>
+</html>

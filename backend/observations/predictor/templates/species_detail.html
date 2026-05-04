@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ species_name }} - Species Detail</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f4f8fb 0%, #eaf4f6 100%);
+            min-height: 100vh;
+            color: #1f2937;
+        }
+
+        .wrap {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(15, 118, 110, 0.08);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .header-title h1 {
+            font-size: 2.2rem;
+            font-style: italic;
+            color: #0f766e;
+            margin-bottom: 8px;
+        }
+
+        .header-title p {
+            font-size: 1rem;
+            color: #6b7280;
+        }
+
+        .back-btn {
+            text-decoration: none;
+            padding: 10px 16px;
+            background: #0f766e;
+            color: white;
+            border-radius: 8px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .back-btn:hover {
+            background: #115e56;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .info-card {
+            background: #f9fafb;
+            padding: 14px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .info-card label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+
+        .info-card .value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(15, 118, 110, 0.08);
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #0f766e;
+            border-bottom: 2px solid #d1fae5;
+            padding-bottom: 12px;
+        }
+
+        .map-container {
+            width: 100%;
+            height: 400px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+
+        .taxonomy-list {
+            list-style: none;
+        }
+
+        .taxonomy-item {
+            padding: 10px;
+            background: #f9fafb;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #0f766e;
+            font-size: 0.95rem;
+        }
+
+        .taxonomy-item span {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #6b7280;
+            margin-bottom: 2px;
+        }
+
+        .stats-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+
+        .stats-box .stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #dcfce7;
+        }
+
+        .stats-box .stat:last-child {
+            border-bottom: none;
+        }
+
+        .stats-box .label {
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .stats-box .value {
+            font-weight: 700;
+            color: #15803d;
+            font-size: 1.1rem;
+        }
+
+        .gallery-section {
+            grid-column: 1 / -1;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .gallery-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .gallery-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .gallery-image {
+            width: 100%;
+            height: 140px;
+            background: #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            font-size: 0.8rem;
+            color: #6b7280;
+        }
+
+        .gallery-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-content {
+            padding: 10px;
+        }
+
+        .gallery-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+            line-height: 1.2;
+        }
+
+        .gallery-date {
+            font-size: 0.7rem;
+            color: #6b7280;
+        }
+
+        .load-more {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 16px;
+        }
+
+        .load-more button {
+            padding: 10px 20px;
+            background: #0f766e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .load-more button:hover {
+            background: #115e56;
+        }
+
+        .load-more button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .empty-gallery {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6b7280;
+        }
+
+        .meta {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin-top: 12px;
+        }
+
+        @media (max-width: 1024px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header-top {
+                flex-direction: column;
+            }
+
+            .header-title h1 {
+                font-size: 1.6rem;
+            }
+
+            .info-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .gallery-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="header">
+            <div class="header-top">
+                <div class="header-title">
+                    <h1>{{ species.scientificName }}</h1>
+                    <p>{{ species.class }} - {{ species.family }}</p>
+                </div>
+                <a class="back-btn" href="/animals/clustering/">← Clustering Map</a>
+            </div>
+
+            <div class="info-grid">
+                <div class="info-card">
+                    <label>Kingdom</label>
+                    <div class="value">{{ species.kingdom }}</div>
+                </div>
+                <div class="info-card">
+                    <label>Phylum</label>
+                    <div class="value">{{ species.phylum }}</div>
+                </div>
+                <div class="info-card">
+                    <label>Class</label>
+                    <div class="value">{{ species.class }}</div>
+                </div>
+                <div class="info-card">
+                    <label>Order</label>
+                    <div class="value">{{ species.order }}</div>
+                </div>
+                <div class="info-card">
+                    <label>Family</label>
+                    <div class="value">{{ species.family }}</div>
+                </div>
+                <div class="info-card">
+                    <label>Genus</label>
+                    <div class="value">{{ species.genus }}</div>
+                </div>
+                <div class="info-card">
+                    <label>Observations</label>
+                    <div class="value">{{ species.observationCount }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <div class="section-title">Geographic Range</div>
+                <div class="map-container" id="map"></div>
+                <div class="stats-box">
+                    <div class="stat">
+                        <span class="label">Latitude Range</span>
+                        <span class="value">{{ species.geographicRange.minLat|floatformat:2 }}° to {{ species.geographicRange.maxLat|floatformat:2 }}°</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Longitude Range</span>
+                        <span class="value">{{ species.geographicRange.minLon|floatformat:2 }}° to {{ species.geographicRange.maxLon|floatformat:2 }}°</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Center</span>
+                        <span class="value">{{ species.geographicRange.centerLat|floatformat:3 }}, {{ species.geographicRange.centerLon|floatformat:3 }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Species Information</div>
+                <ul class="taxonomy-list">
+                    <li class="taxonomy-item">
+                        <span>Common Name</span>
+                        {{ species.species }}
+                    </li>
+                    <li class="taxonomy-item">
+                        <span>Scientific Name</span>
+                        {{ species.scientificName }}
+                    </li>
+                    <li class="taxonomy-item">
+                        <span>Kingdom</span>
+                        {{ species.kingdom }}
+                    </li>
+                    <li class="taxonomy-item">
+                        <span>Phylum</span>
+                        {{ species.phylum }}
+                    </li>
+                    <li class="taxonomy-item">
+                        <span>Class</span>
+                        {{ species.class }}
+                    </li>
+                    <li class="taxonomy-item">
+                        <span>Order</span>
+                        {{ species.order }}
+                    </li>
+                </ul>
+
+                <div class="stats-box">
+                    <div class="stat">
+                        <span class="label">Total Observations</span>
+                        <span class="value">{{ species.observationCount }}</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Date Range</span>
+                        <span class="value">{{ species.dateRange.earliest }} to {{ species.dateRange.latest }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section gallery-section">
+            <div class="section-title">Photo Gallery</div>
+            <p class="meta" id="galleryMeta">Loading photos...</p>
+            <div class="gallery-grid" id="galleryGrid"></div>
+            <div class="load-more" id="loadMoreContainer" style="display:none;">
+                <button id="loadMoreBtn">Load More Photos</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([{{ species.geographicRange.centerLat }}, {{ species.geographicRange.centerLon }}], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19,
+        }).addTo(map);
+
+        // Add markers for all observations
+        const locations = {{ species.locations | safe }};
+        let bounds = L.latLngBounds();
+
+        locations.forEach(loc => {
+            L.circleMarker([loc.latitude, loc.longitude], {
+                radius: 5,
+                fillColor: '#0f766e',
+                color: '#fff',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.7
+            }).bindPopup(`${loc.locality}<br/>${loc.eventDate}`).addTo(map);
+            
+            bounds.extend([loc.latitude, loc.longitude]);
+        });
+
+        if (bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+
+        // Gallery loading
+        let offset = 0;
+        const limit = 20;
+        let totalPhotos = 0;
+        let loading = false;
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadGalleryChunk();
+        });
+
+        document.getElementById('loadMoreBtn').addEventListener('click', loadGalleryChunk);
+
+        async function loadGalleryChunk() {
+            if (loading) return;
+            loading = true;
+
+            try {
+                const response = await fetch(`{{ photos_api }}?species={{ species_name | urlencode }}&offset=${offset}&limit=${limit}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    document.getElementById('galleryMeta').textContent = `Error: ${data.error}`;
+                    return;
+                }
+
+                totalPhotos = data.total;
+                renderPhotos(data.photos);
+
+                offset = data.nextOffset;
+                document.getElementById('galleryMeta').textContent = `Showing ${offset} of ${totalPhotos} photos`;
+
+                if (data.hasMore) {
+                    document.getElementById('loadMoreContainer').style.display = 'block';
+                } else {
+                    document.getElementById('loadMoreContainer').style.display = 'none';
+                }
+            } catch (e) {
+                document.getElementById('galleryMeta').textContent = `Error loading photos: ${e.message}`;
+            } finally {
+                loading = false;
+            }
+        }
+
+        function renderPhotos(photos) {
+            const grid = document.getElementById('galleryGrid');
+
+            if (!offset && !photos.length) {
+                grid.innerHTML = '<div class="empty-gallery">No photos available for this species</div>';
+                return;
+            }
+
+            const html = photos.map(photo => {
+                const title = escapeHtml(photo.title || 'Wildlife Photo');
+                const date = escapeHtml(photo.eventDate || '');
+                const thumb = escapeHtml(photo.thumbnailUrl || '');
+                const link = escapeHtml(photo.occurrenceUrl || '#');
+                const hasImage = !!photo.hasImage;
+                const proxy = `/photo-proxy/?url=${encodeURIComponent(photo.thumbnailUrl || '')}`;
+
+                return `
+                    <a class="gallery-card" href="${link}" target="_blank" rel="noopener noreferrer">
+                        <div class="gallery-image">
+                            ${hasImage
+                                ? `<img src="${thumb}" alt="${title}" loading="lazy" referrerpolicy="no-referrer" onerror="handleImgError(this)" data-proxy="${proxy}">`
+                                : 'No Image'}
+                        </div>
+                        <div class="gallery-content">
+                            <div class="gallery-title">${title}</div>
+                            <div class="gallery-date">${date}</div>
+                        </div>
+                    </a>
+                `;
+            }).join('');
+
+            grid.insertAdjacentHTML('beforeend', html);
+        }
+
+        function handleImgError(img) {
+            if (!img.dataset.proxied && img.dataset.proxy) {
+                img.dataset.proxied = '1';
+                img.src = img.dataset.proxy;
+                return;
+            }
+            img.parentElement.innerHTML = 'Failed to load';
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+    </script>
+</body>
+</html>

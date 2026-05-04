@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insect Population Density Predictor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #4ECDC4 0%, #44B5AA 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4ECDC4 0%, #44B5AA 100%);
+            color: white;
+            padding: 50px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.15em;
+            opacity: 0.95;
+        }
+
+        .nav-link {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            margin-top: 15px;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #44B5AA;
+            margin-top: 30px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #4ECDC4;
+        }
+
+        .form-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .slider {
+            width: 100%;
+        }
+
+        .validation-msg {
+            font-size: 0.8em;
+            color: #c0392b;
+            min-height: 1em;
+        }
+
+        label {
+            font-weight: 700;
+            color: #44B5AA;
+            margin-bottom: 8px;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .label-icon {
+            font-size: 1.3em;
+        }
+
+        .label-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .label-main {
+            font-size: 1em;
+        }
+
+        .label-desc {
+            font-size: 0.8em;
+            font-weight: 500;
+            color: #72CCCF;
+            margin-top: 2px;
+        }
+
+        input {
+            padding: 12px;
+            border: 2px solid #B2E6E2;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s;
+            background: #F0FFFE;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #4ECDC4;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(78, 205, 196, 0.1);
+        }
+
+        .input-hint {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .hint-label {
+            color: #72CCCF;
+            font-weight: 600;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 40px;
+            margin-bottom: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 16px 30px;
+            font-size: 1.05em;
+            font-weight: 700;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .predict-btn {
+            background: linear-gradient(135deg, #4ECDC4 0%, #44B5AA 100%);
+            color: white;
+        }
+
+        .predict-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(78, 205, 196, 0.4);
+        }
+
+        .reset-btn {
+            background: #f5f5f5;
+            color: #333;
+            border: 2px solid #ddd;
+        }
+
+        .reset-btn:hover {
+            background: #eee;
+            border-color: #999;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .result-section {
+            display: none;
+            background: linear-gradient(135deg, #4ECDC4 0%, #44B5AA 100%);
+            padding: 40px;
+            border-radius: 12px;
+            color: white;
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .result-section.show {
+            display: block;
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-header {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            opacity: 0.95;
+        }
+
+        .result-value {
+            font-size: 4em;
+            font-weight: bold;
+            margin: 20px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .result-unit {
+            font-size: 1.1em;
+            opacity: 0.9;
+            margin-bottom: 30px;
+        }
+
+        .error-section {
+            display: none;
+            background: #ff6b6b;
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .error-section.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4ECDC4;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-top: 35px;
+            padding-top: 30px;
+            border-top: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .insights {
+            margin-top: 24px;
+            text-align: left;
+        }
+
+        .insight-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .insight-card {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 8px;
+            padding: 12px;
+            backdrop-filter: blur(4px);
+        }
+
+        .insight-title {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-bottom: 6px;
+        }
+
+        .insight-value {
+            font-size: 1.15em;
+            font-weight: 700;
+        }
+
+        .risk-box {
+            margin-top: 14px;
+            border-radius: 8px;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+
+        .risk-high { border-left: 5px solid #ff7675; }
+        .risk-medium { border-left: 5px solid #feca57; }
+        .risk-low { border-left: 5px solid #55efc4; }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .info-box {
+            background: #E0F7F6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border-left: 5px solid #4ECDC4;
+        }
+
+        .info-box p {
+            color: #44B5AA;
+            font-size: 1em;
+            line-height: 1.5;
+        }
+
+        .photos-link-box {
+            margin-bottom: 30px;
+            background: #F6FEFD;
+            border: 1px solid #C9F0ED;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .photos-link-box p {
+            color: #4a7e7b;
+            font-size: 0.95em;
+        }
+
+        .photos-link-btn {
+            display: inline-block;
+            padding: 10px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            background: #2b8f89;
+            color: #fff;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .result-value {
+                font-size: 2.5em;
+            }
+
+            .form-section {
+                grid-template-columns: 1fr;
+            }
+
+            .buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🦅 Insect Population Density Predictor</h1>
+            <p>Predict how many insects you'll find in an area</p>
+            <div class="nav-links">
+                <a href="/" class="nav-link">← Back to Home</a>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="info-box">
+                <p>ℹ️ <strong>How to use:</strong> Fill in the insect and environmental details below. After prediction, you will be redirected to the full conservation report page.</p>
+            </div>
+
+            <div class="photos-link-box">
+                <p><strong>Photo Gallery:</strong> Open a separate page to browse all insect observation photos with faster loading.</p>
+                <a href="/insects/photos/" class="photos-link-btn">View Insect Photos</a>
+            </div>
+
+            <form id="predictionForm">
+                {% csrf_token %}
+                <h2 class="section-title">🕐 Time & Location Information</h2>
+                <div class="form-section" id="formContainer-time">
+                    <!-- Time fields will be inserted here -->
+                </div>
+
+                <h2 class="section-title">🦋 Insect Taxonomy Details</h2>
+                <div class="form-section" id="formContainer-species">
+                    <!-- Species fields will be inserted here -->
+                </div>
+
+                <h2 class="section-title">🌍 Environmental & Other Factors</h2>
+                <div class="form-section" id="formContainer-env">
+                    <!-- Environmental fields will be inserted here -->
+                </div>
+
+                <div class="buttons">
+                    <button type="submit" class="predict-btn" id="predictBtn">🔮 Make Prediction</button>
+                    <button type="reset" class="reset-btn" id="resetBtn">↻ Reset Form</button>
+                </div>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p><strong>Analyzing data...</strong></p>
+                <p>Our AI is working to predict the insect population...</p>
+            </div>
+
+            <div class="error-section" id="errorSection">
+                <strong>⚠️ Error:</strong> <span id="errorMessage"></span>
+            </div>
+
+            <div class="result-section" id="resultSection">
+                <div class="result-header">✅ Prediction Complete!</div>
+                <div class="result-header">Expected Insect Sightings</div>
+                <div class="result-value" id="predictionResult">0</div>
+                <div class="result-unit">insects per observation area</div>
+                <div class="stats" id="statsContainer"></div>
+                <div class="insights" id="intelligencePanel"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let features = [];
+        let featureRanges = {};
+        const dropdownFeatures = ['order_enc', 'family_enc', 'taxonRank_enc', 'basisOfRecord_enc', 'season_enc'];
+        const sliderFeatures = ['coordinateUncertaintyInMeters', 'lat_grid', 'lon_grid', 'species_richness'];
+
+        const fieldDescriptions = {
+            // These keys match exactly what `/features/insects/` returns.
+            'coordinateUncertaintyInMeters': { name: 'GPS Accuracy (meters)', desc: 'How accurate the location is (lower is better)', icon: '📍' },
+            'day': { name: 'Day of Month', desc: 'Day of observation (1–31)', icon: '🗓️' },
+            'month': { name: 'Month', desc: 'Month of observation (1–12)', icon: '📅' },
+            'year': { name: 'Year', desc: 'Year when sighting was recorded', icon: '📆' },
+            'decade': { name: 'Decade', desc: 'Decade group derived from year', icon: '⏰' },
+            'season_enc': { name: 'Season Code', desc: 'Season of observation (encoded)', icon: '🌦️' },
+            'lat_grid': { name: 'Latitude Grid', desc: 'North–South grid location', icon: '🧭' },
+            'lon_grid': { name: 'Longitude Grid', desc: 'East–West grid location', icon: '🧭' },
+            'order_enc': { name: 'Insect Order Code', desc: 'Major insect group (encoded)', icon: '🦋' },
+            'family_enc': { name: 'Insect Family Code', desc: 'Insect family (encoded)', icon: '🐛' },
+            'taxonRank_enc': { name: 'Taxonomic Rank Code', desc: 'How specific the classification is (encoded)', icon: '📊' },
+            'basisOfRecord_enc': { name: 'Record Type Code', desc: 'How this record was collected (encoded)', icon: '📋' },
+            'species_richness': { name: 'Biodiversity (Species Richness)', desc: 'How many different species in the area', icon: '🌈' },
+        };
+
+        const fieldCategories = {
+            'time': ['day', 'month', 'year', 'decade', 'season_enc'],
+            'species': ['order_enc', 'family_enc', 'taxonRank_enc', 'basisOfRecord_enc'],
+            'env': ['lat_grid', 'lon_grid', 'coordinateUncertaintyInMeters', 'species_richness'],
+        };
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrftoken = getCookie('csrftoken');
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadFeatures();
+            setupFormSubmission();
+        });
+
+        async function loadFeatures() {
+            try {
+                const response = await fetch('/features/insects/');
+                const data = await response.json();
+                featureRanges = data;
+
+                const containers = {
+                    'time': document.getElementById('formContainer-time'),
+                    'species': document.getElementById('formContainer-species'),
+                    'env': document.getElementById('formContainer-env'),
+                };
+
+                Object.values(containers).forEach(c => c.innerHTML = '');
+
+                for (const [feature, ranges] of Object.entries(data)) {
+                    features.push(feature);
+                    const desc = fieldDescriptions[feature] || { name: feature, desc: '', icon: '📌' };
+                    
+                    let category = 'env';
+                    for (const [cat, fields] of Object.entries(fieldCategories)) {
+                        if (fields.includes(feature)) {
+                            category = cat;
+                            break;
+                        }
+                    }
+
+                    const container = containers[category];
+                    const formGroup = document.createElement('div');
+                    formGroup.className = 'form-group';
+
+                    const label = document.createElement('label');
+                    label.innerHTML = `
+                        <span class="label-icon">${desc.icon}</span>
+                        <span class="label-text">
+                            <span class="label-main">${desc.name}</span>
+                            ${desc.desc ? `<span class="label-desc">${desc.desc}</span>` : ''}
+                        </span>
+                    `;
+
+                    const inputWrap = document.createElement('div');
+                    inputWrap.className = 'input-row';
+
+                    let primaryInput;
+                    if (dropdownFeatures.includes(feature)) {
+                        const span = Math.round(ranges.max - ranges.min);
+                        if (span > 0 && span <= 25) {
+                            const select = document.createElement('select');
+                            select.name = feature;
+                            select.required = true;
+                            select.style.padding = '12px';
+                            select.style.border = '2px solid #B2E6E2';
+                            select.style.borderRadius = '8px';
+                            select.style.background = '#F0FFFE';
+                            for (let val = Math.round(ranges.min); val <= Math.round(ranges.max); val++) {
+                                const opt = document.createElement('option');
+                                opt.value = val;
+                                opt.textContent = val;
+                                if (val === Math.round(ranges.mean)) {
+                                    opt.selected = true;
+                                }
+                                select.appendChild(opt);
+                            }
+                            primaryInput = select;
+                        }
+                    }
+
+                    if (!primaryInput) {
+                        const input = document.createElement('input');
+                        input.type = 'number';
+                        input.name = feature;
+                        input.step = '0.1';
+                        input.min = ranges.min;
+                        input.max = ranges.max;
+                        input.value = Math.round(ranges.mean * 10) / 10;
+                        input.required = true;
+                        primaryInput = input;
+                    }
+
+                    if (primaryInput.tagName === 'INPUT' && sliderFeatures.includes(feature)) {
+                        const slider = document.createElement('input');
+                        slider.type = 'range';
+                        slider.className = 'slider';
+                        slider.min = ranges.min;
+                        slider.max = ranges.max;
+                        slider.step = '0.1';
+                        slider.value = primaryInput.value;
+                        slider.addEventListener('input', () => {
+                            primaryInput.value = slider.value;
+                        });
+                        primaryInput.addEventListener('input', () => {
+                            slider.value = primaryInput.value;
+                        });
+                        inputWrap.appendChild(slider);
+                    }
+
+                    const validation = document.createElement('div');
+                    validation.className = 'validation-msg';
+
+                    primaryInput.addEventListener('invalid', () => {
+                        validation.textContent = 'Enter a valid value within the shown range.';
+                    });
+                    primaryInput.addEventListener('input', () => {
+                        validation.textContent = '';
+                    });
+
+                    const hint = document.createElement('div');
+                    hint.className = 'input-hint';
+                    hint.innerHTML = `
+                        <span class="hint-label">Range:</span>
+                        <span>${ranges.min.toFixed(2)} - ${ranges.max.toFixed(2)}</span>
+                    `;
+
+                    formGroup.appendChild(label);
+                    inputWrap.appendChild(primaryInput);
+                    formGroup.appendChild(inputWrap);
+                    formGroup.appendChild(hint);
+                    formGroup.appendChild(validation);
+                    container.appendChild(formGroup);
+                }
+            } catch (error) {
+                showError('Failed to load features: ' + error.message);
+            }
+        }
+
+        function setupFormSubmission() {
+            document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const form = document.getElementById('predictionForm');
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData);
+                submitToReport('/dashboard/insects/', data);
+            });
+
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                document.getElementById('resultSection').classList.remove('show');
+                document.getElementById('errorSection').classList.remove('show');
+            });
+        }
+
+        function submitToReport(actionUrl, data) {
+            const redirectForm = document.createElement('form');
+            redirectForm.method = 'POST';
+            redirectForm.action = actionUrl;
+
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = csrftoken || '';
+            redirectForm.appendChild(csrfInput);
+
+            Object.entries(data).forEach(([key, value]) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = value;
+                redirectForm.appendChild(input);
+            });
+
+            document.body.appendChild(redirectForm);
+            redirectForm.submit();
+        }
+
+        async function makePrediction() {
+            const form = document.getElementById('predictionForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('resultSection').classList.remove('show');
+            document.getElementById('errorSection').classList.remove('show');
+
+            try {
+                const response = await fetch('/predict/insects/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken,
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    displayResult(result);
+                } else {
+                    showError(result.error || 'Prediction failed');
+                }
+            } catch (error) {
+                showError('Error making prediction: ' + error.message);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+            }
+        }
+
+        function displayResult(result) {
+            const prediction = result.prediction;
+            const displayValue = Math.round(prediction * 100) / 100;
+            document.getElementById('predictionResult').textContent = displayValue;
+            
+            let densityLevel = 'Low';
+            if (prediction > 5) {
+                densityLevel = 'High - Many Insects';
+            } else if (prediction > 2) {
+                densityLevel = 'Medium - Some Insects';
+            } else {
+                densityLevel = 'Low - Few Insects';
+            }
+
+            const statsContainer = document.getElementById('statsContainer');
+            statsContainer.innerHTML = `
+                <div class="stat-box">
+                    <div class="stat-value">${displayValue}</div>
+                    <div class="stat-label">Expected Count</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${densityLevel}</div>
+                    <div class="stat-label">Insect Activity</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${(displayValue * 0.7).toFixed(0)}</div>
+                    <div class="stat-label">Conservative</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${(displayValue * 1.3).toFixed(0)}</div>
+                    <div class="stat-label">Optimistic</div>
+                </div>
+            `;
+
+            const env = result.environmental_data || {};
+            const decision = result.decision || {};
+            const riskLevel = (decision.risk_level || 'Medium').toLowerCase();
+
+            const intelligencePanel = document.getElementById('intelligencePanel');
+            intelligencePanel.innerHTML = `
+                <h3 style="margin-bottom: 8px;">Environmental Conditions</h3>
+                <div class="insight-grid">
+                    <div class="insight-card"><div class="insight-title">Temperature</div><div class="insight-value">${(env.temperature ?? 0).toFixed(2)} °C</div></div>
+                    <div class="insight-card"><div class="insight-title">Humidity</div><div class="insight-value">${(env.humidity ?? 0).toFixed(2)} %</div></div>
+                    <div class="insight-card"><div class="insight-title">Rainfall</div><div class="insight-value">${(env.rainfall ?? 0).toFixed(2)} mm</div></div>
+                    <div class="insight-card"><div class="insight-title">Vegetation Index</div><div class="insight-value">${(env.vegetation_index ?? 0).toFixed(3)}</div></div>
+                    <div class="insight-card"><div class="insight-title">Water Availability</div><div class="insight-value">${(env.water_availability ?? 0).toFixed(3)}</div></div>
+                    <div class="insight-card"><div class="insight-title">Human Disturbance</div><div class="insight-value">${(env.human_disturbance ?? 0).toFixed(3)}</div></div>
+                </div>
+                <h3 style="margin: 14px 0 8px 0;">Risk Analysis</h3>
+                <div class="risk-box risk-${riskLevel}">
+                    <div><strong>Risk Level:</strong> ${decision.risk_level || 'Medium'}</div>
+                    <div><strong>Status:</strong> ${decision.status || 'Declining'}</div>
+                    <div style="margin-top: 8px;"><strong>Recommendation:</strong> ${decision.recommendation || 'Continue habitat protection and monitoring.'}</div>
+                </div>
+            `;
+
+            document.getElementById('resultSection').classList.add('show');
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorSection').classList.add('show');
+        }
+    </script>
+</body>
+</html>
+
