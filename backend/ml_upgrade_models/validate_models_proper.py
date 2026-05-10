@@ -17,6 +17,12 @@ import pandas as pd
 from math import sqrt
 
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, accuracy_score, precision_recall_fscore_support
+from sklearn.base import is_classifier, is_regressor
+import sklearn
+try:
+    import xgboost
+except Exception:
+    xgboost = None
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -30,43 +36,73 @@ def safe_load(path: Path):
 
 def detect_artifact_type(obj, name: str):
     lower = name.lower()
-    # filename-based heuristics
-    if lower.endswith(('.pkl', '.joblib')):
-        if '_feature' in lower or lower.endswith('_features.pkl') or lower.endswith('_feature_names.pkl'):
+
+    if any(token in lower for token in ('thumbnail_cache', 'cache', 'helper')):
+        return 'helper'
+
+    # 1) Type-based detection (rely on the loaded object first)
+    try:
+        if isinstance(obj, dict):
+            return 'metadata'
+        if isinstance(obj, (list, tuple)):
             return 'feature'
-        if '_metadata' in lower or 'meta' in lower:
+        # numpy arrays of strings are feature lists
+        import numpy as _np
+        if isinstance(obj, _np.ndarray) and obj.dtype.type is _np.str_:
+            return 'feature'
+    except Exception:
+        pass
+
+    # scaler-like: has transform but NOT a predict method
+    try:
+        if hasattr(obj, 'transform') and not hasattr(obj, 'predict'):
+            return 'scaler'
+    except Exception:
+        pass
+
+    # predictive estimators: only if they implement predict
+    try:
+        if hasattr(obj, 'predict'):
+            # clustering detectors
+            if any(hasattr(obj, a) for a in ('n_clusters', 'cluster_centers_', 'labels_', 'inertia_')):
+                return 'clustering'
+
+            # Try sklearn's utilities when available
+            try:
+                if is_classifier(obj):
+                    return 'classifier'
+                if is_regressor(obj):
+                    return 'regressor'
+            except Exception:
+                pass
+
+            # Fallback heuristics for classifiers
+            if hasattr(obj, 'predict_proba') or hasattr(obj, 'classes_') or getattr(obj, '_estimator_type', None) == 'classifier':
+                return 'classifier'
+
+            # Fallback heuristics for regressors
+            if getattr(obj, '_estimator_type', None) == 'regressor' or hasattr(obj, 'coef_') or hasattr(obj, 'feature_importances_'):
+                return 'regressor'
+
+            # default: treat as regressor if it predicts numeric outputs on a small sample
+            return 'regressor'
+    except Exception:
+        pass
+
+    # 2) Filename-based heuristics (fallback)
+    if lower.endswith(('.pkl', '.joblib')):
+        if '_feature' in lower or lower.endswith('_features.pkl') or lower.endswith('_feature_names.pkl') or 'feature_names' in lower:
+            return 'feature'
+        if '_metadata' in lower or lower.endswith('_meta.pkl') or lower.endswith('_metadata.pkl') or 'meta' in lower:
             return 'metadata'
         if '_scaler' in lower or 'scaler' in lower:
             return 'scaler'
-        if 'kmeans' in lower or 'cluster' in lower:
+        if 'kmeans' in lower or 'cluster' in lower or 'kmeans' in lower:
             return 'clustering'
-        if 'classifier' in lower or 'occurrence' in lower or 'class' in lower:
+        if 'classifier' in lower or 'occurrence' in lower or '_class' in lower or 'classification' in lower:
             return 'classifier_candidate'
         if 'model' in lower or 'regress' in lower or 'predict' in lower:
             return 'regressor_candidate'
-
-    # type-based heuristics
-    if isinstance(obj, dict):
-        return 'metadata'
-    if isinstance(obj, (list, tuple)):
-        return 'feature'
-    # scaler-like: has transform but not predict
-    if hasattr(obj, 'transform') and not hasattr(obj, 'predict'):
-        return 'scaler'
-    # predictive: has predict
-    if hasattr(obj, 'predict'):
-        # clustering
-        if hasattr(obj, 'n_clusters') or hasattr(obj, 'cluster_centers_') or hasattr(obj, 'labels_'):
-            return 'clustering'
-        # classifier or regressor
-        try:
-            # sklearn utility check may not exist for all models, so heuristics
-            if hasattr(obj, 'predict_proba') or hasattr(obj, 'classes_'):
-                return 'classifier'
-        except Exception:
-            pass
-        # default: regressor
-        return 'regressor'
 
     return 'unknown'
 
@@ -87,6 +123,64 @@ def find_feature_names(models_dir: Path, model_name: str):
         if token in p.name.lower() and ('feature' in p.name.lower() or 'feature_names' in p.name.lower()):
             return p
     return None
+
+
+def check_environment_compatibility():
+    compat = {'sklearn': {'version': sklearn.__version__, 'status': 'unknown'},
+              'xgboost': {'version': getattr(xgboost, '__version__', None), 'status': 'unknown'}}
+    # simple rules
+    try:
+        sv = tuple(int(x) for x in sklearn.__version__.split('.')[:2])
+        if sv >= (1, 0):
+            compat['sklearn']['status'] = 'safe'
+        else:
+            compat['sklearn']['status'] = 'warning'
+    except Exception:
+        compat['sklearn']['status'] = 'unknown'
+    if xgboost is None:
+        compat['xgboost']['status'] = 'not_installed'
+    else:
+        try:
+            xv = tuple(int(x) for x in xgboost.__version__.split('.')[:2])
+            if xv >= (1, 6):
+                compat['xgboost']['status'] = 'safe'
+            else:
+                compat['xgboost']['status'] = 'warning'
+        except Exception:
+            compat['xgboost']['status'] = 'unknown'
+    return compat
+
+
+def scan_backend_references(models_dir: Path):
+    """Scan common backend files for explicit model references and check existence."""
+    base = Path(__file__).resolve().parents[2]
+    checks = {'referenced_files': [], 'missing': [], 'duplicates': []}
+    # look for prediction_service and other common loaders
+    candidates = [base / 'apps' / 'common' / 'prediction_service.py']
+    seen = {}
+    for f in candidates:
+        try:
+            if not f.exists():
+                continue
+            txt = f.read_text()
+            # crude extraction: any '.pkl' or '.joblib' in the file
+            import re
+            for m in re.finditer(r"[\w\-/_\\]+\.(?:pkl|joblib)", txt):
+                fn = Path(m.group(0)).name
+                checks['referenced_files'].append(fn)
+                seen[fn] = seen.get(fn, 0) + 1
+                # verify existence under models_dir
+                if not any((models_dir / fn).exists() for _ in (0,)):
+                    # check direct path
+                    if not (base / fn).exists():
+                        checks['missing'].append(fn)
+        except Exception:
+            pass
+    # duplicates
+    for k, v in seen.items():
+        if v > 1:
+            checks['duplicates'].append(k)
+    return checks
 
 
 def build_sample_input(models_dir: Path, model_name: str, n_features=None):
@@ -264,7 +358,7 @@ def validate_metadata(obj, name: str, models_dir: Path):
         report['issues'].append('not a dict')
         return report
     # required keys
-    for k in ('target', 'model_name'):
+    for k in ('model_name', 'target', 'feature_count'):
         if k not in obj:
             report['issues'].append('missing_key:' + k)
     # check referenced features exist
@@ -274,7 +368,46 @@ def validate_metadata(obj, name: str, models_dir: Path):
             report['feature_count'] = len(f)
         else:
             report['issues'].append('features_not_list')
+    if 'feature_count' in obj and isinstance(obj['feature_count'], int):
+        report['feature_count'] = int(obj['feature_count'])
     return report
+
+
+def normalize_metadata_payload(obj, name: str):
+    payload = dict(obj) if isinstance(obj, dict) else {}
+    model_name = payload.get('model_name') or name.replace('.pkl', '').replace('.joblib', '')
+    target = payload.get('target', '')
+    features = payload.get('features') or payload.get('feature_names') or payload.get('base_features')
+    feature_count = payload.get('feature_count')
+    if not isinstance(feature_count, int) or feature_count <= 0:
+        if isinstance(features, (list, tuple)):
+            feature_count = len(features)
+        else:
+            feature_count = 0
+    payload['model_name'] = model_name
+    payload['target'] = target if target is not None else ''
+    payload['feature_count'] = int(feature_count)
+    return payload
+
+
+def normalize_metadata_files(models_dir: Path):
+    updated = []
+    for p in sorted(models_dir.iterdir()):
+        if not p.is_file() or p.suffix.lower() not in ('.pkl', '.joblib'):
+            continue
+        if 'meta' not in p.name.lower() and 'metadata' not in p.name.lower():
+            continue
+        try:
+            obj = joblib.load(p)
+        except Exception:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        payload = normalize_metadata_payload(obj, p.name)
+        if payload != obj:
+            joblib.dump(payload, p)
+            updated.append(p.name)
+    return updated
 
 
 def validate_scaler(obj, name: str, models_dir: Path):
@@ -310,8 +443,15 @@ def find_feature_names(models_dir: Path, model_name: str):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--models-dir', required=False, default='backend/ml_upgrade_models')
+    parser.add_argument('--fix-metadata', action='store_true', help='Normalize metadata files in-place before validation')
     args = parser.parse_args()
     models_dir = Path(args.models_dir)
+    if args.fix_metadata:
+        updated = normalize_metadata_files(models_dir)
+        if updated:
+            print('Normalized metadata files:')
+            for name in updated:
+                print('-', name)
     out = {'generated_at': time.strftime('%Y-%m-%d %H:%M:%S'), 'artifacts': []}
 
     for p in sorted(models_dir.iterdir()):
@@ -331,9 +471,10 @@ def main():
         atype = detect_artifact_type(obj, p.name)
         entry['type'] = atype
         try:
-            if atype == 'regressor' or atype == 'regressor_candidate':
+            # Only validate actual predictive artifacts that implement .predict()
+            if atype == 'regressor':
                 entry['details'] = validate_regressor(obj, models_dir, p.name)
-            elif atype == 'classifier' or atype == 'classifier_candidate':
+            elif atype == 'classifier':
                 entry['details'] = validate_classifier(obj, models_dir, p.name)
             elif atype == 'clustering':
                 entry['details'] = validate_clustering(obj, models_dir, p.name)
@@ -343,6 +484,11 @@ def main():
                 entry['details'] = validate_metadata(obj, p.name, models_dir)
             elif atype == 'scaler':
                 entry['details'] = validate_scaler(obj, p.name, models_dir)
+            elif atype == 'helper':
+                entry['details'] = {'type': 'helper', 'status': 'SKIPPED', 'issues': ['helper_or_cache_artifact']}
+            elif atype.endswith('_candidate'):
+                # Filename suggested a model but object inspection did not confirm predictability.
+                entry['details'] = {'type': atype, 'status': 'CANDIDATE_NOT_VALIDATED', 'issues': ['filename_suggests_model_but_object_not_predictive']}
             else:
                 entry['details'] = {'type': 'unknown', 'repr': repr(obj)[:200]}
         except Exception as e:
@@ -351,6 +497,10 @@ def main():
         if 'status' not in entry or entry['status'] is None:
             entry['status'] = entry['details'].get('status', 'OK')
         out['artifacts'].append(entry)
+
+    # environment compatibility and backend ref checks
+    out['compatibility'] = check_environment_compatibility()
+    out['backend_references'] = scan_backend_references(models_dir)
 
     # write reports
     j = models_dir / 'validation_report.json'

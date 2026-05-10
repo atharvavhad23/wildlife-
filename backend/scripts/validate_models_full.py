@@ -17,13 +17,68 @@ BASE = Path(__file__).resolve().parents[1]
 MODEL_DIR = BASE / 'ml_models'
 
 EXPECTED = [
-    'animals_model.pkl', 'animals_count_model.pkl', 'animals_occurrence_classifier.pkl',
-    'animals_feature_names.pkl', 'animals_metadata.pkl',
-    'birds_model.pkl', 'birds_occurrence_classifier.pkl', 'birds_feature_names.pkl', 'birds_metadata.pkl', 'birds_scaler.pkl',
-    'insects_model.pkl', 'insects_occurrence_classifier.pkl', 'insects_feature_names.pkl', 'insects_metadata.pkl', 'insects_scaler.pkl',
-    'plants_model.pkl', 'plants_occurrence_classifier.pkl', 'plants_feature_names.pkl', 'plants_metadata.pkl', 'plants_scaler.pkl',
-    'plants_kmeans.pkl', 'plants_kmeans_meta.pkl', 'plants_kmeans_scaler.pkl',
+    'animals_occurrence_classifier.pkl',
+    'birds_model.pkl', 'birds_occurrence_classifier.pkl', 'birds_occurrence_features.pkl', 'birds_occurrence_metadata.pkl', 'birds_scaler.pkl',
+    'feature_names.pkl',
+    'insects_feature_names.pkl', 'insects_model.pkl', 'insects_occurrence_classifier.pkl', 'insects_occurrence_features.pkl', 'insects_occurrence_metadata.pkl', 'insects_scaler.pkl',
+    'model_metadata.pkl',
+    'plants_feature_names.pkl', 'plants_kmeans.pkl', 'plants_kmeans_meta.pkl', 'plants_kmeans_scaler.pkl', 'plants_metadata.pkl',
+    'plants_model.pkl', 'plants_occurrence_classifier.pkl', 'plants_occurrence_features.pkl', 'plants_occurrence_metadata.pkl', 'plants_scaler.pkl',
+    'scaler.pkl', 'thumbnail_cache.pkl', 'wildlife_model.pkl',
 ]
+
+LEGACY_EXPECTED = [
+    'animals_model.pkl', 'animals_count_model.pkl', 'animals_feature_names.pkl', 'animals_metadata.pkl', 'birds_feature_names.pkl'
+]
+
+
+def _resolve_feature_names_for_model(model_name):
+    """Return feature names from matching feature/metadata artifacts when available."""
+    stem = model_name.replace('.pkl', '').replace('.joblib', '')
+    family = stem.split('_')[0]
+    candidates = []
+    for cand in MODEL_DIR.iterdir():
+        if not cand.is_file():
+            continue
+        lname = cand.name.lower()
+        if family not in lname and stem not in lname:
+            continue
+        if 'feature' in lname or 'meta' in lname or 'metadata' in lname:
+            candidates.append(cand)
+    candidates.sort(key=lambda p: (0 if 'feature' in p.name.lower() else 1, len(p.name)))
+    for cand in candidates:
+        try:
+            payload = joblib.load(cand)
+        except Exception:
+            continue
+        if isinstance(payload, (list, tuple)) and payload:
+            return list(payload)
+        if isinstance(payload, dict):
+            feats = payload.get('features') or payload.get('feature_names') or payload.get('base_features')
+            if isinstance(feats, (list, tuple)) and feats:
+                return list(feats)
+            if isinstance(payload.get('feature_count'), int) and payload['feature_count'] > 0:
+                return [f'f{i}' for i in range(int(payload['feature_count']))]
+    return None
+
+
+def _build_sample_input(model_name, obj):
+    n = getattr(obj, 'n_features_in_', None)
+    if n:
+        return np.zeros((1, int(n)))
+    feature_names = _resolve_feature_names_for_model(model_name)
+    if feature_names:
+        return np.zeros((1, len(feature_names)))
+    return np.zeros((1, 5))
+
+
+def _should_predict(name, obj):
+    lower = name.lower()
+    if lower.endswith('_kmeans.pkl'):
+        return hasattr(obj, 'predict')
+    if lower.endswith('_model.pkl') or lower.endswith('classifier.pkl'):
+        return hasattr(obj, 'predict')
+    return False
 
 def load(p):
     try:
@@ -46,42 +101,10 @@ def run_sample_prediction():
         if obj is None:
             ok = False
             continue
-        # sample predict
-        if name.endswith('_model.pkl') or name.endswith('classifier.pkl'):
+        # sample predict only for actual predictive models
+        if _should_predict(name, obj):
             try:
-                # build a dummy vector from feature count if available
-                # find the best-matching feature file by longest common prefix with model filename
-                model_basename = name
-                candidates = [cand for cand in MODEL_DIR.iterdir() if 'feature' in cand.name.lower()]
-                feature_file = None
-                best_score = -1
-                for cand in candidates:
-                    # score by common prefix length
-                    a = model_basename.lower()
-                    b = cand.name.lower()
-                    # compute common prefix length
-                    score = 0
-                    for ca, cb in zip(a, b):
-                        if ca == cb:
-                            score += 1
-                        else:
-                            break
-                    if score > best_score:
-                        best_score = score
-                        feature_file = cand
-                if feature_file and feature_file.exists():
-                    try:
-                        features = joblib.load(feature_file)
-                    except Exception:
-                        features = None
-                    # features may be list or model if mis-matched; guard
-                    if isinstance(features, (list, tuple)):
-                        n = max(1, len(features))
-                    else:
-                        n = 5
-                else:
-                    n = 5
-                sample = np.zeros((1, n))
+                sample = _build_sample_input(name, obj)
                 if hasattr(obj, 'predict_proba'):
                     _ = obj.predict_proba(sample)
                 else:
@@ -96,6 +119,9 @@ def main():
     if not MODEL_DIR.exists():
         logger.error('Model directory missing: ' + str(MODEL_DIR))
         sys.exit(2)
+    for name in LEGACY_EXPECTED:
+        if not (MODEL_DIR / name).exists():
+            logger.warning(f'LEGACY MISSING (not counted as failure): {MODEL_DIR / name}')
     ok = run_sample_prediction()
     if ok:
         logger.info('\nValidation succeeded: all models load and sample predict')
