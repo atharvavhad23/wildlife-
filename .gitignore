@@ -1,6 +1,7 @@
 # Environment
 .env
 frontend/.env
+backend/core/config/.env
 __pycache__/
 *.pyc
 # Dependencies

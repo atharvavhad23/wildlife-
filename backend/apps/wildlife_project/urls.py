@@ -1,10 +1,81 @@
 from django.contrib import admin
-from django.urls import path, re_path
-from observations.predictor import views
-# Trigger reload
+from django.urls import include, path, re_path
+from apps.predictions.views import prediction_history_view
+
+# Lazy-load predictor views; if ML stack is broken, create dummy views
+try:
+    from observations.predictor import views
+    PREDICTOR_AVAILABLE = True
+except (ImportError, SystemError):
+    PREDICTOR_AVAILABLE = False
+    # Create dummy views that return error responses if predictor can't load
+    from django.http import JsonResponse
+    def _predictor_error(request):
+        return JsonResponse({'error': 'Predictor module unavailable (ML dependencies)'}, status=503)
+    class views:
+        index = _predictor_error
+        animals_prediction = _predictor_error
+        animals_photos_page = _predictor_error
+        animals_clustering_map = _predictor_error
+        species_detail_page = _predictor_error
+        birds_prediction = _predictor_error
+        birds_photos_page = _predictor_error
+        insects_prediction = _predictor_error
+        insects_photos_page = _predictor_error
+        predict_animals = _predictor_error
+        animals_result = _predictor_error
+        animals_dashboard = _predictor_error
+        predict_birds = _predictor_error
+        birds_result = _predictor_error
+        birds_dashboard = _predictor_error
+        predict_insects = _predictor_error
+        insects_result = _predictor_error
+        insects_dashboard = _predictor_error
+        predict_plants = _predictor_error
+        get_plants_features = _predictor_error
+        get_plants_clustering_api = _predictor_error
+        get_plants_model_info = _predictor_error
+        get_animals_features = _predictor_error
+        get_animals_photos = _predictor_error
+        get_birds_photos = _predictor_error
+        get_insects_photos = _predictor_error
+        get_plants_photos = _predictor_error
+        photo_proxy = _predictor_error
+        get_birds_features = _predictor_error
+        get_insects_features = _predictor_error
+        get_animals_clustering = _predictor_error
+        get_species_detail = _predictor_error
+        get_species_photos = _predictor_error
+        get_birds_species_photos = _predictor_error
+        get_insects_species_photos = _predictor_error
+        get_plants_species_photos = _predictor_error
+        get_birds_clustering = _predictor_error
+        get_insects_clustering = _predictor_error
+        get_birds_species_detail = _predictor_error
+        get_insects_species_detail = _predictor_error
+        get_plants_species_detail = _predictor_error
+        get_cluster_heatmap = _predictor_error
+        get_cluster_details = _predictor_error
+        get_inat_photos = _predictor_error
+        get_cluster_photos = _predictor_error
+        get_species_observations = _predictor_error
+        get_cluster_timeline = _predictor_error
+        get_seasonal_activity = _predictor_error
+        get_conservation_alerts = _predictor_error
+        get_top_observers = _predictor_error
+        get_dashboard_stats = _predictor_error
+        wildlife_dashboard = _predictor_error
+        send_email_otp = _predictor_error
+        verify_email_otp = _predictor_error
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/auth/', include('apps.users.urls')),
+    path('api/species/', include('apps.species.urls')),
+    path('api/observations/', include('apps.observations.urls')),
+    path('api/predict/', include('apps.predictions.urls')),
+    path('api/predictions/history/', prediction_history_view, name='prediction-history-direct'),
+    path('api/', include('apps.analytics.urls')),
     path('auth/send-otp/', views.send_email_otp, name='send_email_otp'),
     path('auth/verify-otp/', views.verify_email_otp, name='verify_email_otp'),
     path('', views.index, name='home'),

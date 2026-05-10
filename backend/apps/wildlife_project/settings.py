@@ -1,7 +1,14 @@
 import os
+import logging
 from pathlib import Path
+from mongoengine import connect
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+CORE_CONFIG_DIR = BASE_DIR / 'core' / 'config'
+
+
+def _bool_env(name: str, default: str = 'False') -> bool:
+    return os.getenv(name, default).lower() in {'1', 'true', 'yes', 'on'}
 
 
 def _load_env_file(path: Path) -> None:
@@ -24,7 +31,18 @@ def _load_env_file(path: Path) -> None:
         pass
 
 
-_load_env_file(BASE_DIR / '.env')
+_load_env_file(CORE_CONFIG_DIR / '.env')
+
+MONGO_URI = os.getenv('MONGO_URI', '')
+if MONGO_URI:
+    connect(
+        host=MONGO_URI,
+        alias='default',
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+        socketTimeoutMS=5000,
+        retryWrites=True,
+    )
 
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
@@ -32,7 +50,11 @@ INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'observations',
+    'apps.users.apps.UsersConfig',
+    'apps.species.apps.SpeciesConfig',
+    'apps.observations.apps.ObservationsConfig',
+    'apps.predictions.apps.PredictionsConfig',
+    'apps.analytics.apps.AnalyticsConfig',
 ]
 
 MIDDLEWARE = [
@@ -47,10 +69,24 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'wildlife_project.urls'
 
+REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0')
+CACHE_TTL_SECONDS = int(os.getenv('CACHE_TTL_SECONDS', '300'))
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
+        'OPTIONS': {
+            'db': int(os.getenv('REDIS_CACHE_DB', '0')),
+        },
+        'TIMEOUT': CACHE_TTL_SECONDS,
+    }
+}
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR.parent / 'observations' / 'predictor' / 'templates'],
+        'DIRS': [BASE_DIR / 'observations' / 'predictor' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -70,8 +106,8 @@ DATABASES = {
     }
 }
 
-SECRET_KEY = 'django-insecure-wildlife-conservation-secret-key-12345'
-DEBUG = True
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-wildlife-conservation-secret-key-12345')
+DEBUG = os.getenv('DEBUG', 'True').lower() in {'1', 'true', 'yes'}
 ALLOWED_HOSTS = ['*']
 
 USE_TZ = True
@@ -79,6 +115,26 @@ TIME_ZONE = 'UTC'
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '[%(asctime)s] %(levelname)s %(name)s %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': os.getenv('LOG_LEVEL', 'INFO'),
+    },
+}
 
 # Project email (SMTP) configuration for OTP delivery.
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
@@ -89,3 +145,5 @@ EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in {'1', 'true', 'ye
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@koynawildlife.local')
+
+MONGOENGINE_INDEX_AUTO_CREATE = _bool_env('MONGOENGINE_INDEX_AUTO_CREATE', 'True')

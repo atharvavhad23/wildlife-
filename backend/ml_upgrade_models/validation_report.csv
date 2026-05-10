@@ -1,0 +1,52 @@
+file,type,status,issues
+animals_count_feature_names.pkl,feature,OK,
+animals_count_metadata.pkl,metadata,OK,missing_key:model_name
+animals_count_model.pkl,regressor_candidate,OK,
+animals_count_scaler.pkl,scaler,OK,
+animals_feature_names.pkl,feature,OK,
+animals_metadata.pkl,metadata,OK,missing_key:model_name
+animals_model.pkl,regressor_candidate,OK,
+animals_occurrence_classifier.pkl,classifier_candidate,PREDICT_FAILED,"Feature shape mismatch, expected: 11, got 15"
+animals_occurrence_classifier_feature_names.pkl,feature,OK,
+animals_occurrence_classifier_metadata.pkl,metadata,OK,missing_key:model_name
+animals_occurrence_classifier_scaler.pkl,scaler,OK,
+animals_occurrence_features.pkl,feature,OK,
+animals_occurrence_metadata.pkl,metadata,OK,missing_key:model_name
+animals_scaler.pkl,scaler,OK,
+birds_feature_names.pkl,feature,OK,
+birds_metadata.pkl,metadata,OK,missing_key:model_name
+birds_model.pkl,regressor_candidate,OK,
+birds_occurrence_classifier.pkl,classifier_candidate,PREDICT_FAILED,"Feature shape mismatch, expected: 34, got 13"
+birds_occurrence_classifier_feature_names.pkl,feature,OK,
+birds_occurrence_classifier_metadata.pkl,metadata,OK,missing_key:model_name
+birds_occurrence_classifier_scaler.pkl,scaler,OK,
+birds_occurrence_features.pkl,feature,OK,
+birds_occurrence_metadata.pkl,metadata,OK,missing_key:model_name
+birds_scaler.pkl,scaler,OK,
+feature_names.pkl,feature,OK,
+insects_feature_names.pkl,feature,OK,
+insects_metadata.pkl,metadata,OK,missing_key:model_name
+insects_model.pkl,regressor_candidate,OK,
+insects_occurrence_classifier.pkl,classifier_candidate,PREDICT_FAILED,"Feature shape mismatch, expected: 34, got 13"
+insects_occurrence_classifier_feature_names.pkl,feature,OK,
+insects_occurrence_classifier_metadata.pkl,metadata,OK,missing_key:model_name
+insects_occurrence_classifier_scaler.pkl,scaler,OK,
+insects_occurrence_features.pkl,feature,OK,
+insects_occurrence_metadata.pkl,metadata,OK,missing_key:model_name
+insects_scaler.pkl,scaler,OK,
+model_metadata.pkl,metadata,OK,missing_key:model_name
+plants_feature_names.pkl,feature,OK,
+plants_kmeans.pkl,clustering,OK,
+plants_kmeans_meta.pkl,metadata,OK,"missing_key:target,missing_key:model_name"
+plants_kmeans_scaler.pkl,scaler,OK,
+plants_metadata.pkl,metadata,OK,missing_key:model_name
+plants_model.pkl,regressor_candidate,OK,
+plants_occurrence_classifier.pkl,classifier_candidate,PREDICT_FAILED,"Feature shape mismatch, expected: 34, got 14"
+plants_occurrence_classifier_feature_names.pkl,feature,OK,
+plants_occurrence_classifier_metadata.pkl,metadata,OK,missing_key:model_name
+plants_occurrence_classifier_scaler.pkl,scaler,OK,
+plants_occurrence_features.pkl,feature,OK,
+plants_occurrence_metadata.pkl,metadata,OK,missing_key:model_name
+plants_scaler.pkl,scaler,OK,
+scaler.pkl,scaler,OK,
+wildlife_model.pkl,regressor_candidate,OK,

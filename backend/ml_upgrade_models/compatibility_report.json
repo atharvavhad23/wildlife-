@@ -1,0 +1,479 @@
+{
+  "generated_at": "2026-05-10 02:21:28",
+  "results": [
+    {
+      "file": "animals_count_feature_names.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_count_feature_names.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "animals_count_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_count_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "animals_count_model.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_count_model.pkl",
+      "status": "PREDICT_OK",
+      "error": null,
+      "has_predict": true,
+      "has_proba": false,
+      "n_features_in": 15,
+      "sample_prediction": 1.1176393032073975
+    },
+    {
+      "file": "animals_count_scaler.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_count_scaler.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'StandardScaler' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": 15
+    },
+    {
+      "file": "animals_feature_names.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_feature_names.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "animals_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "animals_model.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_model.pkl",
+      "status": "PREDICT_OK",
+      "error": null,
+      "has_predict": true,
+      "has_proba": false,
+      "n_features_in": 15,
+      "sample_prediction": 75.76512145996094
+    },
+    {
+      "file": "animals_occurrence_classifier.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_occurrence_classifier.pkl",
+      "status": "PREDICT_OK",
+      "error": null,
+      "has_predict": true,
+      "has_proba": true,
+      "n_features_in": 11,
+      "sample_prediction": 10.0,
+      "sample_confidence": 0.9910491704940796
+    },
+    {
+      "file": "animals_occurrence_classifier_feature_names.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_occurrence_classifier_feature_names.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "animals_occurrence_classifier_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_occurrence_classifier_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "animals_occurrence_classifier_scaler.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_occurrence_classifier_scaler.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'StandardScaler' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": 11
+    },
+    {
+      "file": "animals_occurrence_features.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_occurrence_features.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "animals_occurrence_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_occurrence_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "animals_scaler.pkl",
+      "path": "backend\\ml_upgrade_models\\animals_scaler.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'StandardScaler' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": 15
+    },
+    {
+      "file": "birds_feature_names.pkl",
+      "path": "backend\\ml_upgrade_models\\birds_feature_names.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "birds_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\birds_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "birds_model.pkl",
+      "path": "backend\\ml_upgrade_models\\birds_model.pkl",
+      "status": "PREDICT_OK",
+      "error": null,
+      "has_predict": true,
+      "has_proba": false,
+      "n_features_in": 13,
+      "sample_prediction": -1.0564286708831787
+    },
+    {
+      "file": "birds_occurrence_classifier.pkl",
+      "path": "backend\\ml_upgrade_models\\birds_occurrence_classifier.pkl",
+      "status": "PREDICT_OK",
+      "error": null,
+      "has_predict": true,
+      "has_proba": true,
+      "n_features_in": 34,
+      "sample_prediction": 0.0,
+      "sample_confidence": 0.9999717473983765
+    },
+    {
+      "file": "birds_occurrence_classifier_feature_names.pkl",
+      "path": "backend\\ml_upgrade_models\\birds_occurrence_classifier_feature_names.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "birds_occurrence_classifier_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\birds_occurrence_classifier_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "birds_occurrence_classifier_scaler.pkl",
+      "path": "backend\\ml_upgrade_models\\birds_occurrence_classifier_scaler.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'StandardScaler' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": 34
+    },
+    {
+      "file": "birds_occurrence_features.pkl",
+      "path": "backend\\ml_upgrade_models\\birds_occurrence_features.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "birds_occurrence_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\birds_occurrence_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "birds_scaler.pkl",
+      "path": "backend\\ml_upgrade_models\\birds_scaler.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'StandardScaler' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": 13
+    },
+    {
+      "file": "feature_names.pkl",
+      "path": "backend\\ml_upgrade_models\\feature_names.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "insects_feature_names.pkl",
+      "path": "backend\\ml_upgrade_models\\insects_feature_names.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "insects_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\insects_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "insects_model.pkl",
+      "path": "backend\\ml_upgrade_models\\insects_model.pkl",
+      "status": "PREDICT_OK",
+      "error": null,
+      "has_predict": true,
+      "has_proba": false,
+      "n_features_in": 13,
+      "sample_prediction": 174.17593383789062
+    },
+    {
+      "file": "insects_occurrence_classifier.pkl",
+      "path": "backend\\ml_upgrade_models\\insects_occurrence_classifier.pkl",
+      "status": "PREDICT_OK",
+      "error": null,
+      "has_predict": true,
+      "has_proba": true,
+      "n_features_in": 34,
+      "sample_prediction": 0.0,
+      "sample_confidence": 0.999879002571106
+    },
+    {
+      "file": "insects_occurrence_classifier_feature_names.pkl",
+      "path": "backend\\ml_upgrade_models\\insects_occurrence_classifier_feature_names.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "insects_occurrence_classifier_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\insects_occurrence_classifier_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "insects_occurrence_classifier_scaler.pkl",
+      "path": "backend\\ml_upgrade_models\\insects_occurrence_classifier_scaler.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'StandardScaler' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": 34
+    },
+    {
+      "file": "insects_occurrence_features.pkl",
+      "path": "backend\\ml_upgrade_models\\insects_occurrence_features.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "insects_occurrence_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\insects_occurrence_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "insects_scaler.pkl",
+      "path": "backend\\ml_upgrade_models\\insects_scaler.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'StandardScaler' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": 13
+    },
+    {
+      "file": "model_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\model_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "plants_feature_names.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_feature_names.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "plants_kmeans.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_kmeans.pkl",
+      "status": "PREDICT_OK",
+      "error": null,
+      "has_predict": true,
+      "has_proba": false,
+      "n_features_in": 14,
+      "sample_prediction": 2.0
+    },
+    {
+      "file": "plants_kmeans_meta.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_kmeans_meta.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "plants_kmeans_scaler.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_kmeans_scaler.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'StandardScaler' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": 14
+    },
+    {
+      "file": "plants_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "plants_model.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_model.pkl",
+      "status": "PREDICT_OK",
+      "error": null,
+      "has_predict": true,
+      "has_proba": false,
+      "n_features_in": 14,
+      "sample_prediction": 921.90673828125
+    },
+    {
+      "file": "plants_occurrence_classifier.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_occurrence_classifier.pkl",
+      "status": "PREDICT_OK",
+      "error": null,
+      "has_predict": true,
+      "has_proba": true,
+      "n_features_in": 34,
+      "sample_prediction": 0.0,
+      "sample_confidence": 0.999879002571106
+    },
+    {
+      "file": "plants_occurrence_classifier_feature_names.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_occurrence_classifier_feature_names.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "plants_occurrence_classifier_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_occurrence_classifier_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "plants_occurrence_classifier_scaler.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_occurrence_classifier_scaler.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'StandardScaler' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": 34
+    },
+    {
+      "file": "plants_occurrence_features.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_occurrence_features.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'list' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "plants_occurrence_metadata.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_occurrence_metadata.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'dict' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": null
+    },
+    {
+      "file": "plants_scaler.pkl",
+      "path": "backend\\ml_upgrade_models\\plants_scaler.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'StandardScaler' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": 14
+    },
+    {
+      "file": "scaler.pkl",
+      "path": "backend\\ml_upgrade_models\\scaler.pkl",
+      "status": "PREDICT_FAILED",
+      "error": "AttributeError: 'StandardScaler' object has no attribute 'predict'",
+      "has_predict": false,
+      "has_proba": false,
+      "n_features_in": 15
+    },
+    {
+      "file": "wildlife_model.pkl",
+      "path": "backend\\ml_upgrade_models\\wildlife_model.pkl",
+      "status": "PREDICT_OK",
+      "error": null,
+      "has_predict": true,
+      "has_proba": false,
+      "n_features_in": 15,
+      "sample_prediction": 95.4654843459017
+    }
+  ]
+}

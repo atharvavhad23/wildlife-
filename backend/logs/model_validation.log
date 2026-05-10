@@ -1,0 +1,313 @@
+2026-05-10 00:46:16,337 INFO BASE_DIR resolved to: E:\miniproject_wildlfie\wildlife-\backend
+2026-05-10 00:46:16,338 INFO Scanning ml_models directory: E:\miniproject_wildlfie\wildlife-\backend\ml_models
+2026-05-10 00:46:16,341 INFO Discovered 44 artifacts
+2026-05-10 00:46:16,342 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_occurrence_classifier.pkl | helper=False | score=25
+2026-05-10 00:46:16,342 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_occurrence_features.pkl | helper=True | score=-75
+2026-05-10 00:46:16,343 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_occurrence_metadata.pkl | helper=True | score=-75
+2026-05-10 00:46:16,343 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl | helper=True | score=-75
+2026-05-10 00:46:16,343 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl | helper=True | score=-75
+2026-05-10 00:46:16,343 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl | helper=False | score=75
+2026-05-10 00:46:16,344 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_occurrence_classifier.pkl | helper=False | score=25
+2026-05-10 00:46:16,344 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_occurrence_features.pkl | helper=True | score=-75
+2026-05-10 00:46:16,344 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_occurrence_metadata.pkl | helper=True | score=-75
+2026-05-10 00:46:16,344 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl | helper=True | score=-75
+2026-05-10 00:46:16,345 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl | helper=True | score=-95
+2026-05-10 00:46:16,345 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl | helper=True | score=-75
+2026-05-10 00:46:16,346 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl | helper=True | score=-75
+2026-05-10 00:46:16,346 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl | helper=False | score=75
+2026-05-10 00:46:16,347 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\birds_feature_names.pkl | helper=True | score=-75
+2026-05-10 00:46:16,347 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\birds_metadata.pkl | helper=True | score=-75
+2026-05-10 00:46:16,347 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\birds_model.pkl | helper=False | score=75
+2026-05-10 00:46:16,347 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\birds_scaler.pkl | helper=True | score=-75
+2026-05-10 00:46:16,348 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\insects_feature_names.pkl | helper=True | score=-75
+2026-05-10 00:46:16,348 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\insects_metadata.pkl | helper=True | score=-75
+2026-05-10 00:46:16,348 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\insects_model.pkl | helper=False | score=75
+2026-05-10 00:46:16,348 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\insects_scaler.pkl | helper=True | score=-75
+2026-05-10 00:46:16,348 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\plants_feature_names.pkl | helper=True | score=-85
+2026-05-10 00:46:16,348 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\plants_metadata.pkl | helper=True | score=-85
+2026-05-10 00:46:16,349 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\plants_model.pkl | helper=False | score=65
+2026-05-10 00:46:16,349 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\plants_scaler.pkl | helper=True | score=-85
+2026-05-10 00:46:16,349 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_occurrence_classifier.pkl | helper=False | score=25
+2026-05-10 00:46:16,349 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_occurrence_features.pkl | helper=True | score=-75
+2026-05-10 00:46:16,350 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_occurrence_metadata.pkl | helper=True | score=-75
+2026-05-10 00:46:16,350 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl | helper=True | score=-75
+2026-05-10 00:46:16,350 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl | helper=True | score=-45
+2026-05-10 00:46:16,350 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl | helper=True | score=-85
+2026-05-10 00:46:16,350 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl | helper=False | score=15
+2026-05-10 00:46:16,351 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl | helper=True | score=-85
+2026-05-10 00:46:16,351 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl | helper=True | score=-85
+2026-05-10 00:46:16,351 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl | helper=True | score=-85
+2026-05-10 00:46:16,351 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl | helper=False | score=65
+2026-05-10 00:46:16,352 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_occurrence_classifier.pkl | helper=False | score=15
+2026-05-10 00:46:16,352 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_occurrence_features.pkl | helper=True | score=-85
+2026-05-10 00:46:16,352 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_occurrence_metadata.pkl | helper=True | score=-85
+2026-05-10 00:46:16,353 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl | helper=True | score=-85
+2026-05-10 00:46:16,353 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl | helper=True | score=-95
+2026-05-10 00:46:16,353 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\thumbnail_cache.pkl | helper=False | score=5
+2026-05-10 00:46:16,354 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl | helper=False | score=55
+2026-05-10 00:46:17,821 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_occurrence_classifier.pkl
+2026-05-10 00:53:07,231 INFO BASE_DIR resolved to: E:\miniproject_wildlfie\wildlife-\backend
+2026-05-10 00:53:07,231 INFO Scanning ml_models directory: E:\miniproject_wildlfie\wildlife-\backend\ml_models
+2026-05-10 00:53:07,234 INFO Discovered 44 artifacts
+2026-05-10 00:53:07,234 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_occurrence_classifier.pkl | helper=False | score=25
+2026-05-10 00:53:07,234 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_occurrence_features.pkl | helper=True | score=-75
+2026-05-10 00:53:07,234 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_occurrence_metadata.pkl | helper=True | score=-75
+2026-05-10 00:53:07,235 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl | helper=True | score=-75
+2026-05-10 00:53:07,235 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl | helper=True | score=-75
+2026-05-10 00:53:07,235 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl | helper=False | score=75
+2026-05-10 00:53:07,235 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_occurrence_classifier.pkl | helper=False | score=25
+2026-05-10 00:53:07,236 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_occurrence_features.pkl | helper=True | score=-75
+2026-05-10 00:53:07,236 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_occurrence_metadata.pkl | helper=True | score=-75
+2026-05-10 00:53:07,236 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl | helper=True | score=-75
+2026-05-10 00:53:07,236 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl | helper=True | score=-95
+2026-05-10 00:53:07,237 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl | helper=True | score=-75
+2026-05-10 00:53:07,237 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl | helper=True | score=-75
+2026-05-10 00:53:07,237 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl | helper=False | score=75
+2026-05-10 00:53:07,237 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\birds_feature_names.pkl | helper=True | score=-75
+2026-05-10 00:53:07,237 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\birds_metadata.pkl | helper=True | score=-75
+2026-05-10 00:53:07,237 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\birds_model.pkl | helper=False | score=75
+2026-05-10 00:53:07,237 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\birds_scaler.pkl | helper=True | score=-75
+2026-05-10 00:53:07,239 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\insects_feature_names.pkl | helper=True | score=-75
+2026-05-10 00:53:07,239 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\insects_metadata.pkl | helper=True | score=-75
+2026-05-10 00:53:07,239 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\insects_model.pkl | helper=False | score=75
+2026-05-10 00:53:07,240 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\insects_scaler.pkl | helper=True | score=-75
+2026-05-10 00:53:07,240 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\plants_feature_names.pkl | helper=True | score=-85
+2026-05-10 00:53:07,240 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\plants_metadata.pkl | helper=True | score=-85
+2026-05-10 00:53:07,240 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\plants_model.pkl | helper=False | score=65
+2026-05-10 00:53:07,240 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_models\plants_scaler.pkl | helper=True | score=-85
+2026-05-10 00:53:07,241 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_occurrence_classifier.pkl | helper=False | score=25
+2026-05-10 00:53:07,241 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_occurrence_features.pkl | helper=True | score=-75
+2026-05-10 00:53:07,241 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_occurrence_metadata.pkl | helper=True | score=-75
+2026-05-10 00:53:07,241 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl | helper=True | score=-75
+2026-05-10 00:53:07,241 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl | helper=True | score=-45
+2026-05-10 00:53:07,241 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl | helper=True | score=-85
+2026-05-10 00:53:07,242 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl | helper=False | score=15
+2026-05-10 00:53:07,242 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl | helper=True | score=-85
+2026-05-10 00:53:07,242 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl | helper=True | score=-85
+2026-05-10 00:53:07,242 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl | helper=True | score=-85
+2026-05-10 00:53:07,242 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl | helper=False | score=65
+2026-05-10 00:53:07,243 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_occurrence_classifier.pkl | helper=False | score=15
+2026-05-10 00:53:07,243 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_occurrence_features.pkl | helper=True | score=-85
+2026-05-10 00:53:07,243 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_occurrence_metadata.pkl | helper=True | score=-85
+2026-05-10 00:53:07,243 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl | helper=True | score=-85
+2026-05-10 00:53:07,244 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl | helper=True | score=-95
+2026-05-10 00:53:07,244 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\thumbnail_cache.pkl | helper=False | score=5
+2026-05-10 00:53:07,244 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl | helper=False | score=55
+2026-05-10 00:53:07,484 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_occurrence_classifier.pkl
+2026-05-10 01:10:28,999 INFO BASE_DIR resolved to: E:\miniproject_wildlfie\wildlife-\backend
+2026-05-10 01:10:29,000 INFO Scanning ml_models directory: E:\miniproject_wildlfie\wildlife-\backend\ml_models
+2026-05-10 01:10:29,001 WARNING No .pkl or .joblib artifacts found under E:\miniproject_wildlfie\wildlife-\backend\ml_models
+2026-05-10 01:11:29,920 INFO BASE_DIR resolved to: E:\miniproject_wildlfie\wildlife-\backend
+2026-05-10 01:11:29,921 INFO Scanning ml_models directory: E:\miniproject_wildlfie\wildlife-\backend\ml_models
+2026-05-10 01:11:29,923 INFO Discovered 20 artifacts
+2026-05-10 01:11:29,923 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl | helper=False | score=75
+2026-05-10 01:11:29,923 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl | helper=True | score=-75
+2026-05-10 01:11:29,923 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl | helper=True | score=-75
+2026-05-10 01:11:29,923 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl | helper=False | score=75
+2026-05-10 01:11:29,925 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl | helper=True | score=-75
+2026-05-10 01:11:29,925 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl | helper=True | score=-95
+2026-05-10 01:11:29,925 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl | helper=True | score=-75
+2026-05-10 01:11:29,925 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl | helper=True | score=-75
+2026-05-10 01:11:29,925 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl | helper=False | score=75
+2026-05-10 01:11:29,926 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl | helper=True | score=-75
+2026-05-10 01:11:29,926 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl | helper=True | score=-45
+2026-05-10 01:11:29,926 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl | helper=True | score=-85
+2026-05-10 01:11:29,926 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl | helper=False | score=15
+2026-05-10 01:11:29,926 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl | helper=True | score=-85
+2026-05-10 01:11:29,927 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl | helper=True | score=-85
+2026-05-10 01:11:29,927 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl | helper=True | score=-85
+2026-05-10 01:11:29,927 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl | helper=False | score=65
+2026-05-10 01:11:29,928 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl | helper=True | score=-85
+2026-05-10 01:11:29,928 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl | helper=True | score=-95
+2026-05-10 01:11:29,928 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl | helper=False | score=55
+2026-05-10 01:11:29,929 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl
+2026-05-10 01:11:31,723 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl via joblib: type=GradientBoostingRegressor
+2026-05-10 01:11:31,724 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl => 95.4654843459017
+2026-05-10 01:11:31,724 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl
+2026-05-10 01:11:32,238 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl via joblib: type=list
+2026-05-10 01:11:32,239 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl => NO_PREDICT
+2026-05-10 01:11:32,239 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl
+2026-05-10 01:11:32,700 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl via joblib: type=dict
+2026-05-10 01:11:32,701 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl => NO_PREDICT
+2026-05-10 01:11:32,701 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl
+2026-05-10 01:11:35,091 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl via joblib: type=XGBRegressor
+2026-05-10 01:11:35,091 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl => 1.4858768
+2026-05-10 01:11:35,092 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl
+2026-05-10 01:11:36,369 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl via joblib: type=StandardScaler
+2026-05-10 01:11:36,369 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl => NO_PREDICT
+2026-05-10 01:11:36,369 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl
+2026-05-10 01:11:36,772 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl via joblib: type=list
+2026-05-10 01:11:36,772 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl => NO_PREDICT
+2026-05-10 01:11:36,772 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl
+2026-05-10 01:11:37,163 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl via joblib: type=list
+2026-05-10 01:11:37,163 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl => NO_PREDICT
+2026-05-10 01:11:37,163 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl
+2026-05-10 01:11:37,657 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl via joblib: type=dict
+2026-05-10 01:11:37,658 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl => NO_PREDICT
+2026-05-10 01:11:37,658 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl
+2026-05-10 01:11:39,397 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl via joblib: type=RandomForestRegressor
+2026-05-10 01:11:39,398 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl => 36.63748246605559
+2026-05-10 01:11:39,398 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl
+2026-05-10 01:11:40,356 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl via joblib: type=StandardScaler
+2026-05-10 01:11:40,357 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl => NO_PREDICT
+2026-05-10 01:11:40,357 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl
+2026-05-10 01:11:40,708 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl via joblib: type=dict
+2026-05-10 01:11:40,710 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl => NO_PREDICT
+2026-05-10 01:11:40,710 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl
+2026-05-10 01:11:41,068 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl via joblib: type=list
+2026-05-10 01:11:41,069 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl => NO_PREDICT
+2026-05-10 01:11:41,069 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl
+2026-05-10 01:11:42,411 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl via joblib: type=KMeans
+2026-05-10 01:11:42,411 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl => 2
+2026-05-10 01:11:42,412 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl
+2026-05-10 01:11:42,763 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl via joblib: type=dict
+2026-05-10 01:11:42,764 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl => NO_PREDICT
+2026-05-10 01:11:42,764 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl
+2026-05-10 01:11:43,711 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl via joblib: type=StandardScaler
+2026-05-10 01:11:43,711 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl => NO_PREDICT
+2026-05-10 01:11:43,711 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl
+2026-05-10 01:11:44,070 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl via joblib: type=dict
+2026-05-10 01:11:44,070 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl => NO_PREDICT
+2026-05-10 01:11:44,070 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl
+2026-05-10 01:11:45,122 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl via joblib: type=Ridge
+2026-05-10 01:11:45,122 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl => 4468.711374999965
+2026-05-10 01:11:45,122 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl
+2026-05-10 01:11:46,188 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl via joblib: type=StandardScaler
+2026-05-10 01:11:46,188 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl => NO_PREDICT
+2026-05-10 01:11:46,188 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl
+2026-05-10 01:11:47,263 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl via joblib: type=StandardScaler
+2026-05-10 01:11:47,264 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl => NO_PREDICT
+2026-05-10 01:11:47,264 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl
+2026-05-10 01:11:48,523 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl via joblib: type=GradientBoostingRegressor
+2026-05-10 01:11:48,524 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl => 95.4654843459017
+2026-05-10 01:11:48,524 INFO Best candidate: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl (score=75)
+2026-05-10 01:11:48,527 INFO prediction_service.find_model_path([]) returned: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl
+2026-05-10 01:11:48,527 INFO Validation summary:
+2026-05-10 01:11:48,527 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl | helper=False | score=75 | loaded=True | error=None
+2026-05-10 01:11:48,527 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:11:48,527 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:11:48,529 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl | helper=False | score=75 | loaded=True | error=None
+2026-05-10 01:11:48,529 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:11:48,529 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl | helper=True | score=-95 | loaded=True | error=None
+2026-05-10 01:11:48,529 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:11:48,529 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:11:48,530 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl | helper=False | score=75 | loaded=True | error=None
+2026-05-10 01:11:48,530 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:11:48,530 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl | helper=True | score=-45 | loaded=True | error=None
+2026-05-10 01:11:48,530 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl | helper=True | score=-85 | loaded=True | error=None
+2026-05-10 01:11:48,530 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl | helper=False | score=15 | loaded=True | error=None
+2026-05-10 01:11:48,531 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl | helper=True | score=-85 | loaded=True | error=None
+2026-05-10 01:11:48,531 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl | helper=True | score=-85 | loaded=True | error=None
+2026-05-10 01:11:48,531 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl | helper=True | score=-85 | loaded=True | error=None
+2026-05-10 01:11:48,531 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl | helper=False | score=65 | loaded=True | error=None
+2026-05-10 01:11:48,532 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl | helper=True | score=-85 | loaded=True | error=None
+2026-05-10 01:11:48,532 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl | helper=True | score=-95 | loaded=True | error=None
+2026-05-10 01:11:48,532 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl | helper=False | score=55 | loaded=True | error=None
+2026-05-10 01:11:48,532 INFO /api/predict/ should be able to load a model at runtime and not return 503 (selected: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl)
+2026-05-10 01:28:52,386 INFO BASE_DIR resolved to: E:\miniproject_wildlfie\wildlife-\backend
+2026-05-10 01:28:52,387 INFO Scanning ml_models directory: E:\miniproject_wildlfie\wildlife-\backend\ml_models
+2026-05-10 01:28:52,388 INFO Discovered 20 artifacts
+2026-05-10 01:28:52,388 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl | helper=False | score=75
+2026-05-10 01:28:52,389 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl | helper=True | score=-75
+2026-05-10 01:28:52,389 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl | helper=True | score=-75
+2026-05-10 01:28:52,389 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl | helper=False | score=75
+2026-05-10 01:28:52,389 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl | helper=True | score=-75
+2026-05-10 01:28:52,389 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl | helper=True | score=-95
+2026-05-10 01:28:52,389 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl | helper=True | score=-75
+2026-05-10 01:28:52,390 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl | helper=True | score=-75
+2026-05-10 01:28:52,390 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl | helper=False | score=75
+2026-05-10 01:28:52,390 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl | helper=True | score=-75
+2026-05-10 01:28:52,390 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl | helper=True | score=-45
+2026-05-10 01:28:52,390 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl | helper=True | score=-85
+2026-05-10 01:28:52,391 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl | helper=False | score=15
+2026-05-10 01:28:52,391 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl | helper=True | score=-85
+2026-05-10 01:28:52,391 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl | helper=True | score=-85
+2026-05-10 01:28:52,391 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl | helper=True | score=-85
+2026-05-10 01:28:52,391 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl | helper=False | score=65
+2026-05-10 01:28:52,391 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl | helper=True | score=-85
+2026-05-10 01:28:52,392 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl | helper=True | score=-95
+2026-05-10 01:28:52,392 INFO Found: E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl | helper=False | score=55
+2026-05-10 01:28:52,392 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl
+2026-05-10 01:28:53,608 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl via joblib: type=GradientBoostingRegressor
+2026-05-10 01:28:53,608 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl => 95.4654843459017
+2026-05-10 01:28:53,608 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl
+2026-05-10 01:28:53,968 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl via joblib: type=list
+2026-05-10 01:28:53,968 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl => NO_PREDICT
+2026-05-10 01:28:53,968 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl
+2026-05-10 01:28:54,365 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl via joblib: type=dict
+2026-05-10 01:28:54,365 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl => NO_PREDICT
+2026-05-10 01:28:54,365 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl
+2026-05-10 01:28:55,874 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl via joblib: type=XGBRegressor
+2026-05-10 01:28:55,875 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl => 1.4858768
+2026-05-10 01:28:55,875 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl
+2026-05-10 01:28:56,827 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl via joblib: type=StandardScaler
+2026-05-10 01:28:56,828 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl => NO_PREDICT
+2026-05-10 01:28:56,828 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl
+2026-05-10 01:28:57,168 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl via joblib: type=list
+2026-05-10 01:28:57,168 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl => NO_PREDICT
+2026-05-10 01:28:57,169 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl
+2026-05-10 01:28:57,486 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl via joblib: type=list
+2026-05-10 01:28:57,486 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl => NO_PREDICT
+2026-05-10 01:28:57,486 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl
+2026-05-10 01:28:57,827 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl via joblib: type=dict
+2026-05-10 01:28:57,828 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl => NO_PREDICT
+2026-05-10 01:28:57,828 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl
+2026-05-10 01:28:59,283 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl via joblib: type=RandomForestRegressor
+2026-05-10 01:28:59,284 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl => 36.63748246605559
+2026-05-10 01:28:59,284 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl
+2026-05-10 01:29:00,213 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl via joblib: type=StandardScaler
+2026-05-10 01:29:00,213 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl => NO_PREDICT
+2026-05-10 01:29:00,213 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl
+2026-05-10 01:29:00,554 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl via joblib: type=dict
+2026-05-10 01:29:00,554 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl => NO_PREDICT
+2026-05-10 01:29:00,554 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl
+2026-05-10 01:29:00,880 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl via joblib: type=list
+2026-05-10 01:29:00,881 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl => NO_PREDICT
+2026-05-10 01:29:00,881 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl
+2026-05-10 01:29:02,021 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl via joblib: type=KMeans
+2026-05-10 01:29:02,021 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl => 2
+2026-05-10 01:29:02,022 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl
+2026-05-10 01:29:02,348 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl via joblib: type=dict
+2026-05-10 01:29:02,349 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl => NO_PREDICT
+2026-05-10 01:29:02,349 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl
+2026-05-10 01:29:03,255 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl via joblib: type=StandardScaler
+2026-05-10 01:29:03,255 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl => NO_PREDICT
+2026-05-10 01:29:03,255 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl
+2026-05-10 01:29:03,572 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl via joblib: type=dict
+2026-05-10 01:29:03,572 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl => NO_PREDICT
+2026-05-10 01:29:03,572 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl
+2026-05-10 01:29:04,565 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl via joblib: type=Ridge
+2026-05-10 01:29:04,565 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl => 4468.711374999965
+2026-05-10 01:29:04,566 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl
+2026-05-10 01:29:05,773 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl via joblib: type=StandardScaler
+2026-05-10 01:29:05,773 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl => NO_PREDICT
+2026-05-10 01:29:05,774 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl
+2026-05-10 01:29:06,855 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl via joblib: type=StandardScaler
+2026-05-10 01:29:06,855 INFO SAMPLE PREDICTION SKIPPED E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl => NO_PREDICT
+2026-05-10 01:29:06,855 DEBUG Attempting load: E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl
+2026-05-10 01:29:08,139 INFO SUCCESS loading E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl via joblib: type=GradientBoostingRegressor
+2026-05-10 01:29:08,140 INFO SAMPLE PREDICTION E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl => 95.4654843459017
+2026-05-10 01:29:08,140 INFO Best candidate: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl (score=75)
+2026-05-10 01:29:08,143 INFO prediction_service.find_model_path([]) returned: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl
+2026-05-10 01:29:08,143 INFO Validation summary:
+2026-05-10 01:29:08,143 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl | helper=False | score=75 | loaded=True | error=None
+2026-05-10 01:29:08,143 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_feature_names.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:29:08,144 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_metadata.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:29:08,144 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_model.pkl | helper=False | score=75 | loaded=True | error=None
+2026-05-10 01:29:08,144 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\birds_scaler.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:29:08,144 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\feature_names.pkl | helper=True | score=-95 | loaded=True | error=None
+2026-05-10 01:29:08,145 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_feature_names.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:29:08,145 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_metadata.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:29:08,145 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_model.pkl | helper=False | score=75 | loaded=True | error=None
+2026-05-10 01:29:08,145 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\insects_scaler.pkl | helper=True | score=-75 | loaded=True | error=None
+2026-05-10 01:29:08,146 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\model_metadata.pkl | helper=True | score=-45 | loaded=True | error=None
+2026-05-10 01:29:08,146 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_feature_names.pkl | helper=True | score=-85 | loaded=True | error=None
+2026-05-10 01:29:08,146 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans.pkl | helper=False | score=15 | loaded=True | error=None
+2026-05-10 01:29:08,146 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_meta.pkl | helper=True | score=-85 | loaded=True | error=None
+2026-05-10 01:29:08,146 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_kmeans_scaler.pkl | helper=True | score=-85 | loaded=True | error=None
+2026-05-10 01:29:08,146 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_metadata.pkl | helper=True | score=-85 | loaded=True | error=None
+2026-05-10 01:29:08,147 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_model.pkl | helper=False | score=65 | loaded=True | error=None
+2026-05-10 01:29:08,147 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\plants_scaler.pkl | helper=True | score=-85 | loaded=True | error=None
+2026-05-10 01:29:08,147 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\scaler.pkl | helper=True | score=-95 | loaded=True | error=None
+2026-05-10 01:29:08,147 INFO E:\miniproject_wildlfie\wildlife-\backend\ml_models\wildlife_model.pkl | helper=False | score=55 | loaded=True | error=None
+2026-05-10 01:29:08,147 INFO /api/predict/ should be able to load a model at runtime and not return 503 (selected: E:\miniproject_wildlfie\wildlife-\backend\ml_models\animals_model.pkl)

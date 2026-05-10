@@ -1,0 +1,3 @@
+BASE_DIR: E:\miniproject_wildlfie\wildlife-\backend\apps
+Scanning: E:\miniproject_wildlfie\wildlife-\backend\apps\ml_models
+No .pkl or .joblib artifacts found under ml_models

@@ -2,40 +2,100 @@ from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from django.core.cache import cache
-from django.core.mail import send_mail
 from django.conf import settings
-import joblib
-import pandas as pd
-import numpy as np
+import logging
 import math
 import json
-import xgboost
 import re
 import secrets
 from urllib.parse import quote_plus
 from urllib.request import urlopen, Request
-import warnings
 from pathlib import Path
-from observations.predictor.utils.environmental_data import get_environmental_data
-from observations.predictor.utils.decision_engine import analyze_prediction
-from observations.predictor.utils.trend_analysis import analyze_trend
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
 import pickle
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+import threading
 
-warnings.filterwarnings('ignore')
+from apps.common import prediction_service
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+logger = logging.getLogger(__name__)
+
+# Lazy imports for heavy ML/utils dependencies (loaded on first use, not at startup)
+pd = None
+np = None
+cache = None
+send_mail = None
+get_environmental_data = None
+analyze_prediction = None
+analyze_trend = None
+KMeans = None
+StandardScaler = None
+xgboost = None
+
+
+def _lazy_import_ml():
+    """Load heavy ML dependencies only when prediction endpoints are called."""
+    global pd, np, KMeans, StandardScaler, xgboost
+    if pd is not None:
+        return
+    try:
+        import pandas as pnd
+        import numpy as npy
+        from sklearn.cluster import KMeans as km
+        from sklearn.preprocessing import StandardScaler as ss
+
+        pd = pnd
+        np = npy
+        KMeans = km
+        StandardScaler = ss
+        try:
+            import xgboost as xgb
+            xgboost = xgb
+        except Exception:
+            pass
+    except ImportError:
+        pass
+
+
+def _lazy_import_utils():
+    """Load predictor utils only when clustering/prediction endpoints are called."""
+    global get_environmental_data, analyze_prediction, analyze_trend
+    if get_environmental_data is not None:
+        return
+    try:
+        from observations.predictor.utils.environmental_data import get_environmental_data as ged
+        from observations.predictor.utils.decision_engine import analyze_prediction as ap
+        from observations.predictor.utils.trend_analysis import analyze_trend as at
+        globals()['get_environmental_data'] = ged
+        globals()['analyze_prediction'] = ap
+        globals()['analyze_trend'] = at
+    except ImportError:
+        pass
+
+
+def _lazy_import_cache():
+    """Load cache and mail on first use."""
+    global cache, send_mail
+    if cache is not None:
+        return
+    from django.core.cache import cache as c
+    from django.core.mail import send_mail as sm
+    globals()['cache'] = c
+    globals()['send_mail'] = sm
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _project_file(name: str) -> str:
-    ml_path = PROJECT_ROOT / 'ml_logic' / name
-    if ml_path.exists():
-        return str(ml_path)
-    return str(PROJECT_ROOT / name)
+    candidates = [
+        PROJECT_ROOT / 'ml_models' / name,
+        PROJECT_ROOT / name,
+        PROJECT_ROOT.parent / name,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return str(candidates[0])
 
 
 BASE_BIRDS_FEATURES = [
@@ -199,7 +259,7 @@ def send_email_otp(request):
             fail_silently=False,
         )
     except Exception as exc:
-        print("EMAIL ERROR:", exc)  # Debug in terminal
+        logger.exception('EMAIL ERROR')
         return JsonResponse(
             {'error': f'Failed to send OTP email: {str(exc)}'},
             status=500
@@ -279,9 +339,9 @@ def _load_occurrence_classifier_if_needed(category: str):
         return
 
     try:
-        occurrence_models[category] = joblib.load(_project_file(f'{category}_occurrence_classifier.pkl'))
+        occurrence_models[category] = prediction_service.load_artifact(_project_file(f'{category}_occurrence_classifier.pkl'))
         try:
-            loaded_features = joblib.load(_project_file(f'{category}_occurrence_features.pkl'))
+            loaded_features = prediction_service.load_artifact(_project_file(f'{category}_occurrence_features.pkl'))
             if isinstance(loaded_features, list) and loaded_features:
                 occurrence_model_features[category] = loaded_features
         except Exception:
@@ -334,89 +394,6 @@ def _predict_occurrence_trend(category: str, feature_values: dict) -> dict | Non
         }
     except Exception:
         return None
-
-
-def _get_taxonomic_mapping(category: str) -> dict:
-    """Dynamically get categorical string mappings from the raw CSV so the UI displays names."""
-    cache_key = f"{category}_taxonomic_mapping"
-    mapping = cache.get(cache_key)
-    if mapping is not None:
-        return mapping
-
-    mapping = {}
-    try:
-        csv_file = _project_file(f'Koyna_{category}_final.csv')
-        # Only read the relevant taxonomic columns to keep it lightweight
-        df = pd.read_csv(csv_file, usecols=lambda c: c in ['class', 'order', 'family'])
-        for src, enc in [('class', 'class_enc'), ('order', 'order_enc'), ('family', 'family_enc')]:
-            if src in df.columns:
-                # Same factorize logic used in training scripts to guarantee exact mapping
-                labels = pd.factorize(df[src].fillna('Unknown'))[1].tolist()
-                mapping[enc] = [str(x).title() for x in labels]
-    except Exception:
-        pass
-
-    cache.set(cache_key, mapping, timeout=86400)
-    return mapping
-
-
-def _normalize_species_text(value: str) -> str:
-    text = _safe_text(value, '').lower().strip()
-    return re.sub(r'\s+', ' ', text)
-
-
-def _species_core_name(value: str) -> str:
-    """Strip author/year suffix patterns to improve species matching."""
-    text = _normalize_species_text(value)
-    text = re.sub(r'\([^)]*\)', ' ', text)
-    text = text.split(',')[0].strip()
-    return re.sub(r'\s+', ' ', text)
-
-
-def _filter_species_rows(df: pd.DataFrame, species_name: str) -> pd.DataFrame:
-    """Find species rows robustly across naming variants and author suffixes."""
-    if df.empty or 'scientificName' not in df.columns:
-        return pd.DataFrame()
-
-    query = _normalize_species_text(species_name)
-    if not query:
-        return pd.DataFrame()
-
-    sci = df['scientificName'].fillna('').astype(str)
-    norm = sci.map(_normalize_species_text)
-
-    # 1) Exact normalized match.
-    exact = df[norm == query]
-    if not exact.empty:
-        return exact
-
-    # 2) Literal contains (no regex interpretation of special chars).
-    literal = df[sci.str.contains(species_name, case=False, na=False, regex=False)]
-    if not literal.empty:
-        return literal
-
-    # 3) Match by core species name without author/year text.
-    query_core = _species_core_name(species_name)
-    if query_core:
-        norm_core = norm.map(_species_core_name)
-        core = df[(norm_core == query_core) | norm_core.str.startswith(query_core + ' ', na=False)]
-        if not core.empty:
-            return core
-
-        core_literal = df[sci.str.contains(query_core, case=False, na=False, regex=False)]
-        if not core_literal.empty:
-            return core_literal
-
-    return pd.DataFrame()
-
-
-def _extract_animals_lat_lon(payload: dict) -> tuple[float, float]:
-    lat = _safe_float(payload.get('lat_grid'))
-    lon = _safe_float(payload.get('lon_grid'))
-
-    if lat is None:
-        lat = _safe_float(payload.get('decimalLatitude'))
-    if lon is None:
         lon = _safe_float(payload.get('decimalLongitude'))
 
     if lat is None or lon is None:
@@ -425,6 +402,8 @@ def _extract_animals_lat_lon(payload: dict) -> tuple[float, float]:
 
 
 def _predict_animals_from_payload(payload: dict) -> dict:
+    _load_animals_artifacts_if_needed()
+
     if animals_model is None or animals_scaler is None:
         raise ValueError('Animals model artifacts are not loaded.')
 
@@ -532,6 +511,8 @@ def _predict_animals_from_payload(payload: dict) -> dict:
 
 
 def _predict_birds_from_payload(payload: dict) -> dict:
+    _load_birds_artifacts_if_needed()
+
     if birds_model is None or birds_scaler is None:
         raise ValueError('Bird prediction model is currently unavailable. Please retry shortly.')
 
@@ -644,6 +625,8 @@ def _predict_birds_from_payload(payload: dict) -> dict:
 
 
 def _predict_insects_from_payload(payload: dict) -> dict:
+    _load_insects_artifacts_if_needed()
+
     if insects_model is None or insects_scaler is None:
         raise ValueError('Insect prediction model is currently unavailable. Please retry shortly.')
 
@@ -866,81 +849,24 @@ def _build_insects_engineered_preview(base_input: dict) -> list[dict]:
     except Exception:
         return []
 
-# Load animals model
+animals_model = None
+animals_scaler = None
+animals_features = []
 animals_metadata = {}
 animals_pca = None
-try:
-    animals_model = joblib.load(_project_file('wildlife_model.pkl'))
-    animals_scaler = joblib.load(_project_file('scaler.pkl'))
-    animals_features = joblib.load(_project_file('feature_names.pkl'))
-    try:
-        animals_pca = joblib.load(_project_file('animals_pca.pkl'))
-        animals_metadata = joblib.load(_project_file('model_metadata.pkl'))
-    except Exception:
-        pass
-    print("Animals model loaded successfully.")
-except Exception as e:
-    print(f"Error loading animals model: {e}")
-    animals_model = None
 
-# Load birds artifacts
 birds_model = None
 birds_scaler = None
 birds_pca = None
 birds_features = BASE_BIRDS_FEATURES.copy()
 birds_metadata = {}
 
-try:
-    try:
-        birds_features = joblib.load(_project_file('birds_feature_names.pkl'))
-    except Exception:
-        birds_features = BASE_BIRDS_FEATURES.copy()
-
-    birds_scaler = joblib.load(_project_file('birds_scaler.pkl'))
-    birds_model = joblib.load(_project_file('birds_model.pkl'))
-    try:
-        birds_pca = joblib.load(_project_file('birds_pca.pkl'))
-    except Exception:
-        pass
-    try:
-        birds_metadata = joblib.load(_project_file('birds_metadata.pkl'))
-    except Exception:
-        birds_metadata = {}
-    print("Birds model loaded successfully.")
-except Exception as e:
-    print(f"Error loading birds model: {e}")
-
-
-
-# Load insects artifacts
 insects_model = None
 insects_scaler = None
 insects_pca = None
 insects_features = BASE_INSECTS_FEATURES.copy()
 insects_metadata = {}
 
-try:
-    try:
-        insects_features = joblib.load(_project_file('insects_feature_names.pkl'))
-    except Exception:
-        insects_features = BASE_INSECTS_FEATURES.copy()
-
-    insects_scaler = joblib.load(_project_file('insects_scaler.pkl'))
-    insects_model = joblib.load(_project_file('insects_model.pkl'))
-    try:
-        insects_pca = joblib.load(_project_file('insects_pca.pkl'))
-    except Exception:
-        pass
-    try:
-        insects_metadata = joblib.load(_project_file('insects_metadata.pkl'))
-    except Exception:
-        insects_metadata = {}
-    print("Insects model loaded successfully.")
-except Exception as e:
-    print(f"Error loading insects model: {e}")
-
-
-# Load plants artifacts
 plants_model = None
 plants_scaler = None
 plants_features = BASE_PLANTS_FEATURES.copy()
@@ -948,26 +874,85 @@ plants_metadata = {}
 plants_kmeans = None
 plants_kmeans_scaler = None
 
-try:
-    try:
-        plants_features = joblib.load(_project_file('plants_feature_names.pkl'))
-    except Exception:
-        plants_features = BASE_PLANTS_FEATURES.copy()
 
-    plants_scaler = joblib.load(_project_file('plants_scaler.pkl'))
-    plants_model  = joblib.load(_project_file('plants_model.pkl'))
+def _load_animals_artifacts_if_needed():
+    """Load animals artifacts on demand and cache them in module globals."""
+    global animals_model, animals_scaler, animals_features, animals_metadata, animals_pca
+    if animals_model is not None and animals_scaler is not None:
+        return
+
     try:
-        plants_metadata = joblib.load(_project_file('plants_metadata.pkl'))
+        animals_model = prediction_service.load_model(_project_file('wildlife_model.pkl'))
+        animals_scaler = prediction_service.load_artifact(_project_file('scaler.pkl'))
+        loaded_features = prediction_service.load_artifact(_project_file('feature_names.pkl'))
+        animals_features = loaded_features if isinstance(loaded_features, list) else animals_features or []
+        try:
+            animals_pca = prediction_service.load_artifact(_project_file('animals_pca.pkl'))
+            loaded_metadata = prediction_service.load_artifact(_project_file('model_metadata.pkl'))
+            animals_metadata = loaded_metadata if isinstance(loaded_metadata, dict) else {}
+        except Exception:
+            pass
     except Exception:
-        plants_metadata = {}
+        animals_model = None
+        animals_scaler = None
+
+
+def _load_birds_artifacts_if_needed():
+    """Load birds artifacts on demand and cache them in module globals."""
+    global birds_model, birds_scaler, birds_pca, birds_features, birds_metadata
+    if birds_model is not None and birds_scaler is not None:
+        return
+
     try:
-        plants_kmeans        = joblib.load(_project_file('plants_kmeans.pkl'))
-        plants_kmeans_scaler = joblib.load(_project_file('plants_kmeans_scaler.pkl'))
+        try:
+            loaded_features = prediction_service.load_artifact(_project_file('birds_feature_names.pkl'))
+            birds_features = loaded_features if isinstance(loaded_features, list) else BASE_BIRDS_FEATURES.copy()
+        except Exception:
+            birds_features = BASE_BIRDS_FEATURES.copy()
+
+        birds_scaler = prediction_service.load_artifact(_project_file('birds_scaler.pkl'))
+        birds_model = prediction_service.load_model(_project_file('birds_model.pkl'))
+        try:
+            birds_pca = prediction_service.load_artifact(_project_file('birds_pca.pkl'))
+        except Exception:
+            pass
+        try:
+            loaded_metadata = prediction_service.load_artifact(_project_file('birds_metadata.pkl'))
+            birds_metadata = loaded_metadata if isinstance(loaded_metadata, dict) else {}
+        except Exception:
+            birds_metadata = {}
     except Exception:
-        plants_kmeans = None
-    print("Plants model loaded successfully.")
-except Exception as e:
-    print(f"Plants model not yet trained ({e}). Run: python prepare_plants_data.py && python train_plants_model.py")
+        birds_model = None
+        birds_scaler = None
+
+
+def _load_insects_artifacts_if_needed():
+    """Load insects artifacts on demand and cache them in module globals."""
+    global insects_model, insects_scaler, insects_pca, insects_features, insects_metadata
+    if insects_model is not None and insects_scaler is not None:
+        return
+
+    try:
+        try:
+            loaded_features = prediction_service.load_artifact(_project_file('insects_feature_names.pkl'))
+            insects_features = loaded_features if isinstance(loaded_features, list) else BASE_INSECTS_FEATURES.copy()
+        except Exception:
+            insects_features = BASE_INSECTS_FEATURES.copy()
+
+        insects_scaler = prediction_service.load_artifact(_project_file('insects_scaler.pkl'))
+        insects_model = prediction_service.load_model(_project_file('insects_model.pkl'))
+        try:
+            insects_pca = prediction_service.load_artifact(_project_file('insects_pca.pkl'))
+        except Exception:
+            pass
+        try:
+            loaded_metadata = prediction_service.load_artifact(_project_file('insects_metadata.pkl'))
+            insects_metadata = loaded_metadata if isinstance(loaded_metadata, dict) else {}
+        except Exception:
+            insects_metadata = {}
+    except Exception:
+        insects_model = None
+        insects_scaler = None
 
 
 def _reload_plants_artifacts_if_needed(force: bool = False):
@@ -979,29 +964,28 @@ def _reload_plants_artifacts_if_needed(force: bool = False):
 
     try:
         try:
-            plants_features = joblib.load(_project_file('plants_feature_names.pkl'))
+            loaded_features = prediction_service.load_artifact(_project_file('plants_feature_names.pkl'))
+            plants_features = loaded_features if isinstance(loaded_features, list) else BASE_PLANTS_FEATURES.copy()
         except Exception:
             plants_features = BASE_PLANTS_FEATURES.copy()
 
-        plants_scaler = joblib.load(_project_file('plants_scaler.pkl'))
-        plants_model = joblib.load(_project_file('plants_model.pkl'))
+        plants_scaler = prediction_service.load_artifact(_project_file('plants_scaler.pkl'))
+        plants_model = prediction_service.load_model(_project_file('plants_model.pkl'))
 
         try:
-            plants_metadata = joblib.load(_project_file('plants_metadata.pkl'))
+            loaded_metadata = prediction_service.load_artifact(_project_file('plants_metadata.pkl'))
+            plants_metadata = loaded_metadata if isinstance(loaded_metadata, dict) else {}
         except Exception:
             plants_metadata = {}
 
         try:
-            plants_kmeans = joblib.load(_project_file('plants_kmeans.pkl'))
-            plants_kmeans_scaler = joblib.load(_project_file('plants_kmeans_scaler.pkl'))
+            plants_kmeans = prediction_service.load_artifact(_project_file('plants_kmeans.pkl'))
+            plants_kmeans_scaler = prediction_service.load_artifact(_project_file('plants_kmeans_scaler.pkl'))
         except Exception:
             plants_kmeans = None
             plants_kmeans_scaler = None
     except Exception:
-        # Keep existing values; caller will handle untrained state.
         pass
-
-
 
 _birds_thresholds_cache = None
 _insects_thresholds_cache = None
@@ -1319,7 +1303,7 @@ def _insects_base_feature_names():
     return BASE_INSECTS_FEATURES
 
 
-def _build_birds_engineered_features(df_base: pd.DataFrame) -> pd.DataFrame:
+def _build_birds_engineered_features(df_base):
     """Create the engineered features used by the latest birds model."""
     X = df_base.copy()
     thresholds = _get_birds_thresholds()
@@ -1372,7 +1356,7 @@ def _build_birds_engineered_features(df_base: pd.DataFrame) -> pd.DataFrame:
     return X
 
 
-def _build_insects_engineered_features(df_base: pd.DataFrame) -> pd.DataFrame:
+def _build_insects_engineered_features(df_base):
     """Create engineered features used by the insects linear regression model."""
     X = df_base.copy()
     thresholds = _get_insects_thresholds()
@@ -1447,6 +1431,7 @@ def index(request):
 
 def animals_prediction(request):
     """Render animals prediction page"""
+    _load_animals_artifacts_if_needed()
     return render(request, 'animals.html', {'features': animals_features})
 
 
@@ -1465,6 +1450,7 @@ def animals_photos_page(request):
 
 def birds_prediction(request):
     """Render birds prediction page"""
+    _load_birds_artifacts_if_needed()
     return render(request, 'birds.html', {'features': birds_features})
 
 
@@ -1483,6 +1469,7 @@ def birds_photos_page(request):
 
 def insects_prediction(request):
     """Render insects prediction page"""
+    _load_insects_artifacts_if_needed()
     return render(request, 'insects.html', {'features': insects_features})
 
 
@@ -1545,6 +1532,7 @@ def animals_result(request):
 @require_http_methods(["GET", "POST"])
 def animals_dashboard(request):
     """Render dashboard for animal prediction output."""
+    _load_animals_artifacts_if_needed()
     if request.method == "GET":
         return render(
             request,
@@ -1646,6 +1634,7 @@ def birds_result(request):
 @require_http_methods(["GET", "POST"])
 def birds_dashboard(request):
     """Render dashboard for bird prediction output."""
+    _load_birds_artifacts_if_needed()
     if request.method == "GET":
         return render(
             request,
@@ -1720,6 +1709,7 @@ def insects_result(request):
 @require_http_methods(["GET", "POST"])
 def insects_dashboard(request):
     """Render dashboard for insect prediction output."""
+    _load_insects_artifacts_if_needed()
     if request.method == "GET":
         return render(
             request,
@@ -1810,7 +1800,7 @@ def _plants_base_feature_names():
     return BASE_PLANTS_FEATURES
 
 
-def _build_plants_engineered_features(df_base: pd.DataFrame) -> pd.DataFrame:
+def _build_plants_engineered_features(df_base):
     """Apply the same feature engineering used in train_plants_model.py."""
     X = df_base.copy()
 
@@ -2107,7 +2097,7 @@ def get_plants_model_info(request):
     meta = plants_metadata if isinstance(plants_metadata, dict) else {}
     km_meta = {}
     try:
-        km_meta = joblib.load(_project_file('plants_kmeans_meta.pkl'))
+        km_meta = prediction_service.load_artifact(_project_file('plants_kmeans_meta.pkl'))
     except Exception:
         pass
     return JsonResponse({
@@ -2131,6 +2121,7 @@ def get_plants_model_info(request):
 def get_animals_features(request):
     """Return animal features and their ranges"""
     try:
+        _load_animals_artifacts_if_needed()
         df = pd.read_csv(_project_file('koyna_animals_regression_density.csv'))
         X = df.drop(columns=['decimalLatitude', 'decimalLongitude', 'TARGET_sighting_density'])
         
@@ -2231,6 +2222,7 @@ def photo_proxy(request):
 def get_birds_features(request):
     """Return bird features and their ranges"""
     try:
+        _load_birds_artifacts_if_needed()
         df = pd.read_csv(_project_file('koyna_birds_regression_density.csv'))
         X = df.drop(columns=['decimalLatitude', 'decimalLongitude', 'bird_sighting_density'])
         
@@ -2273,6 +2265,7 @@ def get_birds_features(request):
 def get_insects_features(request):
     """Return insect features and their ranges"""
     try:
+        _load_insects_artifacts_if_needed()
         df = pd.read_csv(_project_file('koyna_insects_regression_density.csv'))
         X = df.drop(columns=['decimalLatitude', 'decimalLongitude', 'insect_sighting_density'])
 
@@ -2338,7 +2331,7 @@ def _load_category_data(category='animals'):
         _species_cache[category] = df
         return df
     except Exception as e:
-        print(f"Error loading {category} data: {e}")
+        logger.warning('Error loading %s data: %s', category, e)
         return pd.DataFrame()
 
 
@@ -2501,7 +2494,7 @@ def get_animals_clustering(request):
         result = _perform_clustering(n_clusters)
         return JsonResponse(result)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        logger.exception('EMAIL ERROR')
 
 
 @require_http_methods(["GET"])
