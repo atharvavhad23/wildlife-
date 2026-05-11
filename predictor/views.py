@@ -190,9 +190,9 @@ OTP_TTL_SECONDS = 10 * 60
 
 def _apply_v3_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Advanced Feature Engineering (V6 - Coupled Research Grade)
+    Advanced Feature Engineering (V3 Scientific Forecasting)
     ========================================================
-    Reconstructs ecological stressors and calculates non-linear biological thresholds.
+    Reconstructs the exact feature set used by train_all_models_v3_scientific.py.
     """
     X = df.copy()
 
@@ -202,24 +202,26 @@ def _apply_v3_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     if 'lon_grid' not in X.columns:
         X['lon_grid'] = pd.to_numeric(X.get('decimalLongitude', 73.5), errors='coerce').fillna(73.5).round(1)
 
-    # V6 Engineered Stressors (Must match training script exactly)
-    # Self-Healing: Populate missing environmental data if not present
+    # Self-Healing: Populate missing environmental data if not present.
     for col, default in [('temperature', 27.0), ('rainfall', 8.0), ('species_richness', 120.0), ('month', 6), ('year', 2025)]:
-        if col not in X.columns: X[col] = default
+        if col not in X.columns:
+            X[col] = default
 
+    # V3 Scientific Engineered Features
     X['decade'] = (X['year'] // 10) * 10
-    X['years_since_2020'] = (X['year'] - 2020).clip(lower=0)
-    
-    # Non-linear Stress Components
-    X['temp_stress_squared'] = (X['temperature'] - 28.0).clip(lower=0)**2
-    X['drought_severity']    = (10.0 - X['rainfall']).clip(lower=0)**2
-    X['water_index']         = np.log1p(X['rainfall'].clip(lower=0))
-    X['habitat_index']       = (0.5 * X['water_index'] - 0.2 * np.sqrt(X['temp_stress_squared'])).clip(lower=0)
-    X['richness_log']        = np.log1p(X['species_richness'].clip(lower=0))
-    
-    # Seasonal Cycles
+    X['years_since_2020'] = (X['year'] - 2020)
+    X['temp_stress'] = np.abs(X['temperature'] - 26.0)
+    X['water_index'] = np.log1p(X['rainfall'])
+    X['habitat_quality'] = (0.4 * X['water_index'] - 0.3 * X['temp_stress']).clip(lower=0)
+    X['climate_pressure'] = X['years_since_2020'] * X['temp_stress']
+    X['richness_log'] = np.log1p(X['species_richness'])
     X['month_sin'] = np.sin(2 * np.pi * X['month'] / 12)
     X['month_cos'] = np.cos(2 * np.pi * X['month'] / 12)
+
+    # Compatibility aliases used by some UI/reporting code.
+    X['temp_stress_squared'] = X['temp_stress'] ** 2
+    X['drought_severity'] = (10.0 - X['rainfall']).clip(lower=0) ** 2
+    X['habitat_index'] = X['habitat_quality']
 
     return X
 
