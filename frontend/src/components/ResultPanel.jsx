@@ -320,8 +320,15 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
           {mode === 'density' ? (
             <>
               <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40 mb-4">Estimated {speciesLabel} Density</h2>
-              <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40 leading-none mb-4">
-                {Number(prediction).toFixed(3)}
+              <div className="flex flex-col items-center gap-1 mb-4">
+                <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40 leading-none">
+                  {Number(prediction).toFixed(3)}
+                </div>
+                {result.uncertainty && (
+                  <div className="text-sm font-bold text-white/30 tracking-widest">
+                    ± {result.uncertainty} (95% CI)
+                  </div>
+                )}
               </div>
               <div className="text-xs font-black text-green-400 uppercase tracking-[0.2em]">{unit}</div>
               <p className="mt-8 text-sm text-white/30 max-w-lg mx-auto leading-relaxed">
@@ -360,10 +367,25 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
             {mode === 'density' ? (
               <div className="bg-white/5 p-4 rounded-xl border border-white/5">
                 <div className="text-xs font-bold text-white mb-1">Architecture</div>
-                <div className="text-sm text-white/50">{regressionModel}</div>
-                {result?.accuracy && (
-                  <div className="mt-3 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-green-500/10 text-green-400 text-[10px] font-black uppercase tracking-wider">
-                    ✓ {Number(result.accuracy).toFixed(1)}% Accuracy
+                <div className="text-sm text-white/50 mb-3">{regressionModel}</div>
+                
+                {result.metrics && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2 rounded bg-black/20 border border-white/5">
+                      <div className="text-[9px] font-black text-white/30 uppercase">R² Score</div>
+                      <div className="text-xs font-bold text-green-400">{result.metrics.r2}</div>
+                    </div>
+                    <div className="p-2 rounded bg-black/20 border border-white/5">
+                      <div className="text-[9px] font-black text-white/30 uppercase">MAE</div>
+                      <div className="text-xs font-bold text-green-400">{result.metrics.mae}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {decision.stress_score !== undefined && (
+                  <div className="mt-3 p-2 rounded bg-amber-500/5 border border-amber-500/10">
+                    <div className="text-[9px] font-black text-amber-500/40 uppercase">Ecological Stress Score</div>
+                    <div className="text-xs font-bold text-amber-500">{decision.stress_score} / 1.0</div>
                   </div>
                 )}
               </div>
