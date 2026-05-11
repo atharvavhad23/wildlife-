@@ -203,6 +203,10 @@ def _apply_v3_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         X['lon_grid'] = pd.to_numeric(X.get('decimalLongitude', 73.5), errors='coerce').fillna(73.5).round(1)
 
     # V6 Engineered Stressors (Must match training script exactly)
+    # Self-Healing: Populate missing environmental data if not present
+    for col, default in [('temperature', 27.0), ('rainfall', 8.0), ('species_richness', 120.0), ('month', 6), ('year', 2025)]:
+        if col not in X.columns: X[col] = default
+
     X['decade'] = (X['year'] // 10) * 10
     X['years_since_2020'] = (X['year'] - 2020).clip(lower=0)
     
