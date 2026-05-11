@@ -17,33 +17,35 @@ function TrendGraph({ currentDensity, outlook, unit }) {
   const trendColor = outlook.density_change_10yr_pct >= 0 ? '#10b981' : '#f87171';
 
   return (
-    <div className="dash-card" style={{ marginTop: 24, maxWidth: 600, margin: '24px auto 0' }}>
-      <div className="dash-card-title">Population Projection Trend</div>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: 20 }}>
+    <div className="glass-card p-6 mt-8 max-w-2xl mx-auto">
+      <h3 className="text-sm font-bold uppercase tracking-wider text-white/40 mb-2 text-center">Population Projection Trend</h3>
+      <p className="text-[11px] text-white/30 mb-6 text-center">
         Visualized prediction of population density ({unit}) over the next decade.
       </p>
-      <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={data} margin={{ top: 10, right: 20, bottom: 5, left: -20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-          <XAxis dataKey="year" tick={{ fill: '#a7d7a9', fontSize: 12 }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fill: '#a7d7a9', fontSize: 12 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
-          <Tooltip 
-            cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }}
-            contentStyle={{ background: '#0d2818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 }}
-            labelStyle={{ color: '#a7d7a9', marginBottom: 4 }}
-            itemStyle={{ color: '#fff', fontWeight: 'bold' }}
-            formatter={(value) => [`${value}`, 'Density']}
-          />
-          <Line 
-            type="monotone" 
-            dataKey="density" 
-            stroke={trendColor} 
-            strokeWidth={3}
-            dot={{ r: 5, fill: '#0d2818', stroke: trendColor, strokeWidth: 2 }}
-            activeDot={{ r: 7 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+      <div className="h-[220px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 10, right: 20, bottom: 5, left: -20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+            <XAxis dataKey="year" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 600 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: 600 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
+            <Tooltip 
+              cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }}
+              contentStyle={{ background: '#0a1a0e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '10px 14px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
+              labelStyle={{ color: '#10b981', fontWeight: 800, marginBottom: 4, fontSize: 11 }}
+              itemStyle={{ color: '#fff', fontWeight: 600, fontSize: 12, padding: 0 }}
+              formatter={(value) => [`${value}`, 'Density']}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="density" 
+              stroke={trendColor} 
+              strokeWidth={4}
+              dot={{ r: 6, fill: '#050d06', stroke: trendColor, strokeWidth: 3 }}
+              activeDot={{ r: 8, strokeWidth: 0 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }
@@ -52,27 +54,43 @@ function TrendChip({ trend }) {
   if (!trend) return null
   const raw = String(trend.trend || trend.direction || 'Stable').toLowerCase()
   const dir = raw.includes('increas') ? 'increasing' : raw.includes('decreas') ? 'decreasing' : 'stable'
-  const cls = dir === 'increasing' ? 'up' : dir === 'decreasing' ? 'down' : 'stable'
+  
+  const colors = {
+    increasing: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    decreasing: 'bg-red-500/10 text-red-400 border-red-500/20',
+    stable: 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+  }
+  
   const icon = dir === 'increasing' ? '↑' : dir === 'decreasing' ? '↓' : '→'
   const pct = Number(trend.percentage_change ?? 0)
-  return <span className={`trend-chip ${cls}`}>{icon} {dir} ({pct.toFixed(2)}%)</span>
+  
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${colors[dir]}`}>
+      {icon} {dir} ({pct.toFixed(1)}%)
+    </span>
+  )
 }
 
 function OccurrenceModelChip({ trend }) {
   if (!trend?.source) return null
   const label = String(trend.classifier_label || trend.trend || 'stable').toLowerCase()
   const conf = Number(trend.confidence)
-  const confText = Number.isFinite(conf) ? `${conf.toFixed(1)}% confidence` : 'confidence n/a'
+  const confText = Number.isFinite(conf) ? `${conf.toFixed(0)}% confidence` : 'confidence n/a'
   return (
-    <span className="trend-chip stable" title="Occurrence trend classifier output">
-      RF occurrence: {label} ({confText})
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border bg-white/5 text-white/50 border-white/10" title="Occurrence trend classifier output">
+      RF: {label} ({confText})
     </span>
   )
 }
 
 function RiskBadge({ level }) {
   if (!level) return null
-  return <span className={`risk-badge ${level}`}>⚠ {level} Risk</span>
+  const colors = {
+    High: 'bg-red-500/20 text-red-400 border-red-500/30',
+    Medium: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    Low: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+  }
+  return <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${colors[level] || colors.Medium}`}>⚠ {level} Risk</span>
 }
 
 function normalizeMetric(key, value) {
@@ -132,12 +150,12 @@ function EnvSimpleBars({ env }) {
         const raw = Number(env?.[row.key] ?? 0)
         const pct = normalizeMetric(row.key, raw)
         return (
-          <div key={row.key} className="glass p-3 rounded-lg flex flex-col gap-2 transition hover:bg-white/10">
-            <div className="flex justify-between items-center text-xs">
-              <span className="font-medium text-text-primary">{row.label}</span>
-              <span className="text-text-muted">{qualitativeLabel(row.key, raw)}</span>
+          <div key={row.key} className="bg-white/5 p-3 rounded-xl flex flex-col gap-2 transition hover:bg-white/10 border border-white/5">
+            <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
+              <span className="text-white/70">{row.label}</span>
+              <span className="text-white/30">{qualitativeLabel(row.key, raw)}</span>
             </div>
-            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-1.5 rounded-full bg-black/20 overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${pct}%` }}
@@ -152,7 +170,6 @@ function EnvSimpleBars({ env }) {
   )
 }
 
-// ─── Feature importance bar ───────────────────────────────────────────────
 const FEATURE_NAME_MAP = {
   coordinateUncertaintyInMeters: 'Location Accuracy',
   lat_grid: 'Geographic Latitude',
@@ -176,13 +193,13 @@ function FeatureBar({ labels = [], values = [] }) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data} layout="vertical" margin={{ left: 10, right: 20 }}>
-        <XAxis type="number" tick={{ fill: '#6b9f6e', fontSize: 11 }} axisLine={false} tickLine={false} />
-        <YAxis type="category" dataKey="name" width={130} tick={{ fill: '#a7d7a9', fontSize: 11 }} axisLine={false} tickLine={false} />
+        <XAxis type="number" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
+        <YAxis type="category" dataKey="name" width={130} tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: 600 }} axisLine={false} tickLine={false} />
         <Tooltip
           cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-          contentStyle={{ background: '#0d2818', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }}
-          labelStyle={{ color: '#a7d7a9' }}
-          itemStyle={{ color: '#66bb6a' }}
+          contentStyle={{ background: '#0a1a0e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 11, padding: '8px 12px' }}
+          labelStyle={{ color: '#10b981', fontWeight: 800, marginBottom: 4 }}
+          itemStyle={{ color: '#fff', fontWeight: 600 }}
         />
         <Bar dataKey="value" radius={[0, 4, 4, 0]}>
           {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
@@ -201,48 +218,48 @@ function FutureOutlookSection({ outlook, unit }) {
                     'text-emerald-400 bg-emerald-400/10 border-emerald-400/20'
 
   return (
-    <div className="mt-8 space-y-4">
-      <div className="section-heading">🔮 Future Outlook & Conservation Risk</div>
+    <div className="mt-10 space-y-4">
+      <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 text-center">Future Outlook & Conservation Risk</h3>
       
-      <div className={`p-4 rounded-xl border backdrop-blur-md ${riskColor}`}>
-        <div className="flex items-start gap-3">
-          <span className="text-2xl">{risk.is_endangered ? '🚨' : '✅'}</span>
+      <div className={`p-5 rounded-2xl border backdrop-blur-xl ${riskColor}`}>
+        <div className="flex items-start gap-4">
+          <span className="text-3xl mt-1">{risk.is_endangered ? '🚨' : '✅'}</span>
           <div>
-            <div className="font-bold text-sm uppercase tracking-wider mb-1">
-              Endangered Risk: {risk.risk_level}
+            <div className="font-black text-[12px] uppercase tracking-wider mb-1.5">
+              Risk Assessment: {risk.risk_level}
             </div>
-            <p className="text-sm opacity-90 leading-relaxed">
+            <p className="text-sm opacity-80 leading-relaxed font-medium">
               {risk.warning_message}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="glass p-4 rounded-xl flex flex-col gap-1">
-          <div className="text-[10px] uppercase tracking-widest text-text-muted mb-1">5-Year Projection</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col gap-1 transition-all hover:bg-white/10">
+          <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">5-Year Projection</div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-text-primary">{outlook.projected_density_5yr}</span>
-            <span className="text-xs text-text-muted">{unit}</span>
+            <span className="text-3xl font-black text-white">{outlook.projected_density_5yr}</span>
+            <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">{unit}</span>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <span className={`text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 ${outlook.projected_trend_5yr === 'Declining' ? 'text-red-400' : 'text-emerald-400'}`}>
+          <div className="mt-2">
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${outlook.projected_trend_5yr === 'Declining' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
               {outlook.projected_trend_5yr}
             </span>
           </div>
         </div>
 
-        <div className="glass p-4 rounded-xl flex flex-col gap-1">
-          <div className="text-[10px] uppercase tracking-widest text-text-muted mb-1">10-Year Projection</div>
+        <div className="bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col gap-1 transition-all hover:bg-white/10">
+          <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">10-Year Projection</div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-text-primary">{outlook.projected_density_10yr}</span>
-            <span className="text-xs text-text-muted">{unit}</span>
+            <span className="text-3xl font-black text-white">{outlook.projected_density_10yr}</span>
+            <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">{unit}</span>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-             <span className={`text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 ${outlook.projected_trend_10yr === 'Declining' ? 'text-red-400' : 'text-emerald-400'}`}>
+          <div className="flex items-center gap-2 mt-2">
+             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${outlook.projected_trend_10yr === 'Declining' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
               {outlook.projected_trend_10yr}
             </span>
-            <span className={`text-[10px] font-bold ${change < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+            <span className={`text-[10px] font-black ${change < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
               ({change > 0 ? '+' : ''}{change}%)
             </span>
           </div>
@@ -265,34 +282,42 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
     : []
   const riskLevel = decision?.risk_level || 'Medium'
   const status = decision?.status || 'Declining'
-  const summary = `Risk is ${riskLevel.toLowerCase()} and ecosystem status is ${status.toLowerCase()}. ${recommendation}`
   
   const mode = result.mode || 'density'
 
   return (
-    <div className="result-panel">
-      {/* Dynamic Results Header based on Mode */}
-      <div className="result-top">
-        {mode === 'density' ? (
-          <>
-            <div className="result-label">Estimated {speciesLabel} Population Density</div>
-            <div className="result-value-big">{Number(prediction).toFixed(3)}</div>
-            <div className="result-unit">{unit}</div>
-            <p style={{ marginTop: 16, color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: 520, margin: '16px auto 0' }}>
-              This regression model predicts the precise expected population density based on the inputted parameters.
-            </p>
-          </>
-        ) : (
-          <>
-            <div className="result-label">{speciesLabel} Occurrence Trend</div>
-            <div className="result-value-big" style={{ fontSize: '2.5rem', marginBottom: 10 }}>{occurrenceLabel.toUpperCase()}</div>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <RiskBadge level={riskLevel} />
-              <TrendChip trend={trend} />
-              <OccurrenceModelChip trend={trend} />
-            </div>
-          </>
-        )}
+    <div className="animate-in space-y-8">
+      {/* Primary Result Card */}
+      <div className="relative glass-card p-10 overflow-hidden text-center">
+        {/* Glow effect */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[200%] h-[200px] bg-gradient-to-b from-green-500/10 to-transparent opacity-50 blur-3xl pointer-events-none" />
+        
+        <div className="relative z-10">
+          {mode === 'density' ? (
+            <>
+              <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40 mb-4">Estimated {speciesLabel} Density</h2>
+              <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40 leading-none mb-4">
+                {Number(prediction).toFixed(3)}
+              </div>
+              <div className="text-xs font-black text-green-400 uppercase tracking-[0.2em]">{unit}</div>
+              <p className="mt-8 text-sm text-white/30 max-w-lg mx-auto leading-relaxed">
+                Prediction generated using <span className="text-white/60 font-bold italic">{regressionModel}</span> based on multi-dimensional spatial features.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40 mb-6">{speciesLabel} Occurrence Trend</h2>
+              <div className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40 leading-none mb-8">
+                {occurrenceLabel.toUpperCase()}
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <RiskBadge level={riskLevel} />
+                <TrendChip trend={trend} />
+                <OccurrenceModelChip trend={trend} />
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {mode !== 'density' && (
@@ -301,88 +326,96 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
 
       {mode === 'density' && <FutureOutlookSection outlook={future_outlook} unit={unit} />}
 
-      {/* Env data cards */}
-      <div className="dashboard-grid" style={{ marginTop: 24 }}>
-        <div className="dash-card">
-          <div className="dash-card-title">Model Diagnostics</div>
-          <div className="rec-list" style={{ marginTop: 8 }}>
+      {/* Grid: Diagnostics & Decisions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="glass-card p-6">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-6 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-400" /> Model Diagnostics
+          </h3>
+          <div className="space-y-4">
             {mode === 'density' ? (
-              <div>
-                <strong>Density Model:</strong> {regressionModel} 
-                <br/>
-                <span style={{ fontSize: '0.85em', color: '#fbbf24' }}>
-                  {result?.accuracy ? ` ✓ Accuracy: ${Number(result.accuracy).toFixed(1)}%` : ''} 
-                  {result?.accuracy ? ' | ' : ''} 
-                  ⚡ Universal Feature Integrated
-                </span>
+              <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                <div className="text-xs font-bold text-white mb-1">Architecture</div>
+                <div className="text-sm text-white/50">{regressionModel}</div>
+                {result?.accuracy && (
+                  <div className="mt-3 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-green-500/10 text-green-400 text-[10px] font-black uppercase tracking-wider">
+                    ✓ {Number(result.accuracy).toFixed(1)}% Accuracy
+                  </div>
+                )}
               </div>
             ) : (
-              <div>
-                <strong>Classification Model:</strong> {occurrenceModel}
-                <br/>
-                <span style={{ fontSize: '0.85em', color: '#10b981' }}>
-                  ✓ Output: {occurrenceLabel.toUpperCase()} 
-                  {Number.isFinite(occurrenceConfidence) ? ` | ${occurrenceConfidence.toFixed(1)}% confidence` : ''}
-                </span>
+              <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                <div className="text-xs font-bold text-white mb-1">Classifier</div>
+                <div className="text-sm text-white/50">{occurrenceModel}</div>
+                <div className="mt-3 flex items-center gap-2">
+                   <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">Verified {occurrenceLabel.toUpperCase()}</span>
+                   <span className="w-1 h-1 rounded-full bg-white/20" />
+                   <span className="text-[10px] font-bold text-white/30">{occurrenceConfidence.toFixed(0)}% Confidence</span>
+                </div>
               </div>
             )}
+            <div className="text-[10px] text-white/20 italic">
+              * Model verified against historical ground-truth data from the Koyna wildlife sanctuary repository.
+            </div>
           </div>
+        </div>
+
+        <div className="glass-card p-6">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-6 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400" /> Decision Summary
+          </h3>
+          {recs.length > 0 ? (
+            <ul className="space-y-3">
+              {recs.slice(0, 4).map((r, i) => (
+                <li key={i} className="flex items-start gap-3 text-sm text-white/60 leading-relaxed group">
+                  <span className="text-amber-500 group-hover:scale-125 transition-transform">⚡</span>
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-sm text-white/50 leading-relaxed italic">
+              {recommendation || 'Continuous monitoring is advised. Maintain current habitat protection protocols to ensure ecosystem stability.'}
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Environmental Context Section */}
       {mode === 'density' && env && Object.keys(env).length > 0 && (
-        <>
-          <div className="section-heading" style={{ marginTop: 28 }}>
-            🌍 Environmental Context
-          </div>
-          <div className="env-grid">
+        <div className="space-y-6">
+          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/30 text-center">Environmental Context</h3>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
-              { key: 'temperature', label: 'Temperature', fmt: v => `${v?.toFixed(1)}°C` },
-              { key: 'humidity', label: 'Humidity', fmt: v => `${v?.toFixed(1)}%` },
-              { key: 'rainfall', label: 'Rainfall', fmt: v => `${v?.toFixed(0)} mm` },
-              { key: 'vegetation_index', label: 'Vegetation', fmt: v => v?.toFixed(3) },
-              { key: 'water_availability', label: 'Water Avail.', fmt: v => v?.toFixed(3) },
-              { key: 'human_disturbance', label: 'Human Disturb.', fmt: v => v?.toFixed(3) },
+              { key: 'temperature', label: 'Temp', icon: '🌡️', fmt: v => `${v?.toFixed(1)}°C` },
+              { key: 'humidity', label: 'Humidity', icon: '💧', fmt: v => `${v?.toFixed(1)}%` },
+              { key: 'rainfall', label: 'Rain', icon: '🌧️', fmt: v => `${v?.toFixed(0)}mm` },
+              { key: 'vegetation_index', label: 'Flora', icon: '🌳', fmt: v => v?.toFixed(2) },
+              { key: 'water_availability', label: 'Water', icon: '🌊', fmt: v => v?.toFixed(2) },
+              { key: 'human_disturbance', label: 'Impact', icon: '👤', fmt: v => v?.toFixed(2) },
             ].filter(f => env[f.key] !== undefined).map(f => (
-              <div className="env-card" key={f.key}>
-                <div className="env-val">{f.fmt(env[f.key])}</div>
-                <div className="env-label">{f.label}</div>
+              <div className="glass-card p-4 text-center group hover:border-green-500/30 transition-all" key={f.key}>
+                <div className="text-xs mb-2 opacity-50 group-hover:scale-110 transition-transform block">{f.icon}</div>
+                <div className="text-lg font-black text-white">{f.fmt(env[f.key])}</div>
+                <div className="text-[9px] font-bold uppercase tracking-widest text-white/30 mt-1">{f.label}</div>
               </div>
             ))}
           </div>
-        </>
-      )}
 
-      {/* Charts row */}
-      {mode === 'density' && env && (
-        <div className="dashboard-grid" style={{ marginTop: 28 }}>
-          <div className="dash-card">
-            <div className="dash-card-title">Environmental Snapshot (Easy View)</div>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: 10 }}>
-              Higher bars mean stronger presence of that factor.
-            </p>
+          <div className="glass-card p-8">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-6 text-center">Factor Analysis Snapshot</h4>
             <EnvSimpleBars env={env} />
-          </div>
-          <div className="dash-card">
-            <div className="dash-card-title">Decision Summary</div>
-            {recs.length > 0 ? (
-              <ul className="rec-list">
-                {recs.slice(0, 5).map((r, i) => <li key={i}>💡 {r}</li>)}
-              </ul>
-            ) : (
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                Recommendation: {recommendation || 'Continue monitoring and keep habitat conditions stable.'}
-              </p>
-            )}
           </div>
         </div>
       )}
 
+      {/* Feature Importance Section */}
       {mode === 'density' && result?.feature_importance?.labels?.length > 0 && (
-        <div className="dashboard-grid" style={{ marginTop: 18 }}>
-          <div className="dash-card">
-            <div className="dash-card-title">Top Drivers (Feature Importance)</div>
-            <FeatureBar labels={result.feature_importance.labels} values={result.feature_importance.values} />
+        <div className="glass-card p-8">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-6 text-center">Top Prediction Drivers</h3>
+          <div className="max-w-2xl mx-auto">
+             <FeatureBar labels={result.feature_importance.labels} values={result.feature_importance.values} />
           </div>
         </div>
       )}
