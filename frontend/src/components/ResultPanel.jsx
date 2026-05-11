@@ -209,7 +209,7 @@ function FeatureBar({ labels = [], values = [] }) {
   )
 }
 
-function FutureOutlookSection({ outlook, unit }) {
+function FutureOutlookSection({ outlook, unit, env }) {
   if (!outlook) return null
   const { endangered_risk: risk, density_change_10yr_pct: change } = outlook
   
@@ -246,7 +246,7 @@ function FutureOutlookSection({ outlook, unit }) {
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${outlook.projected_trend_5yr === 'Declining' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
               {outlook.projected_trend_5yr}
             </span>
-            {outlook.simulated_conditions_5yr && (
+            {outlook.simulated_conditions_5yr && env && (
                <span className="text-[9px] text-white/20 group-hover:text-white/40 transition-colors">
                  Simulated: +{(outlook.simulated_conditions_5yr.temperature - env.temperature).toFixed(2)}°C
                </span>
@@ -269,7 +269,7 @@ function FutureOutlookSection({ outlook, unit }) {
                 ({change > 0 ? '+' : ''}{change}%)
               </span>
             </div>
-            {outlook.simulated_conditions_10yr && (
+            {outlook.simulated_conditions_10yr && env && (
                <span className="text-[9px] text-white/20 group-hover:text-white/40 transition-colors">
                  Simulated: +{(outlook.simulated_conditions_10yr.temperature - env.temperature).toFixed(2)}°C
                </span>
@@ -348,7 +348,7 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
         <TrendGraph currentDensity={prediction} outlook={future_outlook} unit={unit} />
       )}
 
-      {mode === 'density' && <FutureOutlookSection outlook={future_outlook} unit={unit} />}
+      {mode === 'density' && <FutureOutlookSection outlook={future_outlook} unit={unit} env={env} />}
 
       {/* Grid: Diagnostics & Decisions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

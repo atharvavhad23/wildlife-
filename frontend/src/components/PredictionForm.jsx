@@ -101,7 +101,8 @@ export function usePrediction(featuresUrl, predictUrl) {
       if (data.status === 'success') {
         setResult({ ...data, mode })
       } else {
-        setError(data.error || 'Prediction failed.')
+        const errorMsg = typeof data.error === 'object' ? JSON.stringify(data.error) : (data.error || 'Prediction failed.')
+        setError(errorMsg)
       }
     } catch (e) {
       setError('Network error: ' + e.message)

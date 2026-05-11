@@ -2951,11 +2951,7 @@ def _get_labeled_df(n_clusters=8, category='animals'):
             scaler  = joblib.load(model_dir / f'{category}_clustering_scaler.pkl')
             feats_list = joblib.load(model_dir / f'{category}_clustering_features.pkl')
             
-            X = df_clean[feats_list].fillna(0).copy()
-            # Apply V4 Spatial Weighting for consistent separation
-            if 'lat_grid' in X.columns: X['lat_grid'] *= 2.5
-            if 'lon_grid' in X.columns: X['lon_grid'] *= 2.5
-            
+            X = df_clean[feats_list].fillna(0)
             X_scaled = scaler.transform(X)
             df_clean['cluster'] = gmm.predict(X_scaled)
             return df_clean
@@ -2963,11 +2959,11 @@ def _get_labeled_df(n_clusters=8, category='animals'):
         pass
 
     # 4. Dynamic Spatial Partitioning (Slider Mode)
-    # Uses raw coordinates for strictly geographical partitioning.
-    # No scaling is needed for Lat/Lon as they are already on the same scale.
+    # Uses spatial coordinates with a fresh scaler for user-defined K.
     feats_list = ['lat_grid', 'lon_grid']
     X = df_clean[feats_list].fillna(0)
-    df_clean['cluster'] = KMeans(n_clusters=n_clusters, random_state=42, n_init=10).fit_predict(X)
+    X_scaled = StandardScaler().fit_transform(X)
+    df_clean['cluster'] = KMeans(n_clusters=n_clusters, random_state=42, n_init=10).fit_predict(X_scaled)
     
     return df_clean
 
