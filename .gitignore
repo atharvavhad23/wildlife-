@@ -1,3 +1,7 @@
 backend/node_modules/
 .env
 frontend/.env
+# Python compiled files
+__pycache__/
+*.py[cod]
+*.pyc
