@@ -65,9 +65,51 @@ function ClusterDetailView({ id, details, category, timeline, loading, photos, l
   return (
     <div className="animate-in">
       {/* Cluster header */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-        <h2 className="text-sm font-bold text-white">Region {id}</h2>
+      <div className="flex flex-col mb-4">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+          <h2 className="text-sm font-bold text-white uppercase tracking-tight">Region {id}</h2>
+        </div>
+        <div className="text-[11px] font-black text-green-400/90 uppercase tracking-wider bg-green-500/5 px-2 py-1 rounded border border-green-500/10">
+          {details?.ecological_name || 'Scientific Ecological Niche'}
+        </div>
+      </div>
+
+      {/* Environmental Stats */}
+      {details?.stats && (
+        <div className="grid grid-cols-3 gap-1.5 mb-3">
+          <div className="bg-white/3 rounded-lg p-2 border border-white/5">
+            <div className="text-[10px] font-black text-white/80">{details.stats.avg_temp}°C</div>
+            <div className="text-[7px] uppercase text-white/30 font-bold">Avg Temp</div>
+          </div>
+          <div className="bg-white/3 rounded-lg p-2 border border-white/5">
+            <div className="text-[10px] font-black text-white/80">{details.stats.avg_rain}mm</div>
+            <div className="text-[7px] uppercase text-white/30 font-bold">Avg Rain</div>
+          </div>
+          <div className="bg-white/3 rounded-lg p-2 border border-white/5">
+            <div className="text-[10px] font-black text-white/80">{details.stats.avg_richness}</div>
+            <div className="text-[7px] uppercase text-white/30 font-bold">Richness</div>
+          </div>
+        </div>
+      )}
+
+      {/* Risk & Trend Indicators */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {details?.risk_level && (
+          <div className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest border ${
+            details.risk_level === 'Critical' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+            details.risk_level === 'High'     ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+            details.risk_level === 'Medium'   ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+            'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+          }`}>
+            Risk: {details.risk_level}
+          </div>
+        )}
+        {details?.trend_projection && (
+          <div className="px-2 py-1 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 text-[8px] font-black uppercase tracking-widest">
+            Trend: {details.trend_projection}
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -241,7 +283,9 @@ export default function ClusteringMap() {
             if (hullPts.length > 2) {
               const poly = L.polygon(hullPts, { color, weight: 2, fillColor: color, fillOpacity: 0.15, dashArray: '5, 5' }).addTo(map)
               poly.on('click', () => setSelectedCluster(cid))
-              poly.bindTooltip(`Cluster ${cid}`, { sticky: true })
+              const clusterInfo = clusterDetails[cid]
+              const tooltipName = clusterInfo?.ecological_name || `Cluster ${cid}`
+              poly.bindTooltip(tooltipName, { sticky: true })
             }
           }
           if (layerType === 'markers' || layerType === 'both') {
@@ -401,27 +445,41 @@ export default function ClusteringMap() {
                 </div>
               )}
               <div className="space-y-2">
-                {Array.from({ length: nClusters }).map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setSelectedCluster(i)}
-                    className="w-full p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 hover:border-green-500/20 transition-all flex items-center gap-3 text-left group"
-                  >
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0"
-                      style={{ backgroundColor: `${CLUSTER_COLORS[i % CLUSTER_COLORS.length]}20`, color: CLUSTER_COLORS[i % CLUSTER_COLORS.length] }}
+                {Array.from({ length: nClusters }).map((_, i) => {
+                  const clusterData = clusterDetails?.[i];
+                  const displayName = clusterData?.ecological_name || `Region ${i}`;
+                  const color = CLUSTER_COLORS[i % CLUSTER_COLORS.length];
+                  
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setSelectedCluster(i)}
+                      className={`w-full p-3 rounded-xl border transition-all duration-300 ${
+                        selectedCluster === i
+                          ? 'bg-emerald-500/20 border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.1)]'
+                          : 'bg-white/5 border-white/5 hover:bg-white/10'
+                      } flex items-center gap-3 text-left group`}
                     >
-                      {i}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold text-white/70 group-hover:text-white transition-colors">Region {i}</div>
-                      <div className="text-[9px] text-white/25 mt-0.5">Click to explore →</div>
-                    </div>
-                    <svg className="w-3 h-3 text-white/20 group-hover:text-white/50 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                ))}
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0"
+                        style={{ backgroundColor: `${color}20`, color: color }}
+                      >
+                        {i}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px] font-bold text-white group-hover:text-green-400 transition-colors truncate">
+                          {displayName}
+                        </div>
+                        <div className="text-[8px] text-white/20 mt-0.5 uppercase tracking-widest font-black group-hover:text-white/40">
+                          {clusterData?.risk_level ? `${clusterData.risk_level} Risk Sector` : 'Scientific GMM Analytics'}
+                        </div>
+                      </div>
+                      <svg className="w-3 h-3 text-white/20 group-hover:text-white/50 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
