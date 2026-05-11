@@ -3050,26 +3050,10 @@ def _get_labeled_df(n_clusters=8, category='animals'):
 
     # 2. Reconstruct Features (Self-Healing)
     df_clean = _apply_v3_feature_engineering(df_clean)
-    
-    # 3. Hybrid Clustering Strategy
-    try:
-        model_dir = PROJECT_ROOT / 'ml_logic'
-        gmm = joblib.load(model_dir / f'{category}_gmm_clusterer.pkl')
-        
-        # If user count matches scientific optimized count, use the pre-trained model
-        if n_clusters == gmm.n_components:
-            scaler  = joblib.load(model_dir / f'{category}_clustering_scaler.pkl')
-            feats_list = joblib.load(model_dir / f'{category}_clustering_features.pkl')
-            
-            X = df_clean[feats_list].fillna(0)
-            X_scaled = scaler.transform(X)
-            df_clean['cluster'] = gmm.predict(X_scaled)
-            return df_clean
-    except Exception:
-        pass
 
-    # 4. Dynamic Spatial Partitioning (Slider Mode)
-    # Uses spatial coordinates with a fresh scaler for user-defined K.
+    # 3. Dynamic Spatial Partitioning (Slider Mode)
+    # Use the same geographic basis for every requested cluster count so the map
+    # always reflects the slider value immediately.
     feats_list = ['lat_grid', 'lon_grid']
     X = df_clean[feats_list].fillna(0)
     X_scaled = StandardScaler().fit_transform(X)

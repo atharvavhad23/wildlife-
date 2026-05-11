@@ -224,6 +224,16 @@ export default function ClusteringMap() {
 
   useEffect(() => { loadData(category, nClusters) }, [category, nClusters])
 
+  useEffect(() => {
+    setSelectedCluster(null)
+    setComparisonCluster(null)
+    setClusterDetails(null)
+    setCompDetails(null)
+    setTimeline([])
+    setPhotosA([])
+    setPhotosB([])
+  }, [category, nClusters])
+
   const fetchDetails = async (id, setFn) => {
     try {
       const res = await fetch(`/api/cluster-details/?dataset=${category}&clusters=${nClusters}&cluster_id=${id}`)
@@ -283,8 +293,7 @@ export default function ClusteringMap() {
             if (hullPts.length > 2) {
               const poly = L.polygon(hullPts, { color, weight: 2, fillColor: color, fillOpacity: 0.15, dashArray: '5, 5' }).addTo(map)
               poly.on('click', () => setSelectedCluster(cid))
-              const clusterInfo = clusterDetails[cid]
-              const tooltipName = clusterInfo?.ecological_name || `Cluster ${cid}`
+              const tooltipName = `Cluster ${cid}`
               poly.bindTooltip(tooltipName, { sticky: true })
             }
           }
@@ -378,7 +387,16 @@ export default function ClusteringMap() {
               type="range"
               min={3} max={15} step={1}
               value={nClusters}
-              onChange={e => { setNClusters(Number(e.target.value)); setSelectedCluster(null) }}
+              onChange={e => {
+                setNClusters(Number(e.target.value))
+                setSelectedCluster(null)
+                setComparisonCluster(null)
+                setClusterDetails(null)
+                setCompDetails(null)
+                setTimeline([])
+                setPhotosA([])
+                setPhotosB([])
+              }}
               className="w-full"
             />
             <div className="flex justify-between text-[8px] text-white/20 mt-0.5">
