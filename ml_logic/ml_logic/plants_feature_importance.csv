@@ -1,0 +1,13 @@
+Feature,Importance
+species_richness,0.7096116
+lat_grid,0.21899597
+lon_grid,0.07104131
+order_enc,0.00020814524
+family_enc,4.4089917e-05
+class_enc,3.1863532e-05
+temperature,1.5604308e-05
+year,1.4149246e-05
+month,1.2207533e-05
+day,1.0539444e-05
+rainfall,1.0412079e-05
+humidity,3.9836114e-06

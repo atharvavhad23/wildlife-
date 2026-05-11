@@ -236,35 +236,59 @@ function FutureOutlookSection({ outlook, unit }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col gap-1 transition-all hover:bg-white/10">
+        <div className="bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col gap-1 transition-all hover:bg-white/10 group">
           <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">5-Year Projection</div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black text-white">{outlook.projected_density_5yr}</span>
             <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">{unit}</span>
           </div>
-          <div className="mt-2">
+          <div className="mt-2 flex items-center justify-between">
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${outlook.projected_trend_5yr === 'Declining' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
               {outlook.projected_trend_5yr}
             </span>
+            {outlook.simulated_conditions_5yr && (
+               <span className="text-[9px] text-white/20 group-hover:text-white/40 transition-colors">
+                 Simulated: +{(outlook.simulated_conditions_5yr.temperature - env.temperature).toFixed(2)}°C
+               </span>
+            )}
           </div>
         </div>
 
-        <div className="bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col gap-1 transition-all hover:bg-white/10">
+        <div className="bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col gap-1 transition-all hover:bg-white/10 group">
           <div className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">10-Year Projection</div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black text-white">{outlook.projected_density_10yr}</span>
             <span className="text-[10px] font-bold text-white/30 uppercase tracking-wider">{unit}</span>
           </div>
-          <div className="flex items-center gap-2 mt-2">
-             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${outlook.projected_trend_10yr === 'Declining' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
-              {outlook.projected_trend_10yr}
-            </span>
-            <span className={`text-[10px] font-black ${change < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-              ({change > 0 ? '+' : ''}{change}%)
-            </span>
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-2">
+               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${outlook.projected_trend_10yr === 'Declining' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}>
+                {outlook.projected_trend_10yr}
+              </span>
+              <span className={`text-[10px] font-black ${change < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                ({change > 0 ? '+' : ''}{change}%)
+              </span>
+            </div>
+            {outlook.simulated_conditions_10yr && (
+               <span className="text-[9px] text-white/20 group-hover:text-white/40 transition-colors">
+                 Simulated: +{(outlook.simulated_conditions_10yr.temperature - env.temperature).toFixed(2)}°C
+               </span>
+            )}
           </div>
         </div>
       </div>
+
+      {outlook.simulated_conditions_10yr && (
+        <div className="p-4 rounded-xl bg-white/2 border border-white/5 text-center">
+          <p className="text-[9px] font-bold text-white/20 uppercase tracking-[0.2em] mb-2">Scientific Basis: Ecological Drift Simulation (IPCC AR6)</p>
+          <div className="flex justify-center gap-6 text-[10px] font-medium text-white/40">
+            <span className="flex items-center gap-1.5"><span className="text-orange-500/50">🔥</span> Warming: +0.18°C/dec</span>
+            <span className="flex items-center gap-1.5"><span className="text-blue-500/50">💧</span> Water: -1.5% loss/dec</span>
+            <span className="flex items-center gap-1.5"><span className="text-green-500/50">🧬</span> Richness: -3% loss/dec</span>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
