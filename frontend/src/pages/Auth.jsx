@@ -18,13 +18,30 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
 async function postJson(url, body) {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error || 'Request failed')
+  let res
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    throw new Error('Unable to reach server. Please try again.')
+  }
+
+  let data = {}
+  try {
+    data = await res.json()
+  } catch {
+    if (!res.ok) {
+      throw new Error(`Request failed (${res.status})`)
+    }
+    return { success: true }
+  }
+
+  if (!res.ok || data.success === false) {
+    throw new Error(data.error || data.message || 'Request failed')
+  }
   return data
 }
 

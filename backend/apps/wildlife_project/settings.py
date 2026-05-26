@@ -50,11 +50,8 @@ INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'apps.users.apps.UsersConfig',
-    'apps.species.apps.SpeciesConfig',
+    # Retained for shared backend bootstrap/index initialization.
     'apps.observations.apps.ObservationsConfig',
-    'apps.predictions.apps.PredictionsConfig',
-    'apps.analytics.apps.AnalyticsConfig',
 ]
 
 MIDDLEWARE = [
@@ -74,12 +71,7 @@ CACHE_TTL_SECONDS = int(os.getenv('CACHE_TTL_SECONDS', '300'))
 
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': REDIS_URL,
-        'OPTIONS': {
-            'db': int(os.getenv('REDIS_CACHE_DB', '0')),
-        },
-        'TIMEOUT': CACHE_TTL_SECONDS,
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
     }
 }
 
@@ -115,6 +107,8 @@ TIME_ZONE = 'UTC'
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 LOGGING = {
     'version': 1,

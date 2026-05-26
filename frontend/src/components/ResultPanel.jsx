@@ -270,11 +270,20 @@ function FutureOutlookSection({ outlook, unit }) {
 }
 
 export default function ResultPanel({ result, unit, speciesLabel }) {
-  const { prediction, environmental_data: env, decision, trend, future_outlook } = result
+  const {
+    prediction,
+    environmental_data: env,
+    decision,
+    trend,
+    future_outlook,
+  } = result
   const regressionModel = result?.model_info?.winner || result?.model_name || 'Regression Model'
   const occurrenceModel = trend?.source || 'Occurrence Classifier'
   const occurrenceLabel = trend?.classifier_label || 'stable'
   const occurrenceConfidence = Number(trend?.confidence)
+  const occurrenceConfidenceText = Number.isFinite(occurrenceConfidence)
+    ? `${occurrenceConfidence.toFixed(0)}% Confidence`
+    : 'Confidence N/A'
 
   const recommendation = decision?.recommendation || ''
   const recs = recommendation
@@ -300,9 +309,6 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
                 {Number(prediction).toFixed(3)}
               </div>
               <div className="text-xs font-black text-green-400 uppercase tracking-[0.2em]">{unit}</div>
-              <p className="mt-8 text-sm text-white/30 max-w-lg mx-auto leading-relaxed">
-                Prediction generated using <span className="text-white/60 font-bold italic">{regressionModel}</span> based on multi-dimensional spatial features.
-              </p>
             </>
           ) : (
             <>
@@ -350,7 +356,7 @@ export default function ResultPanel({ result, unit, speciesLabel }) {
                 <div className="mt-3 flex items-center gap-2">
                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">Verified {occurrenceLabel.toUpperCase()}</span>
                    <span className="w-1 h-1 rounded-full bg-white/20" />
-                   <span className="text-[10px] font-bold text-white/30">{occurrenceConfidence.toFixed(0)}% Confidence</span>
+                   <span className="text-[10px] font-bold text-white/30">{occurrenceConfidenceText}</span>
                 </div>
               </div>
             )}

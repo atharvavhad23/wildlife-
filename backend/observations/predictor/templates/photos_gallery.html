@@ -230,7 +230,7 @@
                 const link = escapeHtml(photo.occurrenceUrl || '#');
                 const hasImage = !!photo.hasImage;
                 const thumb = escapeHtml(photo.thumbnailUrl || '');
-                const proxy = `/photo-proxy/?url=${encodeURIComponent(photo.thumbnailUrl || '')}`;
+                const proxy = thumb.startsWith('/media/') || thumb.startsWith('/static/') ? '' : `/photo-proxy/?url=${encodeURIComponent(photo.thumbnailUrl || '')}`;
 
                 return `
                     <a class="card" href="${link}" target="_blank" rel="noopener noreferrer">

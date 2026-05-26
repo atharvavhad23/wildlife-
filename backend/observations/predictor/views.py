@@ -11,11 +11,13 @@ import secrets
 from urllib.parse import quote_plus
 from urllib.request import urlopen, Request
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 import pickle
 import threading
+from time import perf_counter
 
 from apps.common import prediction_service
+from apps.common.image_cache import resolve_cached_image, serve_cached_media_or_none
 
 
 logger = logging.getLogger(__name__)
@@ -88,6 +90,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def _project_file(name: str) -> str:
     candidates = [
+        PROJECT_ROOT / 'ml_logic' / name,
         PROJECT_ROOT / 'ml_models' / name,
         PROJECT_ROOT / name,
         PROJECT_ROOT.parent / name,
@@ -96,6 +99,185 @@ def _project_file(name: str) -> str:
         if candidate.exists():
             return str(candidate)
     return str(candidates[0])
+
+
+PREDICTION_ARTIFACTS = {
+    'animals': {
+        'model': ['animals_model.pkl', 'wildlife_model.pkl'],
+        'scaler': ['animals_scaler.pkl', 'scaler.pkl'],
+        'features': ['animals_feature_names.pkl', 'feature_names.pkl'],
+        'metadata': ['animals_metadata.pkl', 'model_metadata.pkl'],
+        'pca': ['animals_pca.pkl'],
+    },
+    'birds': {
+        'model': ['birds_model.pkl'],
+        'scaler': ['birds_scaler.pkl'],
+        'features': ['birds_feature_names.pkl'],
+        'metadata': ['birds_metadata.pkl'],
+        'pca': ['birds_pca.pkl'],
+    },
+    'insects': {
+        'model': ['insects_model.pkl'],
+        'scaler': ['insects_scaler.pkl'],
+        'features': ['insects_feature_names.pkl'],
+        'metadata': ['insects_metadata.pkl'],
+        'pca': ['insects_pca.pkl'],
+    },
+    'plants': {
+        'model': ['plants_model.pkl'],
+        'scaler': ['plants_scaler.pkl'],
+        'features': ['plants_feature_names.pkl'],
+        'metadata': ['plants_metadata.pkl'],
+        'pca': [],
+    },
+}
+
+
+def _prediction_error(message: str, status: int = 400):
+    logger.warning('Prediction error (%s): %s', status, message)
+    return JsonResponse({'success': False, 'error': message}, status=status)
+
+
+def _read_prediction_payload(request):
+    try:
+        payload = json.loads(request.body or '{}')
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _prediction_exception_response(exc: Exception, category: str):
+    message = str(exc) or 'Internal server error'
+
+    if isinstance(exc, FileNotFoundError):
+        return _prediction_error(message, status=404)
+
+    if isinstance(exc, ValueError):
+        invalid_markers = ('invalid input', 'must be a number', 'could not convert', 'missing required', 'missing')
+        if any(marker in message.lower() for marker in invalid_markers):
+            return _prediction_error('Invalid input data', status=400)
+        if 'not found' in message.lower():
+            return _prediction_error(message, status=400)
+        return _prediction_error('Invalid input data', status=400)
+
+    if isinstance(exc, RuntimeError):
+        if message.startswith('Failed to load prediction model'):
+            return _prediction_error('Failed to load prediction model', status=500)
+        if message.startswith('Failed to load prediction scaler'):
+            return _prediction_error('Failed to load prediction scaler', status=500)
+        if message.startswith('Failed to load prediction metadata'):
+            return _prediction_error('Failed to load prediction metadata', status=500)
+        return _prediction_error('Prediction processing failed', status=500)
+
+    return _prediction_error('Internal server error', status=500)
+
+
+def _ensure_prediction_runtime_ready():
+    """Ensure prediction dependencies are available before inference."""
+    _lazy_import_ml()
+    _lazy_import_utils()
+    if pd is None or np is None:
+        raise RuntimeError('Prediction processing failed')
+    if get_environmental_data is None or analyze_prediction is None or analyze_trend is None:
+        raise RuntimeError('Prediction processing failed')
+
+
+def _validate_numeric_inputs(payload: dict, numeric_keys: list[str]):
+    """Validate that provided numeric fields can be parsed as floats."""
+    for key in numeric_keys:
+        if key not in payload:
+            continue
+        raw = payload.get(key)
+        if raw is None or raw == '':
+            raise ValueError('Invalid input data')
+        try:
+            float(raw)
+        except (TypeError, ValueError):
+            raise ValueError('Invalid input data')
+
+
+def _load_first_existing_artifact(names: list[str], missing_message: str, corrupted_message: str | None = None):
+    for name in names:
+        path = Path(_project_file(name))
+        if not path.exists():
+            continue
+        try:
+            return prediction_service.load_artifact(path)
+        except FileNotFoundError:
+            continue
+        except Exception as exc:
+            logger.exception('Failed to load artifact from %s', path)
+            if corrupted_message:
+                raise RuntimeError(corrupted_message) from exc
+            raise
+    raise FileNotFoundError(missing_message)
+
+
+def _load_prediction_bundle(category: str, force: bool = False):
+    category = str(category).strip().lower()
+    if category not in PREDICTION_ARTIFACTS:
+        raise ValueError(f'Unknown prediction category: {category}')
+
+    artifacts = PREDICTION_ARTIFACTS[category]
+    state = globals()
+
+    model_key = f'{category}_model'
+    scaler_key = f'{category}_scaler'
+    features_key = f'{category}_features'
+    metadata_key = f'{category}_metadata'
+    pca_key = f'{category}_pca'
+
+    if not force and state.get(model_key) is not None and state.get(scaler_key) is not None:
+        return
+
+    model = _load_first_existing_artifact(
+        artifacts.get('model', []),
+        missing_message=f'Prediction model not found for {category}',
+        corrupted_message='Failed to load prediction model',
+    )
+    scaler = _load_first_existing_artifact(
+        artifacts.get('scaler', []),
+        missing_message=f'Prediction scaler not found for {category}',
+        corrupted_message='Failed to load prediction scaler',
+    )
+
+    features = _load_first_existing_artifact(
+        artifacts.get('features', []),
+        missing_message=f'Prediction metadata not found for {category}',
+        corrupted_message='Failed to load prediction metadata',
+    )
+    if not isinstance(features, list) or not features:
+        raise ValueError(f'Prediction model not found for {category}')
+
+    metadata = {}
+    if artifacts.get('metadata'):
+        try:
+            metadata = _load_first_existing_artifact(
+                artifacts.get('metadata', []),
+                missing_message=f'Prediction metadata not found for {category}',
+                corrupted_message='Failed to load prediction metadata',
+            )
+        except Exception:
+            metadata = {}
+    if metadata is not None and not isinstance(metadata, dict):
+        metadata = {}
+
+    pca = None
+    if artifacts.get('pca'):
+        try:
+            pca = _load_first_existing_artifact(
+                artifacts.get('pca', []),
+                missing_message=f'Prediction PCA not found for {category}',
+                corrupted_message='Failed to load prediction PCA',
+            )
+        except Exception:
+            pca = None
+
+    state[model_key] = model
+    state[scaler_key] = scaler
+    state[features_key] = features
+    state[metadata_key] = metadata
+    state[pca_key] = pca
 
 
 BASE_BIRDS_FEATURES = [
@@ -201,7 +383,6 @@ def _otp_verified_key(email: str, purpose: str) -> str:
 
 
 @csrf_exempt
-@csrf_exempt
 @require_http_methods(["POST"])
 def send_email_otp(request):
     """Send OTP code to email using configured project SMTP account."""
@@ -215,14 +396,14 @@ def send_email_otp(request):
     try:
         payload = json.loads(request.body or '{}')
     except Exception:
-        return JsonResponse({'error': 'Invalid JSON data.'}, status=400)
+        return JsonResponse({'success': False, 'error': 'Invalid JSON data.'}, status=400)
 
     email = str(payload.get('email', '')).strip().lower()
     purpose = str(payload.get('purpose', 'auth')).strip().lower() or 'auth'
 
     # ✅ Validate email
     if not email or '@' not in email:
-        return JsonResponse({'error': 'Valid email is required.'}, status=400)
+        return JsonResponse({'success': False, 'error': 'Valid email is required.'}, status=400)
 
     # ✅ Proper SMTP configuration check (FIXED)
     if not all([
@@ -231,16 +412,15 @@ def send_email_otp(request):
         getattr(settings, 'EMAIL_HOST_PASSWORD', '')
     ]):
         return JsonResponse(
-            {'error': 'SMTP configuration incomplete. Check EMAIL_HOST, USER, PASSWORD.'},
+            {'success': False, 'error': 'SMTP configuration incomplete. Check EMAIL_HOST, USER, PASSWORD.'},
             status=400,
         )
 
     # ✅ Generate OTP
     otp = f"{secrets.randbelow(900000) + 100000}"
 
-    # ✅ Store OTP in cache
-    cache.set(_otp_key(email, purpose), otp, timeout=OTP_TTL_SECONDS)
-    cache.delete(_otp_verified_key(email, purpose))
+    # Store OTP in Django cache (frontend-compatible key by email)
+    cache.set(email, otp, timeout=300)
 
     subject = f"Koyna Wildlife OTP for {purpose.title()}"
     message = (
@@ -261,17 +441,19 @@ def send_email_otp(request):
     except Exception as exc:
         logger.exception('EMAIL ERROR')
         return JsonResponse(
-            {'error': f'Failed to send OTP email: {str(exc)}'},
+            {'success': False, 'error': f'Failed to send OTP email: {str(exc)}'},
             status=500
         )
 
-    return JsonResponse({'status': 'success', 'message': 'OTP sent to email.'})
+    return JsonResponse({'success': True, 'message': 'OTP sent to email.'}, status=200)
 
 
 @csrf_exempt
 @require_http_methods(["POST"])
 def verify_email_otp(request):
     """Verify OTP code sent to email."""
+    from django.core.cache import cache
+
     try:
         payload = json.loads(request.body or '{}')
     except Exception:
@@ -282,21 +464,20 @@ def verify_email_otp(request):
     code = str(payload.get('otp', '')).strip()
 
     if not email or '@' not in email:
-        return JsonResponse({'error': 'Valid email is required.'}, status=400)
+        return JsonResponse({'success': False, 'error': 'Valid email is required.'}, status=400)
     if not code:
-        return JsonResponse({'error': 'OTP code is required.'}, status=400)
+        return JsonResponse({'success': False, 'error': 'OTP code is required.'}, status=400)
 
-    stored = cache.get(_otp_key(email, purpose))
+    stored = cache.get(email)
     if stored is None:
-        return JsonResponse({'error': 'OTP expired or not found. Request a new code.'}, status=400)
+        return JsonResponse({'success': False, 'error': 'Invalid or expired OTP'}, status=400)
 
     if str(stored) != code:
-        return JsonResponse({'error': 'Invalid OTP code.'}, status=400)
+        return JsonResponse({'success': False, 'error': 'Invalid OTP'}, status=400)
 
-    cache.set(_otp_verified_key(email, purpose), True, timeout=15 * 60)
-    cache.delete(_otp_key(email, purpose))
+    cache.delete(email)
 
-    return JsonResponse({'status': 'success', 'verified': True})
+    return JsonResponse({'success': True, 'message': 'OTP verified'}, status=200)
 
 
 def _safe_number(value, default=0.0):
@@ -394,27 +575,101 @@ def _predict_occurrence_trend(category: str, feature_values: dict) -> dict | Non
         }
     except Exception:
         return None
+
+
+def _extract_animals_lat_lon(payload: dict) -> tuple[float, float]:
+    lat = _safe_float(payload.get('latitude'))
+    if lat is None:
+        lat = _safe_float(payload.get('lat_grid'))
+    if lat is None:
+        lat = _safe_float(payload.get('decimalLatitude'))
+
+    lon = _safe_float(payload.get('longitude'))
+    if lon is None:
+        lon = _safe_float(payload.get('lon_grid'))
+    if lon is None:
         lon = _safe_float(payload.get('decimalLongitude'))
 
     if lat is None or lon is None:
-        raise ValueError('Latitude/longitude inputs are required (lat_grid/lon_grid).')
-    return lat, lon
+        raise ValueError('Invalid input data')
+    return float(lat), float(lon)
 
 
-def _predict_animals_from_payload(payload: dict) -> dict:
-    _load_animals_artifacts_if_needed()
-
-    if animals_model is None or animals_scaler is None:
-        raise ValueError('Animals model artifacts are not loaded.')
-
-    lat, lon = _extract_animals_lat_lon(payload)
-    env_data = get_environmental_data(lat, lon)
-
-    # Override env_data with user manual inputs so UI and Decision Engine reflect them
+def _apply_user_environment_overrides(env_data: dict, payload: dict) -> dict:
+    """Keep API environmental_data aligned with explicit user inputs."""
     for key in ['temperature', 'humidity', 'rainfall', 'vegetation_index', 'water_availability', 'human_disturbance']:
         user_val = _safe_float(payload.get(key))
         if user_val is not None:
             env_data[key] = user_val
+    return env_data
+
+
+def _build_prediction_environment(lat, lon, payload: dict) -> tuple[dict, dict]:
+    """Return the raw simulated environment and the user-facing environmental data."""
+    simulated_environment = get_environmental_data(lat, lon)
+    environmental_data = _apply_user_environment_overrides(dict(simulated_environment), payload)
+    return environmental_data, simulated_environment
+
+
+def _environment_multiplier(env_data: dict) -> float:
+    """
+    Convert environmental conditions into a bounded ecological suitability multiplier.
+    This keeps predictions scientifically responsive to user climate inputs.
+    """
+    t = _safe_float(env_data.get('temperature'), 27.0)
+    h = _safe_float(env_data.get('humidity'), 65.0)
+    r = _safe_float(env_data.get('rainfall'), 80.0)
+    v = _safe_float(env_data.get('vegetation_index'), 0.55)
+    w = _safe_float(env_data.get('water_availability'), 0.55)
+    d = _safe_float(env_data.get('human_disturbance'), 0.35)
+
+    temp_score = max(0.0, 1.0 - (abs(t - 27.0) / 35.0))
+    humid_score = max(0.0, 1.0 - (abs(h - 65.0) / 70.0))
+    rain_score = max(0.0, 1.0 - (abs(r - 120.0) / 380.0))
+    veg_score = max(0.0, min(1.0, v))
+    water_score = max(0.0, min(1.0, w))
+    disturb_score = max(0.0, 1.0 - max(0.0, min(1.0, d)))
+
+    suitability = (
+        0.22 * temp_score
+        + 0.16 * humid_score
+        + 0.14 * rain_score
+        + 0.20 * veg_score
+        + 0.16 * water_score
+        + 0.12 * disturb_score
+    )
+    return round(0.70 + (max(0.0, min(1.0, suitability)) * 0.60), 6)
+
+
+def _project_environment(env_data: dict, years_ahead: int) -> dict:
+    """
+    Deterministic environmental drift model for future projections.
+    """
+    yrs = max(0, int(years_ahead))
+    projected = dict(env_data)
+    projected['temperature'] = _safe_float(projected.get('temperature'), 27.0) + (0.18 * yrs)
+    projected['humidity'] = max(5.0, min(100.0, _safe_float(projected.get('humidity'), 65.0) - (0.22 * yrs)))
+    projected['rainfall'] = max(0.0, _safe_float(projected.get('rainfall'), 80.0) - (1.4 * yrs))
+    projected['vegetation_index'] = max(0.05, min(0.98, _safe_float(projected.get('vegetation_index'), 0.55) - (0.006 * yrs)))
+    projected['water_availability'] = max(0.0, min(1.0, _safe_float(projected.get('water_availability'), 0.55) - (0.008 * yrs)))
+    projected['human_disturbance'] = max(0.0, min(1.0, _safe_float(projected.get('human_disturbance'), 0.35) + (0.01 * yrs)))
+    return projected
+
+
+def _predict_animals_from_payload(payload: dict) -> dict:
+    _ensure_prediction_runtime_ready()
+    _validate_numeric_inputs(payload, [
+        'temperature', 'humidity', 'rainfall', 'vegetation_index', 'water_availability', 'human_disturbance',
+        'species_richness', 'year', 'month', 'day',
+        'latitude', 'longitude', 'lat_grid', 'lon_grid', 'decimalLatitude', 'decimalLongitude',
+    ])
+    _load_animals_artifacts_if_needed()
+
+    if animals_model is None or animals_scaler is None:
+        raise FileNotFoundError('Prediction model not found for animals')
+
+    lat, lon = _extract_animals_lat_lon(payload)
+    env_data, simulated_environment = _build_prediction_environment(lat, lon, payload)
 
     model_input = {}
     if hasattr(animals_scaler, 'feature_names_in_'):
@@ -440,7 +695,7 @@ def _predict_animals_from_payload(payload: dict) -> dict:
         model_input[feature] = means.get(feature, 0.0)
 
     # Base Prediction (Current)
-    def _get_density(input_dict):
+    def _get_density(input_dict, env_for_density):
         df_input = pd.DataFrame([input_dict])[orig_features]
         df_scaled = animals_scaler.transform(df_input)
         if animals_pca is not None:
@@ -451,10 +706,11 @@ def _predict_animals_from_payload(payload: dict) -> dict:
             pred = float(np.expm1(pred))
             
         richness = _safe_float(input_dict.get('species_richness', 0.0))
-        baseline = richness * 0.12 
-        return max(0.0, max(baseline, pred))
+        baseline = max(0.0, richness * 0.12)
+        blended = (0.82 * max(0.0, pred)) + (0.18 * baseline)
+        return max(0.0, blended * _environment_multiplier(env_for_density))
 
-    current_density = _get_density(model_input)
+    current_density = _get_density(model_input, env_data)
     current_trend = _predict_occurrence_trend('animals', model_input) or analyze_trend(current_density)
 
     # Future Outlook Predictions (+5 Years and +10 Years)
@@ -462,12 +718,12 @@ def _predict_animals_from_payload(payload: dict) -> dict:
     
     input_5yr = model_input.copy()
     input_5yr['year'] = current_year + 5
-    density_5yr = _get_density(input_5yr)
+    density_5yr = _get_density(input_5yr, _project_environment(env_data, 5))
     trend_5yr = _predict_occurrence_trend('animals', input_5yr)
 
     input_10yr = model_input.copy()
     input_10yr['year'] = current_year + 10
-    density_10yr = _get_density(input_10yr)
+    density_10yr = _get_density(input_10yr, _project_environment(env_data, 10))
     trend_10yr = _predict_occurrence_trend('animals', input_10yr)
 
     # Endangered Risk Assessment
@@ -503,6 +759,7 @@ def _predict_animals_from_payload(payload: dict) -> dict:
     return {
         'prediction': current_density,
         'environmental_data': env_data,
+        'simulated_environment': simulated_environment,
         'decision': decision,
         'trend': current_trend,
         'future_outlook': future_outlook,
@@ -511,10 +768,15 @@ def _predict_animals_from_payload(payload: dict) -> dict:
 
 
 def _predict_birds_from_payload(payload: dict) -> dict:
+    _ensure_prediction_runtime_ready()
+    _validate_numeric_inputs(payload, [
+        'temperature', 'humidity', 'rainfall', 'vegetation_index', 'water_availability', 'human_disturbance',
+        'latitude', 'longitude', 'lat_grid', 'lon_grid', 'decimalLatitude', 'decimalLongitude',
+    ] + _birds_base_feature_names())
     _load_birds_artifacts_if_needed()
 
     if birds_model is None or birds_scaler is None:
-        raise ValueError('Bird prediction model is currently unavailable. Please retry shortly.')
+        raise FileNotFoundError('Prediction model not found for birds')
 
     if hasattr(birds_scaler, 'feature_names_in_'):
         orig_features = list(birds_scaler.feature_names_in_)
@@ -530,8 +792,12 @@ def _predict_birds_from_payload(payload: dict) -> dict:
             value = means.get(feature, 0.0)
         base_input[feature] = value
 
+    lat = _safe_float(payload.get('lat_grid', 17.5))
+    lon = _safe_float(payload.get('lon_grid', 73.5))
+    env_data, simulated_environment = _build_prediction_environment(lat, lon, payload)
+
     # Base Prediction (Current)
-    def _get_density(payload_dict):
+    def _get_density(payload_dict, env_for_density):
         # Extract features for density model
         if hasattr(birds_scaler, 'feature_names_in_'):
             f_list = list(birds_scaler.feature_names_in_)
@@ -560,17 +826,19 @@ def _predict_birds_from_payload(payload: dict) -> dict:
         if isinstance(birds_metadata, dict) and birds_metadata.get('target_transform') == 'log1p':
             p = float(np.expm1(p))
         r = _safe_float(b_input.get('species_richness', 0.0))
-        return max(0.0, max(r * 0.15, p))
+        baseline = max(0.0, r * 0.15)
+        blended = (0.82 * max(0.0, p)) + (0.18 * baseline)
+        return max(0.0, blended * _environment_multiplier(env_for_density))
 
-    current_density = _get_density(payload)
+    current_density = _get_density(payload, env_data)
     current_year = int(_safe_float(payload.get('year', 2024)))
     
     # Future Outlook (+5 and +10 years)
     p5 = payload.copy(); p5['year'] = current_year + 5
     p10 = payload.copy(); p10['year'] = current_year + 10
     
-    d5 = _get_density(p5)
-    d10 = _get_density(p10)
+    d5 = _get_density(p5, _project_environment(env_data, 5))
+    d10 = _get_density(p10, _project_environment(env_data, 10))
     t5 = _predict_occurrence_trend('birds', p5)
     t10 = _predict_occurrence_trend('birds', p10)
 
@@ -601,22 +869,13 @@ def _predict_birds_from_payload(payload: dict) -> dict:
         }
     }
 
-    lat = _safe_float(payload.get('lat_grid', 17.5))
-    lon = _safe_float(payload.get('lon_grid', 73.5))
-    env_data = get_environmental_data(lat, lon)
-    
-    # Override env_data with user manual inputs so UI and Decision Engine reflect them
-    for key in ['temperature', 'humidity', 'rainfall', 'vegetation_index', 'water_availability', 'human_disturbance']:
-        user_val = _safe_float(payload.get(key))
-        if user_val is not None:
-            env_data[key] = user_val
-            
     decision = analyze_prediction(current_density, env_data, is_endangered=is_e)
     trend = _predict_occurrence_trend('birds', payload) or analyze_trend(current_density)
 
     return {
         'prediction': current_density,
         'environmental_data': env_data,
+        'simulated_environment': simulated_environment,
         'decision': decision,
         'trend': trend,
         'future_outlook': future_outlook,
@@ -625,10 +884,15 @@ def _predict_birds_from_payload(payload: dict) -> dict:
 
 
 def _predict_insects_from_payload(payload: dict) -> dict:
+    _ensure_prediction_runtime_ready()
+    _validate_numeric_inputs(payload, [
+        'temperature', 'humidity', 'rainfall', 'vegetation_index', 'water_availability', 'human_disturbance',
+        'latitude', 'longitude', 'lat_grid', 'lon_grid', 'decimalLatitude', 'decimalLongitude',
+    ] + _insects_base_feature_names())
     _load_insects_artifacts_if_needed()
 
     if insects_model is None or insects_scaler is None:
-        raise ValueError('Insect prediction model is currently unavailable. Please retry shortly.')
+        raise FileNotFoundError('Prediction model not found for insects')
 
     if hasattr(insects_scaler, 'feature_names_in_'):
         orig_features = list(insects_scaler.feature_names_in_)
@@ -644,8 +908,12 @@ def _predict_insects_from_payload(payload: dict) -> dict:
             value = means.get(feature, 0.0)
         base_input[feature] = value
 
+    lat = _safe_float(payload.get('lat_grid', 17.5))
+    lon = _safe_float(payload.get('lon_grid', 73.5))
+    env_data, simulated_environment = _build_prediction_environment(lat, lon, payload)
+
     # Base Prediction
-    def _get_density(p_dict):
+    def _get_density(p_dict, env_for_density):
         if hasattr(insects_scaler, 'feature_names_in_'):
             f_list = list(insects_scaler.feature_names_in_)
         else:
@@ -668,15 +936,18 @@ def _predict_insects_from_payload(payload: dict) -> dict:
         if isinstance(insects_metadata, dict) and insects_metadata.get('target_transform') == 'log1p':
             p = float(np.expm1(p))
         r = _safe_float(i_in.get('species_richness', 0.0))
-        return max(0.0, max(r * 0.22, p))
+        baseline = max(0.0, r * 0.22)
+        blended = (0.82 * max(0.0, p)) + (0.18 * baseline)
+        return max(0.0, blended * _environment_multiplier(env_for_density))
 
-    current_density = _get_density(payload)
+    current_density = _get_density(payload, env_data)
     current_year = int(_safe_float(payload.get('year', 2024)))
     
     # Future Outlook
     p5 = payload.copy(); p5['year'] = current_year + 5
     p10 = payload.copy(); p10['year'] = current_year + 10
-    d5, d10 = _get_density(p5), _get_density(p10)
+    d5 = _get_density(p5, _project_environment(env_data, 5))
+    d10 = _get_density(p10, _project_environment(env_data, 10))
     t5, t10 = _predict_occurrence_trend('insects', p5), _predict_occurrence_trend('insects', p10)
 
     d_change = ((d10 - current_density) / max(current_density, 0.001)) * 100
@@ -704,22 +975,13 @@ def _predict_insects_from_payload(payload: dict) -> dict:
         }
     }
 
-    lat = _safe_float(payload.get('lat_grid', 17.5))
-    lon = _safe_float(payload.get('lon_grid', 73.5))
-    env_data = get_environmental_data(lat, lon)
-    
-    # Override env_data with user manual inputs so UI and Decision Engine reflect them
-    for key in ['temperature', 'humidity', 'rainfall', 'vegetation_index', 'water_availability', 'human_disturbance']:
-        user_val = _safe_float(payload.get(key))
-        if user_val is not None:
-            env_data[key] = user_val
-            
     decision = analyze_prediction(current_density, env_data, is_endangered=is_e)
     trend = _predict_occurrence_trend('insects', payload) or analyze_trend(current_density)
 
     return {
         'prediction': current_density,
         'environmental_data': env_data,
+        'simulated_environment': simulated_environment,
         'decision': decision,
         'trend': trend,
         'future_outlook': future_outlook,
@@ -880,21 +1142,7 @@ def _load_animals_artifacts_if_needed():
     global animals_model, animals_scaler, animals_features, animals_metadata, animals_pca
     if animals_model is not None and animals_scaler is not None:
         return
-
-    try:
-        animals_model = prediction_service.load_model(_project_file('wildlife_model.pkl'))
-        animals_scaler = prediction_service.load_artifact(_project_file('scaler.pkl'))
-        loaded_features = prediction_service.load_artifact(_project_file('feature_names.pkl'))
-        animals_features = loaded_features if isinstance(loaded_features, list) else animals_features or []
-        try:
-            animals_pca = prediction_service.load_artifact(_project_file('animals_pca.pkl'))
-            loaded_metadata = prediction_service.load_artifact(_project_file('model_metadata.pkl'))
-            animals_metadata = loaded_metadata if isinstance(loaded_metadata, dict) else {}
-        except Exception:
-            pass
-    except Exception:
-        animals_model = None
-        animals_scaler = None
+    _load_prediction_bundle('animals')
 
 
 def _load_birds_artifacts_if_needed():
@@ -902,28 +1150,7 @@ def _load_birds_artifacts_if_needed():
     global birds_model, birds_scaler, birds_pca, birds_features, birds_metadata
     if birds_model is not None and birds_scaler is not None:
         return
-
-    try:
-        try:
-            loaded_features = prediction_service.load_artifact(_project_file('birds_feature_names.pkl'))
-            birds_features = loaded_features if isinstance(loaded_features, list) else BASE_BIRDS_FEATURES.copy()
-        except Exception:
-            birds_features = BASE_BIRDS_FEATURES.copy()
-
-        birds_scaler = prediction_service.load_artifact(_project_file('birds_scaler.pkl'))
-        birds_model = prediction_service.load_model(_project_file('birds_model.pkl'))
-        try:
-            birds_pca = prediction_service.load_artifact(_project_file('birds_pca.pkl'))
-        except Exception:
-            pass
-        try:
-            loaded_metadata = prediction_service.load_artifact(_project_file('birds_metadata.pkl'))
-            birds_metadata = loaded_metadata if isinstance(loaded_metadata, dict) else {}
-        except Exception:
-            birds_metadata = {}
-    except Exception:
-        birds_model = None
-        birds_scaler = None
+    _load_prediction_bundle('birds')
 
 
 def _load_insects_artifacts_if_needed():
@@ -931,28 +1158,7 @@ def _load_insects_artifacts_if_needed():
     global insects_model, insects_scaler, insects_pca, insects_features, insects_metadata
     if insects_model is not None and insects_scaler is not None:
         return
-
-    try:
-        try:
-            loaded_features = prediction_service.load_artifact(_project_file('insects_feature_names.pkl'))
-            insects_features = loaded_features if isinstance(loaded_features, list) else BASE_INSECTS_FEATURES.copy()
-        except Exception:
-            insects_features = BASE_INSECTS_FEATURES.copy()
-
-        insects_scaler = prediction_service.load_artifact(_project_file('insects_scaler.pkl'))
-        insects_model = prediction_service.load_model(_project_file('insects_model.pkl'))
-        try:
-            insects_pca = prediction_service.load_artifact(_project_file('insects_pca.pkl'))
-        except Exception:
-            pass
-        try:
-            loaded_metadata = prediction_service.load_artifact(_project_file('insects_metadata.pkl'))
-            insects_metadata = loaded_metadata if isinstance(loaded_metadata, dict) else {}
-        except Exception:
-            insects_metadata = {}
-    except Exception:
-        insects_model = None
-        insects_scaler = None
+    _load_prediction_bundle('insects')
 
 
 def _reload_plants_artifacts_if_needed(force: bool = False):
@@ -961,31 +1167,14 @@ def _reload_plants_artifacts_if_needed(force: bool = False):
 
     if not force and plants_model is not None and plants_scaler is not None:
         return
+    _load_prediction_bundle('plants', force=force)
 
     try:
-        try:
-            loaded_features = prediction_service.load_artifact(_project_file('plants_feature_names.pkl'))
-            plants_features = loaded_features if isinstance(loaded_features, list) else BASE_PLANTS_FEATURES.copy()
-        except Exception:
-            plants_features = BASE_PLANTS_FEATURES.copy()
-
-        plants_scaler = prediction_service.load_artifact(_project_file('plants_scaler.pkl'))
-        plants_model = prediction_service.load_model(_project_file('plants_model.pkl'))
-
-        try:
-            loaded_metadata = prediction_service.load_artifact(_project_file('plants_metadata.pkl'))
-            plants_metadata = loaded_metadata if isinstance(loaded_metadata, dict) else {}
-        except Exception:
-            plants_metadata = {}
-
-        try:
-            plants_kmeans = prediction_service.load_artifact(_project_file('plants_kmeans.pkl'))
-            plants_kmeans_scaler = prediction_service.load_artifact(_project_file('plants_kmeans_scaler.pkl'))
-        except Exception:
-            plants_kmeans = None
-            plants_kmeans_scaler = None
+        plants_kmeans = prediction_service.load_artifact(_project_file('plants_kmeans.pkl'))
+        plants_kmeans_scaler = prediction_service.load_artifact(_project_file('plants_kmeans_scaler.pkl'))
     except Exception:
-        pass
+        plants_kmeans = None
+        plants_kmeans_scaler = None
 
 _birds_thresholds_cache = None
 _insects_thresholds_cache = None
@@ -994,6 +1183,7 @@ _gallery_rows_cache = {}
 _thumbnail_executor = ThreadPoolExecutor(max_workers=6)  # Parallel thumbnail resolver
 _cache_lock = threading.Lock()  # Thread-safe cache access
 _persistent_cache_path = Path(__file__).resolve().parent.parent / 'thumbnail_cache.pkl'
+_THUMBNAIL_MISS = '__MISS__'
 
 def _load_persistent_cache():
     """Load thumbnail cache from disk (across sessions)."""
@@ -1022,9 +1212,23 @@ def _resolve_occurrence_thumbnail(occurrence_url: str) -> str | None:
         return None
 
     with _cache_lock:
+        has_cached = occurrence_url in _oembed_cache
         cached = _oembed_cache.get(occurrence_url)
-        if cached is not None:
-            return cached
+        if has_cached:
+            if cached == _THUMBNAIL_MISS:
+                return None
+            local_cached = resolve_cached_image(cached, cache_key=f'occurrence:{occurrence_url}', occurrence_url=occurrence_url)
+            if local_cached:
+                _oembed_cache[occurrence_url] = local_cached
+                return local_cached
+            if cached:
+                return cached
+
+    local_record = resolve_cached_image(None, cache_key=f'occurrence:{occurrence_url}', occurrence_url=occurrence_url)
+    if local_record:
+        with _cache_lock:
+            _oembed_cache[occurrence_url] = local_record
+        return local_record
 
     thumbnail_url = None
     try:
@@ -1050,8 +1254,16 @@ def _resolve_occurrence_thumbnail(occurrence_url: str) -> str | None:
     except Exception:
         thumbnail_url = None
 
+    if thumbnail_url:
+        thumbnail_url = resolve_cached_image(
+            thumbnail_url,
+            cache_key=f'occurrence:{occurrence_url}',
+            occurrence_url=occurrence_url,
+            source='inaturalist-oembed',
+        ) or thumbnail_url
+
     with _cache_lock:
-        _oembed_cache[occurrence_url] = thumbnail_url
+        _oembed_cache[occurrence_url] = thumbnail_url if thumbnail_url else _THUMBNAIL_MISS
     
     return thumbnail_url
 
@@ -1100,6 +1312,10 @@ def _build_gallery_rows_from_csv(csv_name: str, default_subtitle: str) -> list[d
     cached = _gallery_rows_cache.get(cache_key)
     if cached is not None:
         return cached
+
+    _lazy_import_ml()
+    if pd is None:
+        return []
 
     try:
         df = pd.read_csv(_project_file(csv_name))
@@ -1491,12 +1707,16 @@ def insects_photos_page(request):
 def predict_animals(request):
     """Make animal prediction"""
     try:
-        data = json.loads(request.body)
+        data = _read_prediction_payload(request)
+        if data is None or not data:
+            return _prediction_error('Invalid input data', status=400)
         result = _predict_animals_from_payload(data)
 
         return JsonResponse({
+            'success': True,
             'prediction': result['prediction'],
             'environmental_data': result['environmental_data'],
+            'simulated_environment': result.get('simulated_environment'),
             'decision': result['decision'],
             'trend': result['trend'],
             'future_outlook': result.get('future_outlook'),
@@ -1506,10 +1726,7 @@ def predict_animals(request):
         })
 
     except Exception as e:
-        return JsonResponse({
-            'error': str(e),
-            'status': 'error'
-        }, status=400)
+        return _prediction_exception_response(e, 'animals')
 
 
 @require_http_methods(["GET", "POST"])
@@ -1743,12 +1960,16 @@ def insects_dashboard(request):
 def predict_birds(request):
     """Make birds prediction"""
     try:
-        data = json.loads(request.body)
+        data = _read_prediction_payload(request)
+        if data is None or not data:
+            return _prediction_error('Invalid input data', status=400)
         result = _predict_birds_from_payload(data)
         
         return JsonResponse({
+            'success': True,
             'prediction': result['prediction'],
             'environmental_data': result['environmental_data'],
+            'simulated_environment': result.get('simulated_environment'),
             'decision': result['decision'],
             'trend': result['trend'],
             'future_outlook': result.get('future_outlook'),
@@ -1758,10 +1979,7 @@ def predict_birds(request):
         })
     
     except Exception as e:
-        return JsonResponse({
-            'error': str(e),
-            'status': 'error'
-        }, status=400)
+        return _prediction_exception_response(e, 'birds')
 
 
 @csrf_exempt
@@ -1769,12 +1987,16 @@ def predict_birds(request):
 def predict_insects(request):
     """Make insects prediction"""
     try:
-        data = json.loads(request.body)
+        data = _read_prediction_payload(request)
+        if data is None or not data:
+            return _prediction_error('Invalid input data', status=400)
         result = _predict_insects_from_payload(data)
 
         return JsonResponse({
+            'success': True,
             'prediction': result['prediction'],
             'environmental_data': result['environmental_data'],
+            'simulated_environment': result.get('simulated_environment'),
             'decision': result['decision'],
             'trend': result['trend'],
             'future_outlook': result.get('future_outlook'),
@@ -1784,10 +2006,7 @@ def predict_insects(request):
         })
 
     except Exception as e:
-        return JsonResponse({
-            'error': str(e),
-            'status': 'error'
-        }, status=400)
+        return _prediction_exception_response(e, 'insects')
 
 
 
@@ -1841,13 +2060,15 @@ def _build_plants_engineered_features(df_base):
 
 def _predict_plants_from_payload(payload: dict) -> dict:
     """Run the plants regression model given a form/JSON payload."""
+    _ensure_prediction_runtime_ready()
+    _validate_numeric_inputs(payload, [
+        'temperature', 'humidity', 'rainfall', 'vegetation_index', 'water_availability', 'human_disturbance',
+        'latitude', 'longitude', 'lat_grid', 'lon_grid', 'decimalLatitude', 'decimalLongitude',
+    ] + _plants_base_feature_names())
     _reload_plants_artifacts_if_needed()
 
     if plants_model is None or plants_scaler is None:
-        raise ValueError(
-            'Plants model not yet trained. '
-            'Run: python prepare_plants_data.py && python train_plants_model.py'
-        )
+        raise FileNotFoundError('Prediction model not found for plants')
 
     if hasattr(plants_scaler, 'feature_names_in_'):
         orig_features = list(plants_scaler.feature_names_in_)
@@ -1866,8 +2087,12 @@ def _predict_plants_from_payload(payload: dict) -> dict:
             value = means.get(feature, 0.0)
         base_input[feature] = value
 
+    lat = _safe_float(payload.get('lat_grid', 17.5))
+    lon = _safe_float(payload.get('lon_grid', 73.5))
+    env_data, simulated_environment = _build_prediction_environment(lat, lon, payload)
+
     # Base Prediction
-    def _get_density(p_dict):
+    def _get_density(p_dict, env_for_density):
         p_in = {}
         for f in _plants_base_feature_names():
             v = _safe_float(p_dict.get(f))
@@ -1885,15 +2110,18 @@ def _predict_plants_from_payload(payload: dict) -> dict:
         if isinstance(plants_metadata, dict) and plants_metadata.get('target_transform') == 'log1p':
             p = float(np.expm1(p))
         r = _safe_float(p_in.get('species_richness', 0.0))
-        return max(0.0, max(r * 0.18, p))
+        baseline = max(0.0, r * 0.18)
+        blended = (0.82 * max(0.0, p)) + (0.18 * baseline)
+        return max(0.0, blended * _environment_multiplier(env_for_density))
 
-    current_density = _get_density(payload)
+    current_density = _get_density(payload, env_data)
     current_year = int(_safe_float(payload.get('year', 2024)))
     
     # Future Outlook
     p5 = payload.copy(); p5['year'] = current_year + 5
     p10 = payload.copy(); p10['year'] = current_year + 10
-    d5, d10 = _get_density(p5), _get_density(p10)
+    d5 = _get_density(p5, _project_environment(env_data, 5))
+    d10 = _get_density(p10, _project_environment(env_data, 10))
     t5, t10 = _predict_occurrence_trend('plants', p5), _predict_occurrence_trend('plants', p10)
 
     d_change = ((d10 - current_density) / max(current_density, 0.001)) * 100
@@ -1921,15 +2149,13 @@ def _predict_plants_from_payload(payload: dict) -> dict:
         }
     }
 
-    lat = _safe_float(payload.get('lat_grid', 17.5))
-    lon = _safe_float(payload.get('lon_grid', 73.5))
-    env_data = get_environmental_data(lat, lon)
     decision = analyze_prediction(current_density, env_data)
     trend = _predict_occurrence_trend('plants', payload) or analyze_trend(current_density)
 
     return {
         'prediction': current_density,
         'environmental_data': env_data,
+        'simulated_environment': simulated_environment,
         'decision': decision,
         'trend': trend,
         'future_outlook': future_outlook,
@@ -1942,13 +2168,17 @@ def _predict_plants_from_payload(payload: dict) -> dict:
 def predict_plants(request):
     """API: Make a plants density prediction."""
     try:
-        data   = json.loads(request.body)
+        data = _read_prediction_payload(request)
+        if data is None or not data:
+            return _prediction_error('Invalid input data', status=400)
         _reload_plants_artifacts_if_needed(force=True)
         result = _predict_plants_from_payload(data)
         meta   = plants_metadata if isinstance(plants_metadata, dict) else {}
         return JsonResponse({
+            'success': True,
             'prediction': result['prediction'],
             'environmental_data': result['environmental_data'],
+            'simulated_environment': result.get('simulated_environment'),
             'decision': result['decision'],
             'trend': result['trend'],
             'future_outlook': result.get('future_outlook'),
@@ -1964,13 +2194,16 @@ def predict_plants(request):
             'status': 'success'
         })
     except Exception as e:
-        return JsonResponse({'error': str(e), 'status': 'error'}, status=400)
+        return _prediction_exception_response(e, 'plants')
 
 
 @require_http_methods(["GET"])
 def get_plants_features(request):
     """API: Return plants feature ranges for the prediction form."""
     try:
+        _lazy_import_ml()
+        if pd is None:
+            return JsonResponse({'success': False, 'error': 'Prediction processing failed'}, status=500)
         # Prefer engineered regression dataset when available.
         regression_path = Path(_project_file('koyna_plants_regression_density.csv'))
         if regression_path.exists():
@@ -2076,17 +2309,22 @@ def get_plants_features(request):
 def get_plants_clustering_api(request):
     """API: Return K-Means cluster assignments for the plants dataset."""
     try:
-        n = max(3, min(20, int(request.GET.get('clusters', 8))))
-        df = _get_labeled_df(n, 'plants')
+        n = _parse_cluster_count(request)
+        df, elapsed, timed_out = _run_with_timeout(_get_labeled_df, n, 'plants')
+        if timed_out:
+            return _clustering_error('Clustering timed out', status=503)
         if df is None:
             return JsonResponse({'error': 'No plants data'}, status=400)
         pts = [
             [round(float(r.decimalLatitude), 5), round(float(r.decimalLongitude), 5), int(r.cluster)]
             for r in df[['decimalLatitude', 'decimalLongitude', 'cluster']].itertuples()
         ]
+        logger.info('get_plants_clustering_api served in %.3fs', elapsed)
         return JsonResponse({'points': pts, 'total': len(pts), 'n_clusters': n})
+    except ValueError as e:
+        return _clustering_error(str(e), status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return _clustering_error(str(e), status=500)
 
 
 @require_http_methods(["GET"])
@@ -2121,6 +2359,9 @@ def get_plants_model_info(request):
 def get_animals_features(request):
     """Return animal features and their ranges"""
     try:
+        _lazy_import_ml()
+        if pd is None:
+            return JsonResponse({'success': False, 'error': 'Prediction processing failed'}, status=500)
         _load_animals_artifacts_if_needed()
         df = pd.read_csv(_project_file('koyna_animals_regression_density.csv'))
         X = df.drop(columns=['decimalLatitude', 'decimalLongitude', 'TARGET_sighting_density'])
@@ -2205,23 +2446,43 @@ def photo_proxy(request):
         'https://static.inaturalist.org/',
     )
 
+    local_path = serve_cached_media_or_none(image_url)
+    if local_path is not None:
+        content_type = 'image/jpeg'
+        if local_path.suffix.lower() == '.png':
+            content_type = 'image/png'
+        elif local_path.suffix.lower() == '.webp':
+            content_type = 'image/webp'
+        elif local_path.suffix.lower() == '.gif':
+            content_type = 'image/gif'
+        return HttpResponse(local_path.read_bytes(), content_type=content_type)
+
     if not image_url.startswith(allowed_prefixes):
         return HttpResponse('Invalid image URL', status=400, content_type='text/plain')
 
-    try:
-        req = Request(image_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urlopen(req, timeout=10) as response:
-            content_type = response.headers.get('Content-Type', 'image/jpeg')
-            data = response.read()
-        return HttpResponse(data, content_type=content_type)
-    except Exception:
-        return HttpResponse('Image fetch failed', status=502, content_type='text/plain')
+    cached_url = resolve_cached_image(image_url, cache_key=f'proxy:{image_url}')
+    if cached_url:
+        cached_local = serve_cached_media_or_none(cached_url)
+        if cached_local is not None:
+            content_type = 'image/jpeg'
+            if cached_local.suffix.lower() == '.png':
+                content_type = 'image/png'
+            elif cached_local.suffix.lower() == '.webp':
+                content_type = 'image/webp'
+            elif cached_local.suffix.lower() == '.gif':
+                content_type = 'image/gif'
+            return HttpResponse(cached_local.read_bytes(), content_type=content_type)
+
+    return HttpResponse('Image fetch failed', status=502, content_type='text/plain')
 
 
 @require_http_methods(["GET"])
 def get_birds_features(request):
     """Return bird features and their ranges"""
     try:
+        _lazy_import_ml()
+        if pd is None:
+            return JsonResponse({'success': False, 'error': 'Prediction processing failed'}, status=500)
         _load_birds_artifacts_if_needed()
         df = pd.read_csv(_project_file('koyna_birds_regression_density.csv'))
         X = df.drop(columns=['decimalLatitude', 'decimalLongitude', 'bird_sighting_density'])
@@ -2265,6 +2526,9 @@ def get_birds_features(request):
 def get_insects_features(request):
     """Return insect features and their ranges"""
     try:
+        _lazy_import_ml()
+        if pd is None:
+            return JsonResponse({'success': False, 'error': 'Prediction processing failed'}, status=500)
         _load_insects_artifacts_if_needed()
         df = pd.read_csv(_project_file('koyna_insects_regression_density.csv'))
         X = df.drop(columns=['decimalLatitude', 'decimalLongitude', 'insect_sighting_density'])
@@ -2312,12 +2576,81 @@ _clustering_cache = { 'animals': {}, 'birds': {}, 'insects': {}, 'plants': {} }
 _species_cache = { 'animals': None, 'birds': None, 'insects': None, 'plants': None }
 _clustering_lock = threading.Lock()
 
+CLUSTERING_DATASET_CACHE_TTL_SECONDS = int(getattr(settings, 'CLUSTERING_DATASET_CACHE_TTL_SECONDS', 900))
+CLUSTERING_RESULT_CACHE_TTL_SECONDS = int(getattr(settings, 'CLUSTERING_RESULT_CACHE_TTL_SECONDS', 900))
+CLUSTERING_TIMEOUT_SECONDS = float(getattr(settings, 'CLUSTERING_TIMEOUT_SECONDS', 8.0))
+CLUSTERING_MAX_ROWS = int(getattr(settings, 'CLUSTERING_MAX_ROWS', 10000))
+
+
+def _clustering_error(message: str, status: int = 500):
+    return JsonResponse({'success': False, 'error': message}, status=status)
+
+
+def _parse_cluster_count(request):
+    raw_value = str(request.GET.get('clusters', '8')).strip()
+    try:
+        count = int(raw_value)
+    except (TypeError, ValueError):
+        raise ValueError('Invalid cluster count')
+
+    if count < 3 or count > 20:
+        raise ValueError('Invalid cluster count')
+
+    return count
+
+
+def _parse_cluster_id(request):
+    raw_value = str(request.GET.get('cluster_id', '0')).strip()
+    try:
+        cluster_id = int(raw_value)
+    except (TypeError, ValueError):
+        raise ValueError('Invalid cluster id')
+    return cluster_id
+
+
+def _parse_dataset_param(request, default='animals'):
+    ds = str(request.GET.get('dataset', default)).strip().lower()
+    if ds not in ('animals', 'birds', 'insects', 'plants'):
+        raise ValueError('Invalid dataset')
+    return ds
+
+
+def _run_with_timeout(func, *args, timeout_seconds=CLUSTERING_TIMEOUT_SECONDS, **kwargs):
+    start = perf_counter()
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(func, *args, **kwargs)
+    try:
+        result = future.result(timeout=timeout_seconds)
+        return result, perf_counter() - start, False
+    except FuturesTimeoutError:
+        logger.warning('Clustering timeout in %s after %.2fs', func.__name__, timeout_seconds)
+        future.cancel()
+        return None, perf_counter() - start, True
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
 
 def _load_category_data(category='animals'):
     """Load and cache category CSV data."""
     global _species_cache
+    load_start = perf_counter()
+    _lazy_import_ml()
+
+    if pd is None:
+        logger.warning('ML dependencies unavailable; pandas import failed for category load.')
+        return None
+
     if _species_cache[category] is not None:
+        logger.info('Dataset cache hit (memory) for %s in %.3fs', category, perf_counter() - load_start)
         return _species_cache[category]
+
+    from django.core.cache import cache as django_cache
+    dataset_cache_key = f'clustering:dataset:{category}'
+    cached_df = django_cache.get(dataset_cache_key)
+    if cached_df is not None:
+        _species_cache[category] = cached_df
+        logger.info('Dataset cache hit (django) for %s in %.3fs', category, perf_counter() - load_start)
+        return cached_df
     
     files = {
         'animals': 'Koyna_animals_final.csv',
@@ -2329,23 +2662,81 @@ def _load_category_data(category='animals'):
     try:
         df = pd.read_csv(_project_file(files[category]))
         _species_cache[category] = df
+        django_cache.set(dataset_cache_key, df, timeout=CLUSTERING_DATASET_CACHE_TTL_SECONDS)
+        logger.info('Dataset load for %s took %.3fs (rows=%s)', category, perf_counter() - load_start, len(df))
         return df
     except Exception as e:
         logger.warning('Error loading %s data: %s', category, e)
-        return pd.DataFrame()
+        return pd.DataFrame() if pd is not None else None
+
+
+def _get_taxonomic_mapping(category: str) -> dict:
+    """
+    Build dropdown option mappings for encoded taxonomy fields.
+    Returns dict like {'class_enc': [...], 'order_enc': [...], 'family_enc': [...]}.
+    """
+    _lazy_import_ml()
+    if pd is None:
+        return {}
+
+    category = str(category or 'animals').strip().lower()
+    if category not in {'animals', 'birds', 'insects', 'plants'}:
+        category = 'animals'
+
+    df = _load_category_data(category)
+    if df is None or df.empty:
+        return {}
+
+    mappings = {}
+    col_to_enc = {
+        'class': 'class_enc',
+        'order': 'order_enc',
+        'family': 'family_enc',
+    }
+
+    for raw_col, enc_col in col_to_enc.items():
+        if raw_col not in df.columns:
+            continue
+        values = []
+        for val in df[raw_col].dropna().astype(str):
+            text = val.strip()
+            if not text or text.lower() in {'nan', 'none', 'null'}:
+                continue
+            values.append(text)
+        deduped = list(dict.fromkeys(values))
+        if deduped:
+            mappings[enc_col] = deduped[:300]
+
+    return mappings
 
 
 def _perform_clustering(n_clusters=8, category='animals'):
     """
     Perform K-means clustering by location + taxonomy.
     """
+    perf_start = perf_counter()
+    _lazy_import_ml()
+    if StandardScaler is None or KMeans is None:
+        raise RuntimeError('Clustering dependencies are unavailable.')
+
+    from django.core.cache import cache as django_cache
+
     with _clustering_lock:
         cache_key = f'clusters_{n_clusters}'
         if cache_key in _clustering_cache[category]:
+            logger.info('Clustering cache hit (memory) for %s/%s in %.3fs', category, n_clusters, perf_counter() - perf_start)
             return _clustering_cache[category][cache_key]
+
+    django_cache_key = f'clustering:result:{category}:{n_clusters}'
+    cached_result = django_cache.get(django_cache_key)
+    if cached_result is not None:
+        with _clustering_lock:
+            _clustering_cache[category][cache_key] = cached_result
+        logger.info('Clustering cache hit (django) for %s/%s in %.3fs', category, n_clusters, perf_counter() - perf_start)
+        return cached_result
     
     df = _load_category_data(category)
-    if df.empty:
+    if df is None or df.empty:
         return {'error': 'No data available'}
     
     # Prepare features: geographic + taxonomic encoding
@@ -2356,6 +2747,9 @@ def _perform_clustering(n_clusters=8, category='animals'):
     
     # Feature engineering: location + class encoding
     df_features = df_clean.copy()
+
+    if len(df_features) > CLUSTERING_MAX_ROWS:
+        df_features = df_features.sample(n=CLUSTERING_MAX_ROWS, random_state=42)
     
     # Encode categorical features safely
     class_mapping = {cls: i for i, cls in enumerate(df_features['class'].unique())} if 'class' in df_features.columns else {}
@@ -2412,6 +2806,9 @@ def _perform_clustering(n_clusters=8, category='animals'):
     
     with _clustering_lock:
         _clustering_cache[category][cache_key] = result
+
+    django_cache.set(django_cache_key, result, timeout=CLUSTERING_RESULT_CACHE_TTL_SECONDS)
+    logger.info('Clustering computed for %s/%s in %.3fs (rows=%s)', category, n_clusters, perf_counter() - perf_start, len(df_features))
     
     return result
 
@@ -2475,6 +2872,108 @@ def _get_species_detail(species_name, category='animals'):
     return detail
 
 
+def _filter_species_rows(df, species_name):
+    """
+    Filter dataset rows by species/scientific name with exact-first matching.
+    """
+    if df is None or df.empty:
+        return df
+
+    query = str(species_name or '').strip()
+    if not query:
+        return df.iloc[0:0]
+
+    working = df.copy()
+    for col in ('scientificName', 'species'):
+        if col not in working.columns:
+            working[col] = ''
+        else:
+            working[col] = working[col].fillna('').astype(str).str.strip()
+
+    q_lower = query.lower()
+    exact = working[
+        (working['scientificName'].str.lower() == q_lower)
+        | (working['species'].str.lower() == q_lower)
+    ]
+    if not exact.empty:
+        return exact
+
+    contains = working[
+        working['scientificName'].str.contains(re.escape(query), case=False, na=False)
+        | working['species'].str.contains(re.escape(query), case=False, na=False)
+    ]
+    return contains
+
+
+def _species_list_payload(category, offset=0, limit=30):
+    df = _load_category_data(category)
+    if df is None or df.empty:
+        return {'species': [], 'total': 0, 'offset': offset, 'nextOffset': offset, 'hasMore': False}
+
+    required_cols = ['scientificName', 'species', 'class', 'order', 'family', 'genus', 'kingdom', 'phylum', 'eventDate']
+    normalized = df.copy()
+    for col in required_cols:
+        if col not in normalized.columns:
+            normalized[col] = ''
+        normalized[col] = normalized[col].fillna('').astype(str).str.strip()
+
+    grouped = (
+        normalized.groupby('scientificName', dropna=False)
+        .agg(
+            observationCount=('scientificName', 'size'),
+            species=('species', 'first'),
+            className=('class', 'first'),
+            orderName=('order', 'first'),
+            family=('family', 'first'),
+            genus=('genus', 'first'),
+            kingdom=('kingdom', 'first'),
+            phylum=('phylum', 'first'),
+            earliest=('eventDate', 'min'),
+            latest=('eventDate', 'max'),
+        )
+        .reset_index()
+    )
+
+    grouped = grouped[grouped['scientificName'].str.strip() != '']
+    grouped = grouped.sort_values(by=['observationCount', 'scientificName'], ascending=[False, True]).reset_index(drop=True)
+
+    total = len(grouped)
+    if offset >= total:
+        return {'species': [], 'total': total, 'offset': offset, 'nextOffset': offset, 'hasMore': False}
+
+    if limit is None:
+        chunk = grouped.iloc[offset:]
+    else:
+        chunk = grouped.iloc[offset:offset + limit]
+
+    results = []
+    for row in chunk.itertuples(index=False):
+        results.append({
+            'scientificName': _safe_text(getattr(row, 'scientificName', ''), 'Unknown'),
+            'species': _safe_text(getattr(row, 'species', ''), 'Unknown'),
+            'class': _safe_text(getattr(row, 'className', ''), 'Unknown'),
+            'order': _safe_text(getattr(row, 'orderName', ''), 'Unknown'),
+            'family': _safe_text(getattr(row, 'family', ''), 'Unknown'),
+            'genus': _safe_text(getattr(row, 'genus', ''), 'Unknown'),
+            'kingdom': _safe_text(getattr(row, 'kingdom', ''), 'Unknown'),
+            'phylum': _safe_text(getattr(row, 'phylum', ''), 'Unknown'),
+            'observationCount': int(getattr(row, 'observationCount', 0)),
+            'dateRange': {
+                'earliest': _safe_text(getattr(row, 'earliest', ''), ''),
+                'latest': _safe_text(getattr(row, 'latest', ''), ''),
+            },
+        })
+
+    next_offset = offset + len(results)
+    return {
+        'species': results,
+        'total': total,
+        'offset': offset,
+        'nextOffset': next_offset,
+        'hasMore': next_offset < total,
+    }
+
+
 @require_http_methods(["GET"])
 def animals_clustering_map(request):
     """Render clustering map page for animals."""
@@ -2488,13 +2987,16 @@ def animals_clustering_map(request):
 def get_animals_clustering(request):
     """API: Return clustering data for map."""
     try:
-        n_clusters = int(request.GET.get('clusters', 8))
-        n_clusters = max(3, min(20, n_clusters))
-        
-        result = _perform_clustering(n_clusters)
+        n_clusters = _parse_cluster_count(request)
+        result, elapsed, timed_out = _run_with_timeout(_perform_clustering, n_clusters)
+        if timed_out:
+            return _clustering_error('Clustering timed out', status=503)
+        logger.info('get_animals_clustering served in %.3fs', elapsed)
         return JsonResponse(result)
+    except ValueError as e:
+        return _clustering_error(str(e), status=400)
     except Exception as e:
-        logger.exception('EMAIL ERROR')
+        return _clustering_error(str(e), status=500)
 
 
 @require_http_methods(["GET"])
@@ -2503,9 +3005,13 @@ def get_species_detail(request):
     try:
         species_name = str(request.GET.get('species', '')).strip()
         if not species_name:
-            return JsonResponse({'error': 'Species name required'}, status=400)
-        
-        detail = _sanitize_for_json(_get_species_detail(species_name))
+            offset, limit = _parse_gallery_pagination(request)
+            payload = _species_list_payload('animals', offset=offset, limit=limit or 30)
+            return JsonResponse(payload, json_dumps_params={'allow_nan': False})
+
+        detail = _sanitize_for_json(_get_species_detail(species_name, 'animals'))
+        if isinstance(detail, dict) and detail.get('error'):
+            return JsonResponse(detail, status=404, json_dumps_params={'allow_nan': False})
         return JsonResponse(detail, json_dumps_params={'allow_nan': False})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
@@ -2552,22 +3058,30 @@ def get_plants_species_photos(request):
 @require_http_methods(["GET"])
 def get_birds_clustering(request):
     try:
-        n_clusters = int(request.GET.get('clusters', 8))
-        n_clusters = max(3, min(20, n_clusters))
-        result = _perform_clustering(n_clusters, 'birds')
+        n_clusters = _parse_cluster_count(request)
+        result, elapsed, timed_out = _run_with_timeout(_perform_clustering, n_clusters, 'birds')
+        if timed_out:
+            return _clustering_error('Clustering timed out', status=503)
+        logger.info('get_birds_clustering served in %.3fs', elapsed)
         return JsonResponse(result)
+    except ValueError as e:
+        return _clustering_error(str(e), status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return _clustering_error(str(e), status=500)
 
 @require_http_methods(["GET"])
 def get_insects_clustering(request):
     try:
-        n_clusters = int(request.GET.get('clusters', 8))
-        n_clusters = max(3, min(20, n_clusters))
-        result = _perform_clustering(n_clusters, 'insects')
+        n_clusters = _parse_cluster_count(request)
+        result, elapsed, timed_out = _run_with_timeout(_perform_clustering, n_clusters, 'insects')
+        if timed_out:
+            return _clustering_error('Clustering timed out', status=503)
+        logger.info('get_insects_clustering served in %.3fs', elapsed)
         return JsonResponse(result)
+    except ValueError as e:
+        return _clustering_error(str(e), status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return _clustering_error(str(e), status=500)
 
 
 @require_http_methods(["GET"])
@@ -2575,8 +3089,12 @@ def get_birds_species_detail(request):
     try:
         species_name = str(request.GET.get('species', '')).strip()
         if not species_name:
-            return JsonResponse({'error': 'Species name required'}, status=400)
+            offset, limit = _parse_gallery_pagination(request)
+            payload = _species_list_payload('birds', offset=offset, limit=limit or 30)
+            return JsonResponse(payload, json_dumps_params={'allow_nan': False})
         detail = _sanitize_for_json(_get_species_detail(species_name, 'birds'))
+        if isinstance(detail, dict) and detail.get('error'):
+            return JsonResponse(detail, status=404, json_dumps_params={'allow_nan': False})
         return JsonResponse(detail, json_dumps_params={'allow_nan': False})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
@@ -2586,8 +3104,12 @@ def get_insects_species_detail(request):
     try:
         species_name = str(request.GET.get('species', '')).strip()
         if not species_name:
-            return JsonResponse({'error': 'Species name required'}, status=400)
+            offset, limit = _parse_gallery_pagination(request)
+            payload = _species_list_payload('insects', offset=offset, limit=limit or 30)
+            return JsonResponse(payload, json_dumps_params={'allow_nan': False})
         detail = _sanitize_for_json(_get_species_detail(species_name, 'insects'))
+        if isinstance(detail, dict) and detail.get('error'):
+            return JsonResponse(detail, status=404, json_dumps_params={'allow_nan': False})
         return JsonResponse(detail, json_dumps_params={'allow_nan': False})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
@@ -2597,8 +3119,12 @@ def get_plants_species_detail(request):
     try:
         species_name = str(request.GET.get('species', '')).strip()
         if not species_name:
-            return JsonResponse({'error': 'Species name required'}, status=400)
+            offset, limit = _parse_gallery_pagination(request)
+            payload = _species_list_payload('plants', offset=offset, limit=limit or 30)
+            return JsonResponse(payload, json_dumps_params={'allow_nan': False})
         detail = _sanitize_for_json(_get_species_detail(species_name, 'plants'))
+        if isinstance(detail, dict) and detail.get('error'):
+            return JsonResponse(detail, status=404, json_dumps_params={'allow_nan': False})
         return JsonResponse(detail, json_dumps_params={'allow_nan': False})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
@@ -2618,12 +3144,16 @@ def _get_species_photos_generic(request, category):
         
         offset, limit = _parse_gallery_pagination(request)
         
-        # Build photo data
+        # Build photo data (deduplicate by occurrence URL to avoid repeated cards)
         photos = []
+        seen = set()
         for _, row in species_data.iterrows():
             occurrence_url = str(row.get('occurrenceID', ''))
             if not occurrence_url.startswith('http'):
                 continue
+            if occurrence_url in seen:
+                continue
+            seen.add(occurrence_url)
             
             title = str(row.get('scientificName', 'Unknown'))
             subtitle = str(row.get('locality', 'Koyna Region'))
@@ -2687,12 +3217,28 @@ _labeled_df_cache = {}
 _labeled_df_lock = threading.Lock()
 
 def _get_labeled_df(n_clusters=8, category='animals'):
+    perf_start = perf_counter()
+    _lazy_import_ml()
+    if StandardScaler is None or KMeans is None:
+        raise RuntimeError('Clustering dependencies are unavailable.')
+
+    from django.core.cache import cache as django_cache
+
     cache_key = f'{category}_{n_clusters}'
     with _labeled_df_lock:
         if cache_key in _labeled_df_cache:
+            logger.info('Labeled DF cache hit (memory) for %s/%s in %.3fs', category, n_clusters, perf_counter() - perf_start)
             return _labeled_df_cache[cache_key]
+
+    django_cache_key = f'clustering:labeled_df:{category}:{n_clusters}'
+    cached_df = django_cache.get(django_cache_key)
+    if cached_df is not None:
+        with _labeled_df_lock:
+            _labeled_df_cache[cache_key] = cached_df
+        logger.info('Labeled DF cache hit (django) for %s/%s in %.3fs', category, n_clusters, perf_counter() - perf_start)
+        return cached_df
     df = _load_category_data(category)
-    if df.empty:
+    if df is None or df.empty:
         return None
     df_clean = df.dropna(subset=['decimalLatitude', 'decimalLongitude']).copy()
     if len(df_clean) == 0:
@@ -2700,8 +3246,8 @@ def _get_labeled_df(n_clusters=8, category='animals'):
         
     # Crucial Fix: Downsample massive datasets (like birds) to ensure KMeans 
     # executes instantly on the first click (<0.1s) instead of timing out the map.
-    if len(df_clean) > 10000:
-        df_clean = df_clean.sample(n=10000, random_state=42)
+    if len(df_clean) > CLUSTERING_MAX_ROWS:
+        df_clean = df_clean.sample(n=CLUSTERING_MAX_ROWS, random_state=42)
 
     cm = {c: i for i, c in enumerate(df_clean['class'].unique())} if 'class' in df_clean.columns else {}
     om = {o: i for i, o in enumerate(df_clean['order'].unique())} if 'order' in df_clean.columns else {}
@@ -2712,6 +3258,8 @@ def _get_labeled_df(n_clusters=8, category='animals'):
     df_clean['cluster'] = KMeans(n_clusters=n_clusters, random_state=42, n_init=10).fit_predict(fs)
     with _labeled_df_lock:
         _labeled_df_cache[cache_key] = df_clean
+    django_cache.set(django_cache_key, df_clean, timeout=CLUSTERING_RESULT_CACHE_TTL_SECONDS)
+    logger.info('Labeled DF computed for %s/%s in %.3fs (rows=%s)', category, n_clusters, perf_counter() - perf_start, len(df_clean))
     return df_clean
 
 
@@ -2721,18 +3269,21 @@ def _get_labeled_df(n_clusters=8, category='animals'):
 @require_http_methods(["GET"])
 def get_cluster_heatmap(request):
     try:
-        ds = request.GET.get('dataset', 'animals').strip().lower()
-        if ds not in ('animals', 'birds', 'insects', 'plants'):
-            ds = 'animals'
-        n = max(3, min(20, int(request.GET.get('clusters', 8))))
-        df = _get_labeled_df(n, ds)
+        ds = _parse_dataset_param(request)
+        n = _parse_cluster_count(request)
+        df, elapsed, timed_out = _run_with_timeout(_get_labeled_df, n, ds)
+        if timed_out:
+            return _clustering_error('Clustering timed out', status=503)
         if df is None:
             return JsonResponse({'error': 'No data'}, status=400)
         pts = [[round(float(r.decimalLatitude), 5), round(float(r.decimalLongitude), 5), int(r.cluster)]
                for r in df[['decimalLatitude', 'decimalLongitude', 'cluster']].itertuples()]
+        logger.info('get_cluster_heatmap served in %.3fs', elapsed)
         return JsonResponse({'points': pts, 'total': len(pts), 'n_clusters': n})
+    except ValueError as e:
+        return _clustering_error(str(e), status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return _clustering_error(str(e), status=500)
 
 
 # =============================================================================
@@ -2741,12 +3292,12 @@ def get_cluster_heatmap(request):
 @require_http_methods(["GET"])
 def get_cluster_details(request):
     try:
-        ds = request.GET.get('dataset', 'animals').strip().lower()
-        if ds not in ('animals', 'birds', 'insects', 'plants'):
-            ds = 'animals'
-        n = max(3, min(20, int(request.GET.get('clusters', 8))))
-        cid = int(request.GET.get('cluster_id', 0))
-        df = _get_labeled_df(n, ds)
+        ds = _parse_dataset_param(request)
+        n = _parse_cluster_count(request)
+        cid = _parse_cluster_id(request)
+        df, elapsed, timed_out = _run_with_timeout(_get_labeled_df, n, ds)
+        if timed_out:
+            return _clustering_error('Clustering timed out', status=503)
         if df is None:
             return JsonResponse({'error': 'No data'}, status=400)
         cdf = df[df['cluster'] == cid]
@@ -2801,12 +3352,15 @@ def get_cluster_details(request):
         if 'family' in cdf.columns:
             fv = cdf['family'].dropna().value_counts()
             df_fam = str(fv.index[0]) if len(fv) else ''
+        logger.info('get_cluster_details served in %.3fs', elapsed)
         return JsonResponse({'clusters': {str(cid): {
             'species': species_list, 'species_count': len(species_list),
             'total_obs': len(cdf), 'class_breakdown': cb, 'dominant_family': df_fam,
         }}})
+    except ValueError as e:
+        return _clustering_error(str(e), status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return _clustering_error(str(e), status=500)
 
 
 # =============================================================================
@@ -2825,8 +3379,16 @@ def get_inat_photos(request):
         results, to_fetch = {}, []
         with _inat_photo_lock:
             for oid in obs_ids:
-                if oid in _inat_photo_cache: results[oid] = _inat_photo_cache[oid]
-                else: to_fetch.append(oid)
+                cached_url = _inat_photo_cache.get(oid)
+                if cached_url:
+                    results[oid] = cached_url
+                    continue
+                db_cached = resolve_cached_image(None, cache_key=f'obs:{oid}', occurrence_url=f'https://www.inaturalist.org/observations/{oid}')
+                if db_cached:
+                    results[oid] = db_cached
+                    _inat_photo_cache[oid] = db_cached
+                else:
+                    to_fetch.append(oid)
         def _fetch(obs_id):
             try:
                 req = Request(f'https://api.inaturalist.org/v1/observations/{obs_id}?fields=photos',
@@ -2836,7 +3398,13 @@ def get_inat_photos(request):
                 photos = data.get('results', [{}])[0].get('photos', [])
                 if photos:
                     url = (photos[0].get('url') or '').replace('/square.', '/medium.')
-                    return obs_id, url if url else None
+                    cached = resolve_cached_image(
+                        url,
+                        cache_key=f'obs:{obs_id}',
+                        occurrence_url=f'https://www.inaturalist.org/observations/{obs_id}',
+                        source='inat-api',
+                    )
+                    return obs_id, cached or url if url else None
             except Exception: pass
             return obs_id, None
         if to_fetch:
@@ -2853,12 +3421,13 @@ def get_inat_photos(request):
 def get_cluster_photos(request):
     """API: Get a collection of photos for a specific cluster."""
     try:
-        ds = request.GET.get('dataset', 'animals').strip().lower()
-        if ds not in ('animals', 'birds', 'insects', 'plants'): ds = 'animals'
-        n = max(3, min(20, int(request.GET.get('clusters', 8))))
-        cid = int(request.GET.get('cluster_id', 0))
-        
-        df = _get_labeled_df(n, ds)
+        ds = _parse_dataset_param(request)
+        n = _parse_cluster_count(request)
+        cid = _parse_cluster_id(request)
+
+        df, elapsed, timed_out = _run_with_timeout(_get_labeled_df, n, ds)
+        if timed_out:
+            return _clustering_error('Clustering timed out', status=503)
         if df is None:
             return JsonResponse({'photos': []})
             
@@ -2879,6 +3448,15 @@ def get_cluster_photos(request):
         results = []
         def _fetch(obs_id):
             try:
+                cache_key = f'cluster:{ds}:{cid}:{obs_id}'
+                cached_url = resolve_cached_image(None, cache_key=cache_key, occurrence_url=f'https://www.inaturalist.org/observations/{obs_id}')
+                if cached_url:
+                    return {
+                        'url': cached_url,
+                        'obs_id': obs_id,
+                        'species': 'Unknown',
+                        'common_name': '',
+                    }
                 req = Request(f'https://api.inaturalist.org/v1/observations/{obs_id}?fields=photos,taxon',
                                headers={'User-Agent': 'KoynaWildlifeApp/1.0'})
                 with urlopen(req, timeout=10) as resp:
@@ -2888,8 +3466,16 @@ def get_cluster_photos(request):
                 taxon = res.get('taxon', {})
                 if photos:
                     url = (photos[0].get('url') or '').replace('/square.', '/medium.')
+                    cached_url = resolve_cached_image(
+                        url,
+                        cache_key=cache_key,
+                        occurrence_url=f'https://www.inaturalist.org/observations/{obs_id}',
+                        species_name=str(taxon.get('name', 'Unknown') or 'Unknown'),
+                        category=ds,
+                        source='inat-api',
+                    )
                     return {
-                        'url': url,
+                        'url': cached_url or url,
                         'obs_id': obs_id,
                         'species': taxon.get('name', 'Unknown'),
                         'common_name': taxon.get('preferred_common_name', '')
@@ -2903,10 +3489,12 @@ def get_cluster_photos(request):
                 for f in as_completed(futures):
                     res = f.result()
                     if res: results.append(res)
-        
+        logger.info('get_cluster_photos served in %.3fs', elapsed)
         return JsonResponse({'photos': results, 'count': len(results)})
+    except ValueError as e:
+        return _clustering_error(str(e), status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return _clustering_error(str(e), status=500)
 
 
 # =============================================================================
@@ -2951,20 +3539,24 @@ def get_species_observations(request):
 @require_http_methods(["GET"])
 def get_cluster_timeline(request):
     try:
-        ds = request.GET.get('dataset', 'animals').strip().lower()
-        if ds not in ('animals', 'birds', 'insects', 'plants'): ds = 'animals'
-        n   = max(3, min(20, int(request.GET.get('clusters', 8))))
-        cid = int(request.GET.get('cluster_id', 0))
-        df  = _get_labeled_df(n, ds)
+        ds = _parse_dataset_param(request)
+        n = _parse_cluster_count(request)
+        cid = _parse_cluster_id(request)
+        df, elapsed, timed_out = _run_with_timeout(_get_labeled_df, n, ds)
+        if timed_out:
+            return _clustering_error('Clustering timed out', status=503)
         if df is None: return JsonResponse({'timeline': [], 'total': 0})
         cdf = df[df['cluster'] == cid]
         tl  = []
         if 'year' in cdf.columns:
             yc = cdf.groupby('year').size().reset_index(name='count').sort_values('year')
             tl = [{'year': int(r.year), 'count': int(r.count)} for r in yc.itertuples()]
+        logger.info('get_cluster_timeline served in %.3fs', elapsed)
         return JsonResponse({'timeline': tl, 'total': len(cdf)})
+    except ValueError as e:
+        return _clustering_error(str(e), status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return _clustering_error(str(e), status=500)
 
 
 # =============================================================================
@@ -2973,8 +3565,7 @@ def get_cluster_timeline(request):
 @require_http_methods(["GET"])
 def get_seasonal_activity(request):
     try:
-        ds = request.GET.get('dataset', 'animals').strip().lower()
-        if ds not in ('animals', 'birds', 'insects', 'plants'): ds = 'animals'
+        ds = _parse_dataset_param(request)
         df = _load_category_data(ds)
         months = {i: 0 for i in range(1, 13)}
         MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -2988,9 +3579,11 @@ def get_seasonal_activity(request):
             for m, c in mc.items():
                 if 1 <= m <= 12: months[int(m)] = int(c)
         result = [{'month': i, 'name': MONTH_NAMES[i-1], 'count': months[i]} for i in range(1, 13)]
-        return JsonResponse({'seasonal': result, 'dataset': ds})
+        return JsonResponse({'seasonal': result, 'dataset': ds, 'success': True})
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
 # =============================================================================
@@ -2999,12 +3592,11 @@ def get_seasonal_activity(request):
 @require_http_methods(["GET"])
 def get_conservation_alerts(request):
     try:
-        ds = request.GET.get('dataset', 'animals').strip().lower()
-        if ds not in ('animals', 'birds', 'insects', 'plants'): ds = 'animals'
+        ds = _parse_dataset_param(request)
         df = _load_category_data(ds)
         alerts = []
         if 'year' not in df.columns or 'scientificName' not in df.columns:
-            return JsonResponse({'alerts': []})
+            return JsonResponse({'alerts': [], 'dataset': ds, 'total': 0, 'success': True})
         for sp, rows in df.groupby('scientificName'):
             if len(rows) < 5: continue
             recent = len(rows[rows['year'] >= 2020])
@@ -3023,9 +3615,11 @@ def get_conservation_alerts(request):
                     'severity': 'critical' if drop_pct >= 70 else 'high' if drop_pct >= 50 else 'medium',
                 })
         alerts.sort(key=lambda x: x['dropPercent'], reverse=True)
-        return JsonResponse({'alerts': alerts, 'total': len(alerts), 'dataset': ds})
+        return JsonResponse({'alerts': alerts, 'total': len(alerts), 'dataset': ds, 'success': True})
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
 # =============================================================================
@@ -3034,11 +3628,10 @@ def get_conservation_alerts(request):
 @require_http_methods(["GET"])
 def get_top_observers(request):
     try:
-        ds = request.GET.get('dataset', 'animals').strip().lower()
-        if ds not in ('animals', 'birds', 'insects', 'plants'): ds = 'animals'
+        ds = _parse_dataset_param(request)
         df = _load_category_data(ds)
         if 'recordedBy' not in df.columns:
-            return JsonResponse({'observers': []})
+            return JsonResponse({'observers': [], 'dataset': ds, 'success': True})
         vc = df['recordedBy'].dropna().str.strip().value_counts().head(20)
         sp_per_obs = df.groupby('recordedBy')['scientificName'].nunique() if 'scientificName' in df.columns else {}
         observers = []
@@ -3047,9 +3640,11 @@ def get_top_observers(request):
             if not n or n.lower() in ('', 'nan', 'unknown'): continue
             sp_count = int(sp_per_obs.get(name, 0)) if hasattr(sp_per_obs, 'get') else 0
             observers.append({'name': n, 'observations': int(cnt), 'species': sp_count})
-        return JsonResponse({'observers': observers, 'dataset': ds})
+        return JsonResponse({'observers': observers, 'dataset': ds, 'success': True})
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
 # =============================================================================
@@ -3110,9 +3705,10 @@ def get_dashboard_stats(request):
             'totalRecords': sum(v['total'] for v in out.values()),
             'totalObservers': len(all_observers),
             'totalAlerts': total_alerts,
+            'success': True,
         })
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
 # =============================================================================

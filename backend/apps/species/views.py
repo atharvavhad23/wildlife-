@@ -6,6 +6,7 @@ from mongoengine.queryset.visitor import Q
 from apps.common.pagination import build_paginated_response, parse_pagination_params
 from apps.common.cache_utils import safe_cache_get, safe_cache_set
 from apps.observations.models import Observation
+from apps.common.image_cache import resolve_cached_image
 from apps.species.models import Species
 
 
@@ -165,15 +166,22 @@ def species_photos(request, species_id):
         if species is None:
             return JsonResponse({'error': 'Species not found.'}, status=404)
 
-        queryset = Observation.objects(species=species.id).only('image_url', 'source').order_by('-created_at').limit(50)
+        queryset = Observation.objects(species=species.id).only('image_url', 'image_source_url', 'image_local_path', 'source').order_by('-created_at').limit(50)
         results = []
         seen = set()
 
         for observation in queryset:
-            image_url = _normalize_text(observation.image_url)
-            if image_url and image_url not in seen:
-                seen.add(image_url)
-                results.append({'image_url': image_url, 'source': observation.source})
+            raw_image_url = _normalize_text(getattr(observation, 'image_local_path', '') or observation.image_url or observation.image_source_url)
+            resolved_url = resolve_cached_image(
+                raw_image_url,
+                cache_key=f'observation:{observation.id}',
+                species_name=species.scientific_name,
+                category=species.category,
+                source=observation.source,
+            ) or raw_image_url
+            if resolved_url and resolved_url not in seen:
+                seen.add(resolved_url)
+                results.append({'image_url': resolved_url, 'source': observation.source})
 
         if not results:
             slug = species.scientific_name.replace(' ', '+') if species.scientific_name else species.name.replace(' ', '+')

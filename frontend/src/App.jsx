@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { PageTransition } from './components/PageTransition'
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
@@ -21,6 +22,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import ToastContainer from './components/Toast'
 import { PageLoader } from './components/Skeleton'
+import ErrorBoundary from './components/ErrorBoundary'
 
 function RequireAuth({ children }) {
   const { user, authReady } = useAuth()
@@ -112,11 +114,11 @@ function AppShell() {
   }, [location])
 
   return (
-    <>
+    <ErrorBoundary>
       {showNavbar && <Navbar />}
       <AnimatedRoutes />
       <ToastContainer />
-    </>
+    </ErrorBoundary>
   )
 }
 

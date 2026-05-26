@@ -69,13 +69,33 @@ export default function Dashboard() {
   const [observers, setObservers] = useState([])
   const [loading, setLoading] = useState(true)
   const [switching, setSwitching] = useState(false)
+  const [categoryError, setCategoryError] = useState('')
   const [activeDs, setActiveDs] = useState('animals')
+
+  const fetchJsonSafe = useCallback(async (url, timeoutMs = 12000) => {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      const res = await fetch(url, { signal: controller.signal })
+      const text = await res.text()
+      let data = null
+      try {
+        data = text ? JSON.parse(text) : {}
+      } catch {
+        throw new Error('Invalid JSON response')
+      }
+      if (!res.ok || data?.success === false || data?.error) {
+        throw new Error(data?.error || `Request failed (${res.status})`)
+      }
+      return data
+    } finally {
+      clearTimeout(timer)
+    }
+  }, [])
 
   const fetchGlobalStats = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard-stats/')
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
+      const data = await fetchJsonSafe('/api/dashboard-stats/')
       setStatsData(data)
     } catch (e) {
       console.error('Global stats error:', e)
@@ -83,29 +103,32 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [fetchJsonSafe, toast])
 
   const fetchCategoryData = useCallback(async () => {
     setSwitching(true)
+    setCategoryError('')
     try {
-      const [seasonalRes, alertsRes, observersRes] = await Promise.all([
-        fetch(`/api/seasonal-activity/?dataset=${activeDs}`),
-        fetch(`/api/conservation-alerts/?dataset=${activeDs}`),
-        fetch(`/api/top-observers/?dataset=${activeDs}`),
+      const [seasonalData, alertsData, observersData] = await Promise.all([
+        fetchJsonSafe(`/api/seasonal-activity/?dataset=${activeDs}`),
+        fetchJsonSafe(`/api/conservation-alerts/?dataset=${activeDs}`),
+        fetchJsonSafe(`/api/top-observers/?dataset=${activeDs}`),
       ])
-      const seasonalData = await seasonalRes.json()
-      const alertsData = await alertsRes.json()
-      const observersData = await observersRes.json()
-      
+
       setSeasonal(seasonalData.seasonal || [])
       setAlerts(alertsData.alerts || [])
       setObservers(observersData.observers || [])
     } catch (e) {
       console.error('Category data error:', e)
+      setCategoryError(e?.message || 'Failed to load dataset insights')
+      setSeasonal([])
+      setAlerts([])
+      setObservers([])
+      toast.error('Failed to load seasonal/alerts/observer data')
     } finally {
       setSwitching(false)
     }
-  }, [activeDs])
+  }, [activeDs, fetchJsonSafe, toast])
 
   useEffect(() => { fetchGlobalStats() }, [fetchGlobalStats])
   useEffect(() => { fetchCategoryData() }, [fetchCategoryData])
@@ -273,6 +296,16 @@ export default function Dashboard() {
             <div className="h-[300px] w-full">
               {loading || switching ? (
                 <div className="h-full skeleton-pulse rounded-xl" />
+              ) : categoryError ? (
+                <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
+                  <p className="text-sm text-red-400">{categoryError}</p>
+                  <button
+                    onClick={fetchCategoryData}
+                    className="px-3 py-1.5 rounded-md text-xs font-bold bg-red-500/15 text-red-300 border border-red-400/30 hover:bg-red-500/25 transition-all"
+                  >
+                    Retry
+                  </button>
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={seasonal}>

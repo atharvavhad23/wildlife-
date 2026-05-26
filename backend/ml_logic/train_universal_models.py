@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+from pathlib import Path
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
@@ -36,7 +37,16 @@ def calculate_accuracy(y_true, y_pred, base_acc=94.0):
 def train_model_for_category(category_name, csv_file, target_col, prefix):
     print(f"\n{'='*60}\nTRAINING UNIVERSAL MODEL: {category_name.upper()}\n{'='*60}")
     
-    df = pd.read_csv(csv_file)
+    # Robust path resolution: check local then parent
+    csv_path = Path(csv_file)
+    if not csv_path.exists():
+        parent_path = Path("..") / csv_file
+        if parent_path.exists():
+            csv_path = parent_path
+        else:
+            raise FileNotFoundError(f"Could not find {csv_file} in current or parent directory.")
+
+    df = pd.read_csv(csv_path)
     df = ensure_environmental_features(df)
     
     # Ensure all universal features exist

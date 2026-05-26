@@ -29,6 +29,9 @@ class Observation(Document):
     observed_at = DateTimeField(required=True, default=datetime.utcnow)
     source = StringField(required=True)
     image_url = URLField()
+    image_source_url = URLField()
+    image_local_path = StringField()
+    image_cached_at = DateTimeField()
     created_at = DateTimeField(default=datetime.utcnow)
 
     meta = {

@@ -98,10 +98,10 @@ export function usePrediction(featuresUrl, predictUrl) {
         body: JSON.stringify(payload),
       })
       const data = await res.json()
-      if (data.status === 'success') {
+      if (res.ok && (data?.success === true || data?.status === 'success')) {
         setResult({ ...data, mode })
       } else {
-        setError(data.error || 'Prediction failed.')
+        setError(data?.error || data?.message || 'Prediction failed.')
       }
     } catch (e) {
       setError('Network error: ' + e.message)

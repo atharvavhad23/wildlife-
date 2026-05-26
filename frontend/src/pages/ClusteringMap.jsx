@@ -56,6 +56,12 @@ function getConvexHull(points) {
 function crossProduct(a, b, c) { return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) }
 
 function ClusterDetailView({ id, details, category, timeline, loading, photos, loadingPhotos, color }) {
+  const resolvePhotoSrc = (url) => {
+    if (!url) return null
+    if (url.startsWith('/media/') || url.startsWith('/static/')) return url
+    return `/photo-proxy/?url=${encodeURIComponent(url)}`
+  }
+
   if (loading) return (
     <div className="py-8 flex items-center justify-center">
       <div className="w-6 h-6 rounded-full border-2 border-t-green-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
@@ -106,9 +112,17 @@ function ClusterDetailView({ id, details, category, timeline, loading, photos, l
             {photos.slice(0, 6).map((p, idx) => (
               <div key={idx} className="aspect-square bg-white/5 rounded-lg overflow-hidden group relative">
                 <img
-                  src={`/photo-proxy/?url=${encodeURIComponent(p.url)}`}
+                  src={resolvePhotoSrc(p.url)}
                   alt={p.species}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  onError={(e) => {
+                    if (e.currentTarget.dataset.fallbacked === '1') {
+                      e.currentTarget.style.display = 'none'
+                      return
+                    }
+                    e.currentTarget.dataset.fallbacked = '1'
+                    e.currentTarget.src = '/images/no-image.jpg'
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-1.5">
                   <div className="text-[8px] text-white font-semibold truncate leading-tight">{p.common_name || p.species}</div>
@@ -173,6 +187,7 @@ export default function ClusteringMap() {
     setLoading(true); setError(null)
     try {
       const res = await fetch(`/api/cluster-heatmap/?dataset=${cat}&clusters=${n}`)
+      if (!res.ok) throw new Error(`Heatmap request failed (${res.status})`)
       const d = await res.json()
       if (d.error) throw new Error(d.error)
       setData(d)
@@ -185,22 +200,39 @@ export default function ClusteringMap() {
   const fetchDetails = async (id, setFn) => {
     try {
       const res = await fetch(`/api/cluster-details/?dataset=${category}&clusters=${nClusters}&cluster_id=${id}`)
+      if (!res.ok) throw new Error(`Cluster details failed (${res.status})`)
       const d = await res.json()
-      setFn(d.clusters[id])
+      if (d?.error) throw new Error(d.error)
+      const details = d?.clusters?.[id]
+      if (!details) throw new Error('Cluster details unavailable')
+      setFn(details)
       const isPrimary = setFn === setClusterDetails
       const setPhotoFn = isPrimary ? setPhotosA : setPhotosB
       const setLoadingPhotoFn = isPrimary ? setLoadingPhotosA : setLoadingPhotosB
       if (isPrimary) {
         const tRes = await fetch(`/api/cluster-timeline/?dataset=${category}&clusters=${nClusters}&cluster_id=${id}`)
+        if (!tRes.ok) throw new Error(`Timeline request failed (${tRes.status})`)
         const tD = await tRes.json()
-        setTimeline(tD.timeline)
+        if (tD?.error) throw new Error(tD.error)
+        setTimeline(Array.isArray(tD.timeline) ? tD.timeline : [])
       }
       setLoadingPhotoFn(true)
       fetch(`/api/cluster-photos/?dataset=${category}&clusters=${nClusters}&cluster_id=${id}`)
-        .then(r => r.json())
-        .then(data => setPhotoFn(data.photos || []))
+        .then(r => {
+          if (!r.ok) throw new Error(`Cluster photos failed (${r.status})`)
+          return r.json()
+        })
+        .then(data => setPhotoFn(Array.isArray(data.photos) ? data.photos : []))
+        .catch((e) => {
+          setPhotoFn([])
+          setError(e?.message || 'Failed to load cluster photos')
+        })
         .finally(() => setLoadingPhotoFn(false))
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      setError(e?.message || 'Failed to load cluster details')
+      setFn(null)
+      if (setFn === setClusterDetails) setTimeline([])
+    }
   }
 
   useEffect(() => {

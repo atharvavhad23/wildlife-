@@ -1,6 +1,8 @@
 from django.contrib import admin
-from django.urls import include, path, re_path
-from apps.predictions.views import prediction_history_view
+from django.conf import settings
+from django.conf.urls.static import static
+from django.urls import path, re_path
+from django.http import JsonResponse
 
 # Lazy-load predictor views; if ML stack is broken, create dummy views
 try:
@@ -70,12 +72,6 @@ except (ImportError, SystemError):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/auth/', include('apps.users.urls')),
-    path('api/species/', include('apps.species.urls')),
-    path('api/observations/', include('apps.observations.urls')),
-    path('api/predict/', include('apps.predictions.urls')),
-    path('api/predictions/history/', prediction_history_view, name='prediction-history-direct'),
-    path('api/', include('apps.analytics.urls')),
     path('auth/send-otp/', views.send_email_otp, name='send_email_otp'),
     path('auth/verify-otp/', views.verify_email_otp, name='verify_email_otp'),
     path('', views.index, name='home'),
@@ -137,6 +133,12 @@ urlpatterns = [
     # Wildlife Intelligence Dashboard
     path('wildlife/dashboard/',       views.wildlife_dashboard,       name='wildlife_dashboard'),
 
+    # API fallback: unknown API routes should never return SPA HTML.
+    re_path(r'^api/.*$', lambda request: JsonResponse({'success': False, 'error': 'Not found'}, status=404)),
+
     # Catch-all for SPA routes (MUST be last)
     re_path(r'^.*$', views.index, name='index'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
